@@ -129,12 +129,7 @@ const saveToWorldbook = async () => {
     const currentGameTime = getCurrentGameTime();
 
     // 直接使用世界书服务保存
-    await WorldbookService.createEventStoryRecord(
-      props.event.id,
-      props.event.name,
-      eventContent,
-      currentGameTime,
-    );
+    await WorldbookService.createEventStoryRecord(props.event.id, props.event.name, eventContent, currentGameTime);
 
     console.log(`事件故事已保存到世界书: ${props.event.name}`);
   } catch (error) {
