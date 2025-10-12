@@ -41,7 +41,7 @@ export type CharacterRating = 'S' | 'A' | 'B' | 'C' | 'D';
 export type GoblinType = '普通哥布林' | '哥布林战士' | '哥布林萨满' | '哥布林圣骑士';
 
 /** 种族类型枚举 */
-export type RaceType = '人类' | '狐族' | '永恒精灵' | '黑暗精灵';
+export type RaceType = '人类' | '狐族' | '永恒精灵' | '黑暗精灵' | '哥布林' | '亡灵' | '天使' | '魔族';
 
 /** 出身等级枚举 */
 export type BackgroundType = '平民' | '贵族' | '王族';
@@ -226,7 +226,7 @@ export interface Character {
   /** 出身等级 */
   background: BackgroundType;
   /** 单位类型（用于战斗系统） */
-  unitType?: 'physical' | 'magical' | 'hybrid' | 'defensive' | 'agile';
+  unitType?: 'physical' | 'magical';
   /** 可带领的种族（用于敌方单位队长） */
   canLeadRaces?: RaceType[];
   /** 性经验 */

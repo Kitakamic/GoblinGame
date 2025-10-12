@@ -351,11 +351,11 @@ export class CharacterAttributeCalculator {
    * @returns 评级
    */
   private static scoreToRating(score: number): CharacterRating {
-    if (score >= 90) return 'S'; // 90分以上为S级（提高门槛）
-    if (score >= 75) return 'A'; // 75-89分为A级（提高门槛）
-    if (score >= 60) return 'B'; // 60-74分为B级（提高门槛）
-    if (score >= 45) return 'C'; // 45-59分为C级（提高门槛）
-    return 'D'; // 45分以下为D级
+    if (score >= 80) return 'S'; // 85分以上为S级（约3%概率）
+    if (score >= 70) return 'A'; // 75-84分为A级（约12%概率）
+    if (score >= 60) return 'B'; // 60-74分为B级（约25%概率）
+    if (score >= 45) return 'C'; // 45-59分为C级（约35%概率）
+    return 'D'; // 45分以下为D级（约25%概率）
   }
 
   // ==================== 战斗属性计算方法 ====================
@@ -535,10 +535,7 @@ export class CharacterAttributeCalculator {
    * @param race 种族
    * @returns 单位类型
    */
-  private static determineUnitType(
-    identity: string,
-    race: string,
-  ): 'physical' | 'magical' | 'hybrid' | 'defensive' | 'agile' {
+  private static determineUnitType(identity: string, race: string): 'physical' | 'magical' {
     const identityLower = identity.toLowerCase();
 
     // 根据身份关键词判断单位类型
@@ -548,54 +545,16 @@ export class CharacterAttributeCalculator {
       identityLower.includes('术士') ||
       identityLower.includes('萨满') ||
       identityLower.includes('牧师') ||
-      identityLower.includes('mage') ||
-      identityLower.includes('wizard') ||
-      identityLower.includes('sorcerer')
+      identityLower.includes('祭司') ||
+      identityLower.includes('元素使') ||
+      identityLower.includes('血法师')
     ) {
       return 'magical';
-    }
-
-    if (
-      identityLower.includes('刺客') ||
-      identityLower.includes('盗贼') ||
-      identityLower.includes('游侠') ||
-      identityLower.includes('弓手') ||
-      identityLower.includes('assassin') ||
-      identityLower.includes('rogue') ||
-      identityLower.includes('archer') ||
-      identityLower.includes('ranger')
-    ) {
-      return 'agile';
-    }
-
-    if (
-      identityLower.includes('守卫') ||
-      identityLower.includes('盾') ||
-      identityLower.includes('坦克') ||
-      identityLower.includes('guard') ||
-      identityLower.includes('defender') ||
-      identityLower.includes('tank')
-    ) {
-      return 'defensive';
-    }
-
-    if (
-      identityLower.includes('圣骑士') ||
-      identityLower.includes('战法师') ||
-      identityLower.includes('魔剑士') ||
-      identityLower.includes('paladin') ||
-      identityLower.includes('spellsword')
-    ) {
-      return 'hybrid';
     }
 
     // 根据种族特性判断
     if (race === '永恒精灵' || race === '黑暗精灵') {
       return 'magical';
-    }
-
-    if (race === '狐族') {
-      return 'agile';
     }
 
     // 默认为物理类型
@@ -773,7 +732,7 @@ export class CharacterAttributeCalculator {
         age: parsedData.age,
         country: parsedData.country,
         background: parsedData.background,
-        unitType: this.determineUnitType(parsedData.identity, parsedData.race),
+        unitType: parsedData.unitType || this.determineUnitType(parsedData.identity, parsedData.race),
         canLeadRaces: [parsedData.race as any], // AI生成的英雄可以带领同种族
         sexExperience: parsedData.hiddenTraits?.sexExperience || '未知',
         sensitivePoints,

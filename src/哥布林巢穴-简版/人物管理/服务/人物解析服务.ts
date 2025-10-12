@@ -70,6 +70,7 @@ export interface ParsedCharacterData {
   background: BackgroundType;
   personality: string[];
   canCombat: boolean;
+  unitType?: 'physical' | 'magical';
 
   // 外貌数据
   appearance: ParsedAppearance;
@@ -276,6 +277,7 @@ export class CharacterParser {
         background: this.validateBackground(data.基础信息.出身),
         personality: this.validatePersonality(data.基础信息.性格),
         canCombat: this.validateCanCombat(data.基础信息.可战斗),
+        unitType: this.validateUnitType(data.基础信息.单位类型),
 
         // 外貌数据（严格验证）
         appearance: {
@@ -470,5 +472,31 @@ export class CharacterParser {
     }
 
     return canCombat;
+  }
+
+  /**
+   * 验证单位类型
+   * @param unitType 单位类型
+   * @returns 验证后的单位类型
+   * @throws Error 如果单位类型无效
+   */
+  private static validateUnitType(unitType: any): 'physical' | 'magical' {
+    if (unitType === undefined || unitType === null) {
+      // 如果AI没有提供单位类型，默认为physical
+      console.log('⚠️ [人物解析] 单位类型字段缺失，默认为physical');
+      return 'physical';
+    }
+
+    if (typeof unitType !== 'string') {
+      throw new Error(`单位类型字段无效：${unitType}，必须是：physical/magical`);
+    }
+
+    const validTypes = ['physical', 'magical'];
+    if (!validTypes.includes(unitType)) {
+      throw new Error(`单位类型字段无效：${unitType}，必须是：physical/magical`);
+    }
+
+    console.log(`✅ [人物解析] 单位类型验证通过: ${unitType}`);
+    return unitType as 'physical' | 'magical';
   }
 }

@@ -94,15 +94,12 @@
                 >
                   📝 生成战斗总结
                 </button>
-              </div>
-
-              <!-- 胜利界面 -->
-              <div v-if="battleResult?.victory" class="victory-section">
-                <button class="harvest-btn" @click="showRewards">🎁 开始收获</button>
+                <!-- 胜利时显示收获按钮 -->
+                <button v-if="battleResult?.victory" class="harvest-btn" @click="showRewards">🎁 开始收获</button>
               </div>
 
               <!-- 失败界面 -->
-              <div v-else class="defeat-section">
+              <div v-if="!battleResult?.victory" class="defeat-section">
                 <div class="defeat-actions">
                   <button class="retreat-btn" @click="retreat">🏃 撤退</button>
                   <button class="retry-btn" @click="retryBattle">🔄 再来一次</button>
@@ -524,12 +521,6 @@ const getUnitAvatar = (unit: BattleUnit) => {
       return '⚔️';
     case 'magical':
       return '🔮';
-    case 'defensive':
-      return '🛡️';
-    case 'agile':
-      return '🏹';
-    case 'hybrid':
-      return '✨';
     default:
       return '👤';
   }
@@ -1565,7 +1556,7 @@ const initializeEnemyUnits = () => {
       {
         id: 'human_guard_1',
         name: '人类守卫',
-        type: 'defensive',
+        type: 'physical',
         level: 2,
         attributes: {
           attack: 6,
@@ -2091,6 +2082,23 @@ onMounted(() => {
   justify-content: center;
   align-items: center;
   flex-wrap: wrap;
+}
+
+@media (min-width: 769px) {
+  .battle-controls {
+    flex-wrap: nowrap;
+    gap: 0.8rem;
+  }
+
+  .dialogue-btn,
+  .manual-battle-btn,
+  .auto-battle-btn,
+  .retreat-btn {
+    min-width: 120px;
+    height: 44px;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+  }
 }
 
 .dialogue-btn,
@@ -2963,6 +2971,23 @@ onMounted(() => {
   margin-bottom: 1.5rem;
   width: 100%;
   order: -1; /* 确保在顶部 */
+  flex-wrap: wrap;
+}
+
+@media (min-width: 769px) {
+  .history-button-container {
+    flex-wrap: nowrap;
+    gap: 0.8rem;
+  }
+
+  .history-btn,
+  .summary-btn,
+  .harvest-btn {
+    min-width: 120px;
+    height: 44px;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+  }
 }
 
 /* 历史记录按钮样式 */
@@ -3326,56 +3351,48 @@ onMounted(() => {
   color: #ef4444;
 }
 
-/* 胜利界面样式 */
-.victory-section {
+/* 收获按钮样式 */
+.harvest-btn {
+  background: linear-gradient(135deg, #059669, #047857, #065f46);
+  border: 2px solid rgba(5, 150, 105, 0.8);
+  color: #ffffff;
+  padding: 0.8rem 1.5rem;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+  min-width: 140px;
+  height: 48px;
   display: flex;
-  justify-content: center;
   align-items: center;
-  padding: 0.3rem;
-  height: 100%;
+  justify-content: center;
 
-  .harvest-btn {
-    background: linear-gradient(135deg, #059669, #047857, #065f46);
-    border: 2px solid rgba(5, 150, 105, 0.8);
-    color: #ffffff;
-    padding: 0.8rem 1.5rem;
-    border-radius: 12px;
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: 700;
-    transition: all 0.3s ease;
-    white-space: nowrap;
-    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-    position: relative;
-    overflow: hidden;
-    min-width: 140px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+  }
 
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: left 0.5s ease;
-    }
+  &:hover {
+    background: linear-gradient(135deg, #047857, #065f46, #064e3b);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(5, 150, 105, 0.6);
+    border-color: rgba(5, 150, 105, 1);
+  }
 
-    &:hover {
-      background: linear-gradient(135deg, #047857, #065f46, #064e3b);
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 0 8px 25px rgba(5, 150, 105, 0.6);
-      border-color: rgba(5, 150, 105, 1);
-    }
-
-    &:hover::before {
-      left: 100%;
-    }
+  &:hover::before {
+    left: 100%;
   }
 }
 
@@ -3393,6 +3410,22 @@ onMounted(() => {
     gap: 0.6rem;
     justify-content: center;
     align-items: center;
+    flex-wrap: wrap;
+  }
+}
+
+@media (min-width: 769px) {
+  .defeat-section .defeat-actions {
+    flex-wrap: nowrap;
+    gap: 0.8rem;
+  }
+
+  .defeat-section .retreat-btn,
+  .defeat-section .retry-btn {
+    min-width: 120px;
+    height: 44px;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
   }
 
   .retreat-btn,

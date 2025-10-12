@@ -31,6 +31,9 @@ export class PictureResourceMappingService {
   private static instance: PictureResourceMappingService;
   private pictureResources: PictureResource[] = [];
 
+  // 已使用的图片ID记录（用于避免重复）
+  private usedPictureIds: Set<string> = new Set();
+
   // 图片URL前缀
   private static readonly IMAGE_URL_PREFIX = 'https://kitakamis.online/portraits/';
 
@@ -198,33 +201,156 @@ export class PictureResourceMappingService {
   }
 
   /**
-   * 随机选择一个匹配的图片资源
+   * 随机选择一个匹配的图片资源（先选职业，再选图片）
    * @param locationType 据点类型
    * @param race 种族
    * @returns 随机选择的图片资源，如果没有匹配的则返回null
    */
   public getRandomMatchingPictureResource(locationType: string, race: string): PictureResource | null {
-    console.log(`🎲 [随机选择] 开始随机选择图片资源...`);
+    console.log(`🎲 [随机选择] 开始随机选择图片资源（先选职业，再选图片）...`);
 
-    const matchingResources = this.getMatchingPictureResources(locationType, race);
+    // 第一步：根据据点类型获取允许的职业列表
+    const allowedClasses = this.LOCATION_TYPE_TO_CLASS_MAPPING[locationType as keyof LocationTypeToClassMapping] || [];
+    console.log(`🎯 [职业选择] 据点类型 "${locationType}" 对应的职业列表:`, allowedClasses);
 
-    if (matchingResources.length === 0) {
-      console.log(`❌ [随机选择] 没有匹配的图片资源，返回null`);
+    if (allowedClasses.length === 0) {
+      console.log(`❌ [职业选择] 据点类型 "${locationType}" 没有对应的职业`);
       return null;
     }
 
-    // 随机选择一个
-    const randomIndex = Math.floor(Math.random() * matchingResources.length);
-    const selectedResource = matchingResources[randomIndex];
+    // 第二步：随机选择一个职业
+    const randomClassIndex = Math.floor(Math.random() * allowedClasses.length);
+    const selectedClass = allowedClasses[randomClassIndex];
+    console.log(`🎲 [职业选择] 随机选择职业:`, {
+      候选职业数: allowedClasses.length,
+      随机索引: randomClassIndex,
+      选中职业: selectedClass,
+    });
 
-    console.log(`🎯 [随机选择] 随机选择结果:`);
-    console.log(`  - 候选数量: ${matchingResources.length}`);
-    console.log(`  - 随机索引: ${randomIndex}`);
-    console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
-    console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
-    console.log(`✅ [随机选择] 随机选择完成`);
+    // 第三步：根据种族+职业获取匹配的图片资源
+    const matchingResources = this.pictureResources.filter(
+      resource => resource.race === race && resource.class === selectedClass,
+    );
 
-    return selectedResource;
+    console.log(`🔍 [图片匹配] 种族 "${race}" + 职业 "${selectedClass}" 匹配结果:`, {
+      匹配图片数量: matchingResources.length,
+      图片ID范围:
+        matchingResources.length > 0
+          ? `${matchingResources[0].id} - ${matchingResources[matchingResources.length - 1].id}`
+          : '无',
+      遍历状态: '已完成',
+    });
+
+    if (matchingResources.length === 0) {
+      console.log(`❌ [图片匹配] 没有找到匹配的图片资源`);
+      return null;
+    }
+
+    // 第四步：从匹配的图片中筛选未使用的
+    const unusedMatchingResources = matchingResources.filter(resource => !this.usedPictureIds.has(resource.id));
+
+    if (unusedMatchingResources.length > 0) {
+      // 第五步：从未使用的图片中随机选择一个
+      const randomPictureIndex = Math.floor(Math.random() * unusedMatchingResources.length);
+      const selectedResource = unusedMatchingResources[randomPictureIndex];
+
+      // 标记为已使用
+      this.usedPictureIds.add(selectedResource.id);
+
+      console.log(`🎯 [图片选择] 第一优先级选择结果:`);
+      console.log(`  - 匹配图片总数: ${matchingResources.length}`);
+      console.log(`  - 未使用图片数: ${unusedMatchingResources.length}`);
+      console.log(`  - 随机索引: ${randomPictureIndex}`);
+      console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
+      console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+      console.log(`✅ [图片选择] 第一优先级选择完成`);
+
+      return selectedResource;
+    }
+
+    console.log(`⚠️ [图片选择] 该职业的所有图片都已使用，尝试降级策略...`);
+
+    // 降级策略：尝试其他职业
+    const otherClasses = allowedClasses.filter(className => className !== selectedClass);
+    console.log(`🔄 [降级策略] 开始尝试其他职业:`, otherClasses);
+
+    for (const className of otherClasses) {
+      const otherMatchingResources = this.pictureResources.filter(
+        resource => resource.race === race && resource.class === className,
+      );
+      const unusedOtherResources = otherMatchingResources.filter(resource => !this.usedPictureIds.has(resource.id));
+
+      console.log(`🔍 [降级策略] 尝试职业 "${className}":`, {
+        匹配图片数: otherMatchingResources.length,
+        未使用图片数: unusedOtherResources.length,
+      });
+
+      if (unusedOtherResources.length > 0) {
+        const randomIndex = Math.floor(Math.random() * unusedOtherResources.length);
+        const selectedResource = unusedOtherResources[randomIndex];
+
+        this.usedPictureIds.add(selectedResource.id);
+
+        console.log(`🎯 [图片选择] 降级策略选择结果:`);
+        console.log(`  - 降级职业: ${className}`);
+        console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
+        console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+        console.log(`✅ [图片选择] 降级策略选择完成`);
+
+        return selectedResource;
+      }
+    }
+
+    console.log(`⚠️ [图片选择] 所有职业的图片都已使用，尝试同种族其他职业...`);
+
+    // 进一步降级：同种族的其他职业
+    const allSameRaceResources = this.pictureResources.filter(resource => resource.race === race);
+    const unusedSameRaceResources = allSameRaceResources.filter(resource => !this.usedPictureIds.has(resource.id));
+
+    console.log(`🔍 [同种族降级] 种族 "${race}" 所有职业匹配结果:`, {
+      总图片数: allSameRaceResources.length,
+      未使用图片数: unusedSameRaceResources.length,
+      遍历状态: '已完成',
+    });
+
+    if (unusedSameRaceResources.length > 0) {
+      const randomIndex = Math.floor(Math.random() * unusedSameRaceResources.length);
+      const selectedResource = unusedSameRaceResources[randomIndex];
+
+      this.usedPictureIds.add(selectedResource.id);
+
+      console.log(`🎯 [图片选择] 同种族降级选择结果:`);
+      console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
+      console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+      console.log(`✅ [图片选择] 同种族降级选择完成`);
+
+      return selectedResource;
+    }
+
+    console.log(`❌ [图片选择] 所有图片资源都已使用，重置使用记录并重新选择`);
+
+    // 如果所有图片都用完了，重置使用记录
+    this.resetUsedPictureIds();
+
+    // 重新尝试第一优先级
+    const freshMatchingResources = this.pictureResources.filter(
+      resource => resource.race === race && resource.class === selectedClass,
+    );
+    if (freshMatchingResources.length > 0) {
+      const randomIndex = Math.floor(Math.random() * freshMatchingResources.length);
+      const selectedResource = freshMatchingResources[randomIndex];
+
+      this.usedPictureIds.add(selectedResource.id);
+
+      console.log(`🔄 [图片选择] 重置后重新选择:`);
+      console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
+      console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+
+      return selectedResource;
+    }
+
+    console.log(`❌ [图片选择] 没有匹配的图片资源，返回null`);
+    return null;
   }
 
   /**
@@ -288,11 +414,37 @@ export class PictureResourceMappingService {
   }
 
   /**
+   * 重置已使用的图片ID记录
+   */
+  public resetUsedPictureIds(): void {
+    console.log(`🔄 [重置记录] 重置已使用的图片ID记录`);
+    console.log(`📊 [重置记录] 重置前已使用数量: ${this.usedPictureIds.size}`);
+    this.usedPictureIds.clear();
+    console.log(`✅ [重置记录] 重置完成，已使用数量: ${this.usedPictureIds.size}`);
+  }
+
+  /**
+   * 获取已使用的图片ID统计信息
+   */
+  public getUsedPictureIdsStats(): { usedCount: number; totalCount: number; usageRate: number } {
+    const usedCount = this.usedPictureIds.size;
+    const totalCount = this.pictureResources.length;
+    const usageRate = totalCount > 0 ? (usedCount / totalCount) * 100 : 0;
+
+    return {
+      usedCount,
+      totalCount,
+      usageRate: Math.round(usageRate * 100) / 100, // 保留两位小数
+    };
+  }
+
+  /**
    * 重新加载图片资源（开发时使用）
    */
   public reloadPictureResources(): void {
     console.log('重新加载图片资源...');
     this.pictureResources = [];
+    this.usedPictureIds.clear(); // 重置使用记录
     this.loadPictureResources();
     console.log('图片资源重新加载完成');
   }

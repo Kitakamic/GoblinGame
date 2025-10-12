@@ -108,7 +108,7 @@ export class FormationService {
           const captainBattleUnit: BattleUnit = {
             id: `${captain.id}_captain`,
             name: captain.name,
-            type: 'hybrid', // 队长作为混合型单位
+            type: captain.unitType || 'physical', // 使用人物的实际单位类型，默认为物理型
             level: characterLevel, // 使用计算出的等级
             attributes: {
               attack: captain.attributes.attack + troopAttackBonus,

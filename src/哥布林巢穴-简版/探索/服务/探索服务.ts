@@ -375,7 +375,7 @@ export class ExploreService {
     return result;
   }
 
-  // 根据难度和距离计算侦察成本（包含随机数）
+  // 根据难度和距离计算侦察成本（固定费用）
   public calculateScoutCost(difficulty: number, distance?: number): { gold: number; food: number } {
     // 获取当前大陆的探索成本作为基础值
     const currentContinent = continentExploreService.getCurrentContinent();
@@ -384,15 +384,13 @@ export class ExploreService {
     // 根据星级计算倍数：1星=1倍，10星=50倍
     const multiplier = Math.max(1, difficulty * 5);
 
-    // 距离成本：每公里增加 2% 的成本
+    // 距离成本：每公里增加 5% 的成本
     const distanceMultiplier = distance ? 1 + distance * 0.05 : 1;
 
-    // 添加随机数：基础成本的 ±20% 随机变化
-    const randomFactor = 0.8 + Math.random() * 0.4; // 0.8 到 1.2 之间的随机数
-
+    // 移除随机因子，使用固定费用计算
     return {
-      gold: Math.round(baseCost.gold * multiplier * distanceMultiplier * randomFactor),
-      food: Math.round(baseCost.food * multiplier * distanceMultiplier * randomFactor),
+      gold: Math.round(baseCost.gold * multiplier * distanceMultiplier),
+      food: Math.round(baseCost.food * multiplier * distanceMultiplier),
     };
   }
 

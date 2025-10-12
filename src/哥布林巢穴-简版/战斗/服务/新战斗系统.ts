@@ -224,8 +224,8 @@ export class NewBattleSystem {
    * 选择行动类型
    */
   private selectActionType(unit: BattleUnit): ActionType {
-    // 根据单位类型选择行动
-    if (unit.type === 'magical' || unit.attributes.intelligence > unit.attributes.attack) {
+    // 根据单位类型选择行动：物理单位使用物理攻击，魔法单位使用魔法攻击
+    if (unit.type === 'magical') {
       return ActionType.MAGICAL_ATTACK;
     } else {
       return ActionType.PHYSICAL_ATTACK;
@@ -293,7 +293,7 @@ export class NewBattleSystem {
     const critChance = 0.05 + attacker.attributes.intelligence * 0.002;
     const critical = Math.random() < critChance;
 
-    // 伤害计算
+    // 伤害计算：物理单位使用攻击值
     const baseDamage = baseAttack - baseDefense;
     const damageMultiplier = critical ? 2.0 : 1.0;
     const finalDamage = Math.max(1, Math.floor(baseDamage * damageMultiplier));
@@ -323,9 +323,13 @@ export class NewBattleSystem {
     const critChance = 0.08 + attacker.attributes.intelligence * 0.003;
     const critical = Math.random() < critChance;
 
-    // 法术伤害计算（防御力影响较小）
+    // 法术伤害计算：魔法单位使用智力值，防御力影响较小
     const baseDamage = baseIntelligence - Math.floor(baseDefense * 0.5);
-    const damageMultiplier = critical ? 2.5 : 1.0;
+
+    // 魔法伤害随机倍数：1.0-1.5倍
+    const randomMultiplier = 1.0 + Math.random() * 0.5;
+    const damageMultiplier = critical ? 2.5 : randomMultiplier;
+
     const finalDamage = Math.max(1, Math.floor(baseDamage * damageMultiplier));
 
     return { damage: finalDamage, hit: true, critical };
