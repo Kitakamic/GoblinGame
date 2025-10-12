@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import { globSync } from 'glob';
+=======
+>>>>>>> 92831677ed4b67f66ab09c15d35406525a43739f
 import HtmlInlineScriptWebpackPlugin from 'html-inline-script-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
@@ -51,9 +54,15 @@ function common_path(lhs: string, rhs: string) {
 }
 
 function glob_script_files() {
+<<<<<<< HEAD
   const files: string[] = globSync(`src/**/index.{ts,js}`).filter(
     (file: string) => process.env.CI !== 'true' || !fs.readFileSync(path.join(__dirname, file)).includes('@no-ci'),
   );
+=======
+  const files: string[] = fs
+    .globSync(`src/**/index.{ts,js}`)
+    .filter(file => process.env.CI !== 'true' || !fs.readFileSync(path.join(__dirname, file)).includes('@no-ci'));
+>>>>>>> 92831677ed4b67f66ab09c15d35406525a43739f
 
   const results: string[] = [];
   const handle = (file: string) => {
