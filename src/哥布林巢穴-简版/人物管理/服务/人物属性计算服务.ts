@@ -215,16 +215,10 @@ export class CharacterAttributeCalculator {
       // 普通种族
       人类: 10,
       狐族: 18,
-      哥布林: 5,
-      亡灵: 8,
 
       // 精灵种族
       永恒精灵: 20,
       黑暗精灵: 18,
-
-      // 高级种族
-      天使: 22,
-      魔族: 20,
     };
 
     return raceScores[race] || 10;
@@ -373,12 +367,8 @@ export class CharacterAttributeCalculator {
     const raceMap: Record<string, CharacterAttributes> = {
       人类: { attack: 0, defense: 0, intelligence: 0, speed: 0, health: 0 },
       狐族: { attack: 2, defense: 1, intelligence: 2, speed: 3, health: 8 },
-      哥布林: { attack: 1, defense: 0, intelligence: 0, speed: 1, health: 2 },
-      亡灵: { attack: 2, defense: 1, intelligence: 1, speed: 1, health: 3 },
       永恒精灵: { attack: 1, defense: 0, intelligence: 3, speed: 2, health: 5 },
       黑暗精灵: { attack: 2, defense: 1, intelligence: 2, speed: 2, health: 4 },
-      天使: { attack: 2, defense: 2, intelligence: 3, speed: 2, health: 10 },
-      魔族: { attack: 3, defense: 2, intelligence: 2, speed: 2, health: 8 },
     };
     return raceMap[race] || { attack: 0, defense: 0, intelligence: 0, speed: 0, health: 0 };
   }
@@ -437,12 +427,8 @@ export class CharacterAttributeCalculator {
     const raceMap: Record<string, number> = {
       人类: 0,
       狐族: 20,
-      哥布林: 5,
-      亡灵: 3,
       永恒精灵: 10,
       黑暗精灵: 8,
-      天使: 15,
-      魔族: 18,
     };
     return raceMap[race] || 0;
   }
@@ -492,12 +478,8 @@ export class CharacterAttributeCalculator {
     const raceMap: Record<string, number> = {
       人类: 0,
       狐族: 25,
-      哥布林: 10,
-      亡灵: 0, // 亡灵无法生育
       永恒精灵: 15,
       黑暗精灵: 12,
-      天使: 20,
-      魔族: 22,
     };
     return raceMap[race] || 0;
   }
@@ -757,7 +739,7 @@ export class CharacterAttributeCalculator {
         name: parsedData.name,
         title: parsedData.identity,
         rating,
-        avatar: '',
+        avatar: parsedData.avatar || '',
         favorite: false,
 
         // 状态信息

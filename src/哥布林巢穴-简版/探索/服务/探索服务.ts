@@ -253,6 +253,7 @@ export class ExploreService {
             location.description,
             location.continent,
             location.region,
+            location.pictureResource,
           );
 
           console.log('AI英雄生成提示词:', heroPrompt);
@@ -269,7 +270,12 @@ export class ExploreService {
             console.log('AI返回数据:', aiResponse);
 
             // 使用人物生成服务解析AI返回的数据
-            const character = await HeroDeterminationService.parseHeroCharacter(aiResponse, locationId, location.type);
+            const character = await HeroDeterminationService.parseHeroCharacter(
+              aiResponse,
+              locationId,
+              location.type,
+              location.pictureResource,
+            );
 
             if (character) {
               // 用真实英雄替换标记

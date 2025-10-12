@@ -208,6 +208,15 @@
           <!-- 部队配置 -->
           <div class="troops-config-section">
             <div class="troops-limit">可配置部队等级: {{ currentConfigCaptain?.level }} 个</div>
+            <div class="resource-info">
+              <div v-for="goblinUnit in GOBLIN_UNIT_CHARACTERS" :key="goblinUnit.id" class="resource-item">
+                <span class="resource-name">{{ goblinUnit.id }}:</span>
+                <span class="resource-count">
+                  总数量: {{ getCurrentGoblinCount(goblinUnit.id) }} | 已编制: {{ getUsedGoblinCount(goblinUnit.id) }} |
+                  可用: {{ Math.max(0, getCurrentGoblinCount(goblinUnit.id) - getUsedGoblinCount(goblinUnit.id)) }}
+                </span>
+              </div>
+            </div>
             <div class="troops-sliders">
               <div v-for="goblinUnit in GOBLIN_UNIT_CHARACTERS" :key="goblinUnit.id" class="troop-slider-item">
                 <div class="troop-label">
@@ -226,7 +235,7 @@
                     @input="setTroopCount(goblinUnit.id, parseInt(($event.target as HTMLInputElement).value))"
                   />
                   <span class="slider-value">
-                    {{ getTroopCount(goblinUnit.id) }}/{{ getCurrentGoblinCount(goblinUnit.id) }}
+                    {{ getTroopCount(goblinUnit.id) }}/{{ getMaxTroopCount(goblinUnit.id) }}
                   </span>
                 </div>
               </div>
@@ -516,6 +525,10 @@ const removeCaptain = (index: number) => {
             console.log(`人物 ${character.name} 属性已恢复为原始属性:`, character.attributes);
           }
 
+          // 清除位置信息
+          character.formationPosition = undefined;
+          console.log(`人物 ${character.name} 位置信息已清除`);
+
           modularSaveManager.updateModuleData({ moduleName: 'training', data: trainingData });
           console.log(`人物 ${character.name} 状态已恢复为已堕落`);
         }
@@ -546,9 +559,33 @@ const getTroopCount = (type: string) => {
 
 const getMaxTroopCount = (type: string) => {
   if (!currentConfigCaptain.value) return 0;
+
+  // 获取队长等级限制
   const remainingLevels = getRemainingLevelsForType(type);
   const levelCost = TROOP_LEVEL_COSTS[type] || 1;
-  return Math.floor(remainingLevels / levelCost);
+  const levelLimit = Math.floor(remainingLevels / levelCost);
+
+  // 获取实际哥布林资源数量
+  const availableGoblins = getCurrentGoblinCount(type);
+
+  // 获取其他队长已使用的哥布林数量
+  const usedGoblins = getUsedGoblinCount(type);
+
+  // 计算可用的哥布林数量
+  const availableCount = Math.max(0, availableGoblins - usedGoblins);
+
+  // 返回等级限制和资源限制中的较小值
+  const maxCount = Math.min(levelLimit, availableCount);
+
+  console.log(`计算最大哥布林数量 ${type}:`, {
+    等级限制: levelLimit,
+    可用资源: availableGoblins,
+    已使用: usedGoblins,
+    实际可用: availableCount,
+    最终限制: maxCount,
+  });
+
+  return maxCount;
 };
 
 const getRemainingLevelsForType = (type: string) => {
@@ -679,6 +716,33 @@ const getCurrentGoblinCount = (goblinType: string) => {
   }
 };
 
+// 获取其他队长已使用的哥布林数量
+const getUsedGoblinCount = (goblinType: string) => {
+  try {
+    let usedCount = 0;
+
+    // 遍历所有队长槽位，计算已使用的哥布林数量
+    captainSlots.value.forEach(captain => {
+      // 跳过当前正在配置的队长
+      if (captain && captain.id === currentConfigCaptain.value?.id) {
+        return;
+      }
+
+      // 计算其他队长使用的该类型哥布林数量
+      if (captain && captain.troops) {
+        const count = captain.troops[goblinType as keyof typeof captain.troops] || 0;
+        usedCount += count;
+      }
+    });
+
+    console.log(`其他队长已使用的 ${goblinType} 数量: ${usedCount}`);
+    return usedCount;
+  } catch (error) {
+    console.error('获取已使用哥布林数量失败:', error);
+    return 0;
+  }
+};
+
 // 获取队长基础血量
 const getCaptainBaseHealth = () => {
   if (!currentConfigCaptain.value) return 0;
@@ -771,6 +835,10 @@ const resetFormation = () => {
               character.attributes = { ...captain.originalAttributes };
               console.log(`人物 ${character.name} 属性已恢复为原始属性:`, character.attributes);
             }
+
+            // 清除位置信息
+            character.formationPosition = undefined;
+            console.log(`人物 ${character.name} 位置信息已清除`);
 
             console.log(`人物 ${character.name} 状态已恢复为已堕落`);
           }
@@ -2447,6 +2515,39 @@ onMounted(async () => {
     font-size: 14px;
     margin-bottom: 16px;
     text-align: center;
+  }
+
+  .resource-info {
+    margin-bottom: 16px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(205, 133, 63, 0.2);
+
+    .resource-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      .resource-name {
+        color: #f0e6d2;
+        font-weight: 600;
+        min-width: 80px;
+      }
+
+      .resource-count {
+        color: #9ca3af;
+        font-size: 11px;
+        flex: 1;
+        text-align: right;
+      }
+    }
   }
 
   .troops-sliders {

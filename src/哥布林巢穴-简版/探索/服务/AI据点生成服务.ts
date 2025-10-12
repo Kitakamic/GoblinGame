@@ -29,7 +29,7 @@ export class AILocationGenerationService {
   "distance": {距离公里数},
   "continent": "{大陆名称}",
   "region": "{区域名称}",
-  "race": "{据点主要种族，人类/永恒精灵/狐族/黑暗精灵/亡灵/恶魔，只允许选择一个种族}",
+  "race": "{据点种族，人类/永恒精灵/黑暗精灵/狐族，只允许选择一个种族，但是允许和大陆区域种族不一致，只要符合据点现实即可}",
   "baseGuards": {此值为据点守军总人数，根据据点难度和类型合理设定，也要符合现实，比如*一个村落不可能有几百人的部队，同时一个要塞不可能只有几十人守军*},
   "rewards": {
     "gold": {金币数量},
@@ -47,7 +47,7 @@ export class AILocationGenerationService {
       "speed": {速度，5-20范围},
       "health": {生命值，20-40范围}
     }
-  }
+  },
 }
 </json>
 
@@ -102,6 +102,11 @@ export class AILocationGenerationService {
         const region = continent?.regions.find(r => r.name === regionName);
         if (region) {
           finalPrompt += `\n# 区域描述参考：${region.description}`;
+
+          // 检查并添加首都名称限制
+          if (region.capital) {
+            finalPrompt += `\n# ⚠️ 重要限制：该区域的首都名为"${region.capital}"，已被定义，禁止生成与此名称相同或相似的据点名称`;
+          }
         }
       }
 

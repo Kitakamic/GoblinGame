@@ -32,9 +32,6 @@ export class MixedTroopGenerationService {
     ],
     黑暗精灵: ['', '', '', '', '', ''],
     狐族: [],
-    天使: [],
-    魔族: [],
-    亡灵: [],
   };
   /**
    * 为据点生成混合部队
@@ -216,10 +213,16 @@ export class MixedTroopGenerationService {
           剩余守军: remainingGuards,
           分配比例: heroTroopPercentage,
           分配数量: heroTroopCount,
+          堕落等级: 1,
+          兵种定位: this.getUnitTierByLevel(difficulty + 1),
+          据点难度: difficulty,
         });
 
         if (heroTroopCount > 0) {
-          const heroLevel = hero.level || this.getUnitLevelForDifficulty(difficulty) + 1;
+          // 敌人状态角色的等级固定为1（表示堕落等级）
+          const heroLevel = 1;
+          // 实际的兵种定位基于据点难度等级+1
+          const combatTier = this.getUnitTierByLevel(difficulty + 1);
 
           // 英雄单位使用自己的独特肖像，不从种族肖像库中选择
           const heroAvatar = hero.avatar || this.getDefaultAvatarByRace(hero.race);
@@ -229,7 +232,7 @@ export class MixedTroopGenerationService {
             race: hero.race,
             class: hero.title,
             troopCount: heroTroopCount,
-            level: heroLevel,
+            level: heroLevel, // 固定为1（堕落等级）
             avatar: heroAvatar, // 使用英雄自己的肖像
             attributes: {
               attack: hero.attributes.attack,
@@ -241,8 +244,8 @@ export class MixedTroopGenerationService {
             // 标记为英雄单位
             isHero: true,
             heroId: hero.id,
-            // 添加兵种定位标记
-            tier: this.getUnitTierByLevel(heroLevel),
+            // 添加兵种定位标记（基于据点难度+1）
+            tier: combatTier,
             // 标记为队长单位，需要分配部下
             isCaptain: true,
           });
@@ -586,8 +589,6 @@ export class MixedTroopGenerationService {
         getUnitsByRace('狐族'),
         getUnitsByRace('黑暗精灵'),
         getUnitsByRace('永恒精灵'),
-        getUnitsByRace('亡灵'),
-        getUnitsByRace('哥布林'),
       );
       return allUnits.filter(unit => unit.level === 1);
     }
@@ -913,10 +914,6 @@ export class MixedTroopGenerationService {
       狐族: '🦊',
       永恒精灵: '🧝‍♀️',
       黑暗精灵: '🧝‍♂️',
-      天使: '👼',
-      魔族: '👹',
-      亡灵: '💀',
-      哥布林: '👹',
     };
 
     return raceAvatars[race] || '👤';

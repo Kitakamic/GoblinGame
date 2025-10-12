@@ -1,4 +1,5 @@
 import type { Character } from '../人物管理/类型/人物类型';
+import type { Continent } from '../探索/类型/大陆探索类型';
 import type { HistoryRecord } from './世界书类型定义';
 import { CharacterWorldbookManager } from './人物信息管理器';
 import { GameEventLorebookManager } from './冒头事件管理器';
@@ -94,17 +95,17 @@ export class WorldbookService {
   /**
    * 初始化资源世界书条目（游戏开始时创建）
    */
-  static async initializeResourcesWorldbook(resources: any): Promise<void> {
+  static async initializeResourcesWorldbook(resources: any, continents: Continent[] = []): Promise<void> {
     const worldbookName = this.getCurrentWorldbookName();
-    return ResourcesWorldbookManager.initialize(worldbookName, resources);
+    return ResourcesWorldbookManager.initialize(worldbookName, resources, continents);
   }
 
   /**
    * 更新资源世界书条目
    */
-  static async updateResourcesWorldbook(resources: any): Promise<void> {
+  static async updateResourcesWorldbook(resources: any, continents: Continent[] = []): Promise<void> {
     const worldbookName = this.getCurrentWorldbookName();
-    return ResourcesWorldbookManager.update(worldbookName, resources);
+    return ResourcesWorldbookManager.update(worldbookName, resources, continents);
   }
 
   // ==================== 战前对话记录管理 ====================

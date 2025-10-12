@@ -1,4 +1,5 @@
 import type { Location } from '../类型/探索类型';
+import { pictureResourceMappingService } from './图片资源映射服务';
 
 /**
  * 据点信息解析器
@@ -204,6 +205,38 @@ export class LocationParser {
         (location as any).race = locationData.race;
       }
 
+      // 如果有图片资源信息，添加到据点中
+      if (locationData.pictureResource) {
+        console.log('🖼️ [JSON解析器] 添加图片资源信息:', locationData.pictureResource);
+        (location as any).pictureResource = locationData.pictureResource;
+      }
+
+      // 根据据点的种族和类型匹配图片资源
+      if (locationData.race && locationData.type) {
+        const englishType = this.TYPE_MAPPING[locationData.type] || locationData.type;
+        const pictureResource = pictureResourceMappingService.getRandomMatchingPictureResource(
+          englishType,
+          locationData.race,
+        );
+
+        if (pictureResource) {
+          console.log(
+            `🖼️ [JSON解析器] 据点 ${locationData.name} 匹配到图片资源: ID=${pictureResource.id}, 职业=${pictureResource.class}`,
+          );
+          (location as any).pictureResource = {
+            id: pictureResource.id,
+            race: pictureResource.race,
+            class: pictureResource.class,
+            prompt: pictureResource.prompt,
+            imageUrl: pictureResource.imageUrl,
+          };
+        } else {
+          console.warn(
+            `🖼️ [JSON解析器] 据点 ${locationData.name} 未能匹配到合适的图片资源 (类型: ${englishType}, 种族: ${locationData.race})`,
+          );
+        }
+      }
+
       console.log('🎉 [JSON解析器] 解析完成，最终Location对象:', location);
       console.log('🔍 [JSON解析器] 最终Location的baseGuards:', location.baseGuards);
       console.log('🔍 [JSON解析器] 最终Location的specialUnit:', location.specialUnit);
@@ -369,6 +402,37 @@ export class LocationParser {
           if (locationData.race) {
             console.log('🧬 [批量解析器] 添加种族信息:', locationData.race);
             (location as any).race = locationData.race;
+          }
+
+          // 如果有图片资源信息，添加到据点中
+          if (locationData.pictureResource) {
+            console.log('🖼️ [批量解析器] 添加图片资源信息:', locationData.pictureResource);
+            (location as any).pictureResource = locationData.pictureResource;
+          }
+
+          // 根据据点的种族和类型匹配图片资源
+          if (locationData.race && locationData.type) {
+            const pictureResource = pictureResourceMappingService.getRandomMatchingPictureResource(
+              englishType,
+              locationData.race,
+            );
+
+            if (pictureResource) {
+              console.log(
+                `🖼️ [批量解析器] 据点 ${locationData.name} 匹配到图片资源: ID=${pictureResource.id}, 职业=${pictureResource.class}`,
+              );
+              (location as any).pictureResource = {
+                id: pictureResource.id,
+                race: pictureResource.race,
+                class: pictureResource.class,
+                prompt: pictureResource.prompt,
+                imageUrl: pictureResource.imageUrl,
+              };
+            } else {
+              console.warn(
+                `🖼️ [批量解析器] 据点 ${locationData.name} 未能匹配到合适的图片资源 (类型: ${englishType}, 种族: ${locationData.race})`,
+              );
+            }
           }
 
           locations.push(location);

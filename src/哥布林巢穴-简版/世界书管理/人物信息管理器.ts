@@ -26,7 +26,7 @@ export class CharacterWorldbookManager {
       await WorldbookHelper.replace(worldbookName, worldbook);
       await WorldbookHelper.bindToCurrent(worldbookName);
 
-      toastr.success(`已将人物 ${character.name} 添加到世界书: ${worldbookName}`);
+      console.log(`已将人物 ${character.name} 添加到世界书: ${worldbookName}`);
       return worldbookName;
     } catch (error) {
       toastr.error(`创建人物世界书失败: ${error}`);

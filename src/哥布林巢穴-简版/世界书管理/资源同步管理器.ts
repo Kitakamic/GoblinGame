@@ -1,3 +1,4 @@
+import type { Continent } from '../探索/类型/大陆探索类型';
 import { TimeParseService } from '../服务/时间解析服务';
 import { WorldbookHelper } from './世界书助手';
 import type { WorldbookEntry } from './世界书类型定义';
@@ -9,7 +10,7 @@ export class ResourcesWorldbookManager {
   /**
    * 初始化资源世界书条目（游戏开始时创建）
    */
-  static async initialize(worldbookName: string, resources: any): Promise<void> {
+  static async initialize(worldbookName: string, resources: any, continents: Continent[] = []): Promise<void> {
     try {
       await WorldbookHelper.ensureExists(worldbookName);
 
@@ -18,13 +19,13 @@ export class ResourcesWorldbookManager {
         entry => entry.extra?.entry_type === 'resources',
         entry => ({
           ...entry,
-          content: this.buildContent(resources),
+          content: this.buildContent(resources, continents),
           extra: {
             ...entry.extra,
             updated_at: new Date().toISOString(),
           },
         }),
-        () => this.createEntry(this.buildContent(resources)),
+        () => this.createEntry(this.buildContent(resources, continents)),
       );
 
       console.log('资源世界书条目初始化完成');
@@ -37,7 +38,7 @@ export class ResourcesWorldbookManager {
   /**
    * 更新资源世界书条目
    */
-  static async update(worldbookName: string, resources: any): Promise<void> {
+  static async update(worldbookName: string, resources: any, continents: Continent[] = []): Promise<void> {
     try {
       await WorldbookHelper.ensureExists(worldbookName);
 
@@ -46,13 +47,13 @@ export class ResourcesWorldbookManager {
         entry => entry.extra?.entry_type === 'resources',
         entry => ({
           ...entry,
-          content: this.buildContent(resources),
+          content: this.buildContent(resources, continents),
           extra: {
             ...entry.extra,
             updated_at: new Date().toISOString(),
           },
         }),
-        () => this.createEntry(this.buildContent(resources)),
+        () => this.createEntry(this.buildContent(resources, continents)),
       );
 
       console.log('资源世界书条目更新完成');
@@ -108,10 +109,38 @@ export class ResourcesWorldbookManager {
   /**
    * 构建资源内容
    */
-  private static buildContent(resources: any): string {
+  private static buildContent(resources: any, continents: Continent[] = []): string {
     // 根据回合数获取格式化的日期
     const rounds = resources.rounds || 0;
     const formattedDate = TimeParseService.getTimeInfo(rounds).formattedDate;
+
+    // 构建大陆和区域征服信息
+    let continentInfo = '';
+
+    if (continents && continents.length > 0) {
+      continentInfo = '\n\n# 大陆征服进度\n';
+
+      for (const continent of continents) {
+        // 只显示已解锁的大陆
+        if (continent.isUnlocked) {
+          const conquestStatus = continent.isConquered ? '✅ 已征服' : '🔄 征服中';
+          continentInfo += `\n## ${continent.name} ${conquestStatus}\n`;
+          continentInfo += `- 大陆征服进度: ${continent.conquestProgress.toFixed(1)}%\n`;
+
+          // 显示该大陆下的区域信息
+          if (continent.regions && continent.regions.length > 0) {
+            const unlockedRegions = continent.regions.filter(r => r.isUnlocked);
+            if (unlockedRegions.length > 0) {
+              continentInfo += `- 区域进度:\n`;
+              for (const region of unlockedRegions) {
+                const regionStatus = region.isConquered ? '✅' : '🔄';
+                continentInfo += `  - ${regionStatus} ${region.name}: ${region.conquestProgress.toFixed(1)}%\n`;
+              }
+            }
+          }
+        }
+      }
+    }
 
     return `<NestStatus>
 # 哥布林巢穴资源状态
@@ -129,7 +158,7 @@ export class ResourcesWorldbookManager {
 # 时间信息
 - 当前时间: ${formattedDate}
 - 回合数: ${rounds}
-- 威胁度: ${resources.threat || 0}
+- 威胁度: ${resources.threat || 0}${continentInfo}
 
 # 说明
 - 这是哥布林巢穴的当前状态

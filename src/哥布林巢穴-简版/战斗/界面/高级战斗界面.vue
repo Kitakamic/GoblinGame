@@ -273,25 +273,10 @@
               <span class="reward-name">食物:</span>
               <span class="reward-value">+{{ rewardsData.food }}</span>
             </div>
-            <div v-if="rewardsData?.normalGoblins > 0" class="reward-item">
-              <span class="reward-icon">👺</span>
-              <span class="reward-name">普通哥布林:</span>
-              <span class="reward-value">+{{ rewardsData.normalGoblins }}</span>
-            </div>
-            <div v-if="rewardsData?.warriorGoblins > 0" class="reward-item">
-              <span class="reward-icon">⚔️</span>
-              <span class="reward-name">哥布林战士:</span>
-              <span class="reward-value">+{{ rewardsData.warriorGoblins }}</span>
-            </div>
-            <div v-if="rewardsData?.shamanGoblins > 0" class="reward-item">
-              <span class="reward-icon">🔮</span>
-              <span class="reward-name">哥布林萨满:</span>
-              <span class="reward-value">+{{ rewardsData.shamanGoblins }}</span>
-            </div>
-            <div v-if="rewardsData?.paladinGoblins > 0" class="reward-item">
-              <span class="reward-icon">✨</span>
-              <span class="reward-name">哥布林圣骑士:</span>
-              <span class="reward-value">+{{ rewardsData.paladinGoblins }}</span>
+            <div v-if="rewardsData?.slaves > 0" class="reward-item">
+              <span class="reward-icon">🔒</span>
+              <span class="reward-name">普通奴隶:</span>
+              <span class="reward-value">+{{ rewardsData.slaves }}</span>
             </div>
             <!-- 英雄奖励 -->
             <div v-if="rewardsData?.heroes && rewardsData.heroes.length > 0" class="reward-item hero-reward">
@@ -414,11 +399,12 @@
 <script setup lang="ts">
 import { computed, defineEmits, defineProps, onMounted, ref } from 'vue';
 import GenericDialogueInterface from '../../../通用对话界面/通用对话界面.vue';
+import { WorldbookService } from '../../世界书管理/世界书服务';
 import type { Character } from '../../人物管理/类型/人物类型';
 import { modularSaveManager } from '../../存档管理/模块化存档服务';
+import { continentExploreService } from '../../探索/服务/大陆探索服务';
 import { toast } from '../../服务/弹窗提示服务';
 import { TimeParseService } from '../../服务/时间解析服务';
-import { actionPointsService } from '../../服务/行动力服务';
 import ToastNotification from '../../组件/弹窗提示.vue';
 import CustomConfirmBox from '../../组件/自定义确认框.vue';
 import { MoraleDialogueService } from '../服务/士气对话服务';
@@ -715,6 +701,17 @@ const selectTarget = (target: BattleUnit) => {
 const confirmRewards = async () => {
   console.log('确认奖励:', rewardsData.value);
 
+  // 处理资源奖励（金币、食物、奴隶）
+  if (rewardsData.value?.gold > 0) {
+    modularSaveManager.addResource('gold', rewardsData.value.gold, '据点征服奖励');
+  }
+  if (rewardsData.value?.food > 0) {
+    modularSaveManager.addResource('food', rewardsData.value.food, '据点征服奖励');
+  }
+  if (rewardsData.value?.slaves > 0) {
+    modularSaveManager.addResource('slaves', rewardsData.value.slaves, '据点征服奖励');
+  }
+
   // 处理英雄奖励
   if (rewardsData.value?.heroes && rewardsData.value.heroes.length > 0) {
     for (const hero of rewardsData.value.heroes) {
@@ -723,6 +720,35 @@ const confirmRewards = async () => {
   } else if (rewardsData.value?.hero) {
     // 兼容旧的单个英雄格式
     await updateHeroStatus(rewardsData.value.hero);
+  }
+
+  // 更新资源世界书（包含哥布林损失和大陆征服进度）
+  try {
+    console.log('🔍 [战斗界面] 开始更新资源世界书...');
+    const currentResources = {
+      gold: modularSaveManager.resources.value.gold || 0,
+      food: modularSaveManager.resources.value.food || 0,
+      slaves: modularSaveManager.resources.value.slaves || 0,
+      normalGoblins: modularSaveManager.resources.value.normalGoblins || 0,
+      warriorGoblins: modularSaveManager.resources.value.warriorGoblins || 0,
+      shamanGoblins: modularSaveManager.resources.value.shamanGoblins || 0,
+      paladinGoblins: modularSaveManager.resources.value.paladinGoblins || 0,
+      trainingSlaves: modularSaveManager.resources.value.trainingSlaves || 0,
+      rounds: modularSaveManager.resources.value.rounds || 0,
+      threat: modularSaveManager.resources.value.threat || 0,
+      actionPoints: modularSaveManager.resources.value.actionPoints || 3,
+      maxActionPoints: modularSaveManager.resources.value.maxActionPoints || 3,
+      conqueredRegions: modularSaveManager.resources.value.conqueredRegions || 0,
+    };
+
+    // 获取大陆数据
+    const continents = continentExploreService.continents.value || [];
+    console.log('🔍 [战斗界面] 获取到的大陆数据:', continents);
+
+    await WorldbookService.updateResourcesWorldbook(currentResources, continents);
+    console.log('🔍 [战斗界面] 资源世界书更新完成');
+  } catch (error) {
+    console.error('更新资源世界书失败:', error);
   }
 
   closeRewardsModal();
@@ -957,20 +983,8 @@ const autoExecuteBattle = () => {
 };
 
 const startBattle = () => {
-  // 检查行动力
-  if (!actionPointsService.hasEnoughActionPoints('attackLocation')) {
-    // 显示行动力不足的提示
-    showFormationWarning.value = false;
-    // 使用 toast 服务显示行动力不足提示
-    toast.warning(actionPointsService.getInsufficientActionPointsMessage('attackLocation'));
-    return;
-  }
-
-  // 消耗行动力
-  if (!actionPointsService.consumeActionPoints('attackLocation')) {
-    toast.error('行动力消耗失败');
-    return;
-  }
+  // 注意：行动力已在探索界面消耗，这里不再消耗
+  console.log('高级战斗界面：直接开始手动战斗（行动力已在探索界面消耗）');
 
   startManualBattle();
 };
@@ -1115,10 +1129,7 @@ const getLocationRewards = () => {
   const locationRewards = props.battleData?.target?.rewards || {
     gold: 100,
     food: 50,
-    normalGoblins: 2,
-    warriorGoblins: 0,
-    shamanGoblins: 0,
-    paladinGoblins: 0,
+    slaves: 1,
   };
 
   // 添加英雄信息
@@ -1246,8 +1257,41 @@ const syncGoblinLossesToResources = () => {
 const retreat = () => {
   console.log('撤退');
 
-  // 返还行动力（撤退返还）
-  actionPointsService.refundActionPoints('attackLocation');
+  // 注意：撤退不返还行动力，因为行动力已经消耗了
+
+  // 更新资源世界书（包含哥布林损失）
+  try {
+    console.log('🔍 [战斗界面] 撤退时更新资源世界书...');
+    const currentResources = {
+      gold: modularSaveManager.resources.value.gold || 0,
+      food: modularSaveManager.resources.value.food || 0,
+      slaves: modularSaveManager.resources.value.slaves || 0,
+      normalGoblins: modularSaveManager.resources.value.normalGoblins || 0,
+      warriorGoblins: modularSaveManager.resources.value.warriorGoblins || 0,
+      shamanGoblins: modularSaveManager.resources.value.shamanGoblins || 0,
+      paladinGoblins: modularSaveManager.resources.value.paladinGoblins || 0,
+      trainingSlaves: modularSaveManager.resources.value.trainingSlaves || 0,
+      rounds: modularSaveManager.resources.value.rounds || 0,
+      threat: modularSaveManager.resources.value.threat || 0,
+      actionPoints: modularSaveManager.resources.value.actionPoints || 3,
+      maxActionPoints: modularSaveManager.resources.value.maxActionPoints || 3,
+      conqueredRegions: modularSaveManager.resources.value.conqueredRegions || 0,
+    };
+
+    // 获取大陆数据
+    const continents = continentExploreService.continents.value || [];
+    console.log('🔍 [战斗界面] 撤退时获取到的大陆数据:', continents);
+
+    WorldbookService.updateResourcesWorldbook(currentResources, continents)
+      .then(() => {
+        console.log('🔍 [战斗界面] 撤退时资源世界书更新完成');
+      })
+      .catch(error => {
+        console.error('撤退时更新资源世界书失败:', error);
+      });
+  } catch (error) {
+    console.error('撤退时更新资源世界书失败:', error);
+  }
 
   // 关闭战斗界面
   closeInterface();

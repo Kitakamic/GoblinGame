@@ -63,12 +63,20 @@ export class RandomEventService {
    * 检查回合开始事件触发
    */
   public checkRoundStartEvents(currentRound: number, gameState?: any): EventTriggerResult {
-    const availableEvents = this.getEventsByType(EventType.RANDOM).filter(event =>
-      this.isEventAvailable(event, currentRound, gameState),
-    );
+    // 获取所有可用的事件（包括所有类型的事件）
+    const availableEvents = this.getAllEvents().filter(event => this.isEventAvailable(event, currentRound, gameState));
 
     if (availableEvents.length === 0) {
       return { triggered: false, reason: '没有可用的事件' };
+    }
+
+    // 优先检查初见事件（初次接触时直接触发）
+    const firstContactEvents = availableEvents.filter(event => event.trigger.triggerOnFirstContact);
+    if (firstContactEvents.length > 0) {
+      const selectedEvent = firstContactEvents[0]; // 选择第一个初见事件
+      this.eventHistory.push(selectedEvent.id);
+      console.log(`触发初见事件: ${selectedEvent.name}`);
+      return { triggered: true, event: selectedEvent };
     }
 
     // 计算触发概率
@@ -118,6 +126,23 @@ export class RandomEventService {
       if (!gameState.threat || gameState.threat < trigger.requiredThreat) {
         return false;
       }
+    }
+
+    // 检查大陆征服度条件
+    if (trigger.requiredContinentConquest && gameState) {
+      const { continentName, minConquestProgress } = trigger.requiredContinentConquest;
+      if (!gameState.continents || !gameState.continents[continentName]) {
+        return false;
+      }
+      const continentConquestProgress = gameState.continents[continentName].conquestProgress || 0;
+      if (continentConquestProgress < minConquestProgress) {
+        return false;
+      }
+    }
+
+    // 检查是否只触发一次（如果已经触发过则不再触发）
+    if (trigger.triggerOnce && this.eventHistory.includes(event.id)) {
+      return false;
     }
 
     return true;

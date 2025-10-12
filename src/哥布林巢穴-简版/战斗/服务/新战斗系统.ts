@@ -349,7 +349,7 @@ export class NewBattleSystem {
   }
 
   /**
-   * 处理哥布林损失
+   * 处理哥布林损失 - 普通哥布林优先承担伤害（肉盾机制）
    */
   private handleGoblinLoss(unit: BattleUnit, previousHealth: number, currentHealth: number): void {
     if (!unit.troops) return;
@@ -365,29 +365,44 @@ export class NewBattleSystem {
     const lossRatio = healthLoss / goblinHealthBonus;
     const clampedLossRatio = Math.min(lossRatio, 1); // 限制最大损失比例为100%
 
-    // 按比例损失各种哥布林
+    // 优先损失普通哥布林（肉盾机制）
+    let remainingLossRatio = clampedLossRatio;
+
+    // 1. 优先损失普通哥布林（承担更多伤害）
     if (unit.troops.normalGoblins && unit.troops.normalGoblins > 0) {
-      const normalLoss = Math.floor(unit.troops.normalGoblins * clampedLossRatio);
+      // 普通哥布林承担1.5倍的损失比例
+      const normalLossRatio = Math.min(remainingLossRatio * 1.5, 1);
+      const normalLoss = Math.floor(unit.troops.normalGoblins * normalLossRatio);
       unit.troops.normalGoblins = Math.max(0, unit.troops.normalGoblins - normalLoss);
+
+      // 如果普通哥布林全部损失，剩余损失由其他哥布林承担
+      if (unit.troops.normalGoblins === 0) {
+        remainingLossRatio = Math.max(0, remainingLossRatio - normalLossRatio);
+      } else {
+        remainingLossRatio = Math.max(0, remainingLossRatio - normalLossRatio / 1.5);
+      }
     }
 
-    if (unit.troops.warriorGoblins && unit.troops.warriorGoblins > 0) {
-      const warriorLoss = Math.floor(unit.troops.warriorGoblins * clampedLossRatio);
-      unit.troops.warriorGoblins = Math.max(0, unit.troops.warriorGoblins - warriorLoss);
-    }
+    // 2. 如果还有剩余损失，按比例损失其他哥布林
+    if (remainingLossRatio > 0) {
+      if (unit.troops.warriorGoblins && unit.troops.warriorGoblins > 0) {
+        const warriorLoss = Math.floor(unit.troops.warriorGoblins * remainingLossRatio);
+        unit.troops.warriorGoblins = Math.max(0, unit.troops.warriorGoblins - warriorLoss);
+      }
 
-    if (unit.troops.shamanGoblins && unit.troops.shamanGoblins > 0) {
-      const shamanLoss = Math.floor(unit.troops.shamanGoblins * clampedLossRatio);
-      unit.troops.shamanGoblins = Math.max(0, unit.troops.shamanGoblins - shamanLoss);
-    }
+      if (unit.troops.shamanGoblins && unit.troops.shamanGoblins > 0) {
+        const shamanLoss = Math.floor(unit.troops.shamanGoblins * remainingLossRatio);
+        unit.troops.shamanGoblins = Math.max(0, unit.troops.shamanGoblins - shamanLoss);
+      }
 
-    if (unit.troops.paladinGoblins && unit.troops.paladinGoblins > 0) {
-      const paladinLoss = Math.floor(unit.troops.paladinGoblins * clampedLossRatio);
-      unit.troops.paladinGoblins = Math.max(0, unit.troops.paladinGoblins - paladinLoss);
+      if (unit.troops.paladinGoblins && unit.troops.paladinGoblins > 0) {
+        const paladinLoss = Math.floor(unit.troops.paladinGoblins * remainingLossRatio);
+        unit.troops.paladinGoblins = Math.max(0, unit.troops.paladinGoblins - paladinLoss);
+      }
     }
 
     console.log(
-      `单位 ${unit.name} 按比例损失哥布林，损失比例: ${(clampedLossRatio * 100).toFixed(1)}%，剩余血量: ${currentHealth}/${unit.maxHealth}`,
+      `单位 ${unit.name} 哥布林损失（肉盾机制），普通哥布林优先承担伤害，损失比例: ${(clampedLossRatio * 100).toFixed(1)}%，剩余血量: ${currentHealth}/${unit.maxHealth}`,
     );
   }
 

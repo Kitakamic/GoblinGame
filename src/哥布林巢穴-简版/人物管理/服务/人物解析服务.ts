@@ -4,6 +4,15 @@
  */
 import type { BackgroundType, SensitivePart } from '../类型/人物类型';
 
+/** 图片资源信息 */
+export interface PictureResource {
+  id: string;
+  race: string;
+  class: string;
+  prompt: string;
+  imageUrl?: string;
+}
+
 // ==================== 解析数据类型定义 ====================
 
 /** 解析后的敏感点信息 */
@@ -73,6 +82,9 @@ export interface ParsedCharacterData {
 
   // 隐藏特质
   hiddenTraits: ParsedHiddenTraits;
+
+  // 头像信息
+  avatar?: string;
 }
 
 export class CharacterParser {
@@ -81,9 +93,10 @@ export class CharacterParser {
   /**
    * 解析AI输出的人物信息JSON
    * @param text AI输出的人物信息JSON文本
+   * @param pictureResource 据点的图片资源信息（可选）
    * @returns 解析后的原始数据对象
    */
-  static parseCharacterJson(text: string): ParsedCharacterData | null {
+  static parseCharacterJson(text: string, pictureResource?: PictureResource): ParsedCharacterData | null {
     try {
       console.log('🔍 [人物解析] 开始解析AI输出的人物信息...');
       console.log('📝 [人物解析] 原始AI输出长度:', text.length);
@@ -127,6 +140,18 @@ export class CharacterParser {
 
       console.log('✅ [人物解析] 基础信息验证通过');
       console.log('👤 [人物解析] 人物姓名:', data.基础信息.姓名);
+
+      // 处理图片资源信息
+      if (pictureResource?.imageUrl) {
+        console.log('🖼️ [人物解析] 据点图片资源信息:', {
+          id: pictureResource.id,
+          race: pictureResource.race,
+          class: pictureResource.class,
+          imageUrl: pictureResource.imageUrl,
+        });
+      } else {
+        console.log('⚠️ [人物解析] 未提供据点图片资源信息');
+      }
 
       // 解析敏感点信息
       console.log('🔍 [人物解析] 开始解析敏感点信息...');
@@ -274,6 +299,9 @@ export class CharacterParser {
           fears: this.validateRequiredString(data.隐藏特质?.恐惧, '恐惧'),
           secrets: this.validateRequiredString(data.隐藏特质?.秘密, '秘密'),
         },
+
+        // 头像信息（来自据点图片资源）
+        avatar: pictureResource?.imageUrl,
       };
 
       console.log('✅ [人物解析] 所有字段验证通过');
@@ -289,6 +317,7 @@ export class CharacterParser {
         体重: parsedData.appearance.weight,
         罩杯: parsedData.appearance.cupSize,
         衣着数量: parsedData.appearance.clothing ? Object.keys(parsedData.appearance.clothing).length : 0,
+        头像URL: parsedData.avatar || '未设置',
       });
       console.log('📤 [人物解析] 返回解析后的数据对象');
       return parsedData;

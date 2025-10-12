@@ -60,11 +60,7 @@ const aiReplyContent = ref('');
 const saveConfirmMessage = computed(() => {
   if (!props.event) return '';
 
-  const hasAIReply = aiReplyContent.value
-    ? '\n\n✅ 已获取到AI回复内容'
-    : '\n\n⚠️ 未获取到AI回复内容，将使用事件基本信息';
-
-  return `是否将"${props.event.name}"的故事内容保存到世界书中？${hasAIReply}\n\n这将帮助AI更好地了解游戏世界的发展历程。`;
+  return `是否将"${props.event.name}"的故事内容保存到世界书中？\n\n✅ 已获取到AI回复内容\n\n这将帮助AI更好地了解游戏世界的发展历程。`;
 });
 
 // 对话配置
@@ -96,15 +92,20 @@ const updateShowState = () => {
   showEventDialog.value = props.show && !!props.event;
 };
 
-// 处理关闭事件（显示保存确认弹窗）
+// 处理关闭事件（只在有AI回复时显示保存确认弹窗）
 const handleCloseEvent = () => {
   if (props.event && props.event.dialogueConfig.onDialogueClose) {
     // 调用事件的关闭回调
     props.event.dialogueConfig.onDialogueClose();
   }
 
-  // 显示保存确认弹窗
-  showSaveConfirm.value = true;
+  // 只有在有AI回复内容时才显示保存确认弹窗
+  if (aiReplyContent.value && aiReplyContent.value.trim()) {
+    showSaveConfirm.value = true;
+  } else {
+    // 没有AI回复内容，直接关闭
+    closeEventDialog();
+  }
 };
 
 // 关闭事件对话框
@@ -171,11 +172,13 @@ const endEvent = () => {
 const buildEventContent = (): string => {
   if (!props.event) return '';
 
-  // 优先使用AI回复内容
-  if (aiReplyContent.value) {
+  // 只使用AI回复内容，不使用基础信息
+  if (aiReplyContent.value && aiReplyContent.value.trim()) {
     console.log('使用AI回复内容作为事件内容:', aiReplyContent.value.substring(0, 100) + '...');
     return aiReplyContent.value;
   }
+
+  // 如果没有AI回复内容，返回空字符串（不保存）
   return '';
 };
 

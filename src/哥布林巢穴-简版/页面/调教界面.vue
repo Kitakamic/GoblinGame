@@ -232,8 +232,8 @@
 <script setup lang="ts">
 import { computed, onActivated, onMounted, ref } from 'vue';
 import { WorldbookService } from '../世界书管理/世界书服务';
+import type { Character } from '../世界书管理/人物类型';
 import CharacterCardInterface from '../人物管理/界面/人物卡界面.vue';
-import type { Character } from '../人物管理/类型/人物类型';
 import { modularSaveManager } from '../存档管理/模块化存档服务';
 import { ConfirmService } from '../服务/确认框服务';
 import { actionPointsService } from '../服务/行动力服务';

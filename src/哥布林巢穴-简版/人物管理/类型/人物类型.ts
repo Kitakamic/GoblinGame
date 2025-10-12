@@ -41,7 +41,7 @@ export type CharacterRating = 'S' | 'A' | 'B' | 'C' | 'D';
 export type GoblinType = '普通哥布林' | '哥布林战士' | '哥布林萨满' | '哥布林圣骑士';
 
 /** 种族类型枚举 */
-export type RaceType = '人类' | '狐族' | '永恒精灵' | '黑暗精灵' | '天使' | '魔族' | '哥布林' | '亡灵';
+export type RaceType = '人类' | '狐族' | '永恒精灵' | '黑暗精灵';
 
 /** 出身等级枚举 */
 export type BackgroundType = '平民' | '贵族' | '王族';
@@ -205,6 +205,8 @@ export interface Character {
   deployedAttributes?: CharacterAttributes;
   /** 部队编制信息 */
   troopDeployment?: TroopDeployment;
+  /** 部队编制位置（1-6） */
+  formationPosition?: number;
 
   // ========== 训练信息 ==========
   /** 最后训练时间 */

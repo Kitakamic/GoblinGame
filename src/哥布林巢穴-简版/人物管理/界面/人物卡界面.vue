@@ -433,10 +433,10 @@
 </template>
 
 <script setup lang="ts">
+import type { Character } from '../类型/人物类型';
 import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import { TimeParseService } from '../../服务/时间解析服务';
 import { BreedingService } from '../../服务/生育服务';
-import type { Character } from '../类型/人物类型';
 
 // 定义组件属性
 interface Props {

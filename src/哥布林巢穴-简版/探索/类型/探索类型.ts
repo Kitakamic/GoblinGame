@@ -42,6 +42,14 @@ export interface Location {
   enemyUnitsGeneratedAt?: number;
   // AI英雄生成标记
   needsAIHero?: boolean;
+  // 图片资源信息
+  pictureResource?: {
+    id: string;
+    race: string;
+    class: string;
+    prompt: string;
+    imageUrl?: string; // 完整的图片URL
+  };
 }
 
 // 敌方单位类型定义

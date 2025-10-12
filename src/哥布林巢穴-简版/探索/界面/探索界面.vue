@@ -732,6 +732,15 @@ const startBattle = async (location: Location) => {
     return;
   }
 
+  // 消耗行动力（在打开战斗弹窗之前消耗）
+  if (!actionPointsService.consumeActionPoints('attackLocation')) {
+    console.log('行动力消耗失败');
+    await ConfirmService.showDanger('行动力消耗失败', '操作失败');
+    return;
+  }
+
+  console.log('行动力已消耗，准备战斗数据');
+
   selectedBattleTarget.value = location;
 
   // 获取据点的敌方单位
@@ -800,6 +809,36 @@ const handleBattleComplete = async (result: any) => {
       }
     }
   }
+
+  // 更新资源世界书（无论胜利还是失败，都要更新哥布林损失和大陆征服进度）
+  try {
+    console.log('🔍 [探索界面] 战斗完成后更新资源世界书...');
+    const currentResources = {
+      gold: modularSaveManager.resources.value.gold || 0,
+      food: modularSaveManager.resources.value.food || 0,
+      slaves: modularSaveManager.resources.value.slaves || 0,
+      normalGoblins: modularSaveManager.resources.value.normalGoblins || 0,
+      warriorGoblins: modularSaveManager.resources.value.warriorGoblins || 0,
+      shamanGoblins: modularSaveManager.resources.value.shamanGoblins || 0,
+      paladinGoblins: modularSaveManager.resources.value.paladinGoblins || 0,
+      trainingSlaves: modularSaveManager.resources.value.trainingSlaves || 0,
+      rounds: modularSaveManager.resources.value.rounds || 0,
+      threat: modularSaveManager.resources.value.threat || 0,
+      actionPoints: modularSaveManager.resources.value.actionPoints || 3,
+      maxActionPoints: modularSaveManager.resources.value.maxActionPoints || 3,
+      conqueredRegions: modularSaveManager.resources.value.conqueredRegions || 0,
+    };
+
+    // 获取大陆数据
+    const continents = continentExploreService.continents.value || [];
+    console.log('🔍 [探索界面] 战斗完成后获取到的大陆数据:', continents);
+
+    await WorldbookService.updateResourcesWorldbook(currentResources, continents);
+    console.log('🔍 [探索界面] 战斗完成后资源世界书更新完成');
+  } catch (error) {
+    console.error('战斗完成后更新资源世界书失败:', error);
+  }
+
   // 不自动关闭界面，让用户通过撤退按钮或开始收获按钮来关闭
   console.log('战斗完成，等待用户操作');
 };

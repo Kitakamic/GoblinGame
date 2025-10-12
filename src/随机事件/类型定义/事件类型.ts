@@ -27,7 +27,14 @@ export interface EventTrigger {
     [key: string]: number;
   };
   requiredThreat?: number; // 需要的威胁度
+  requiredContinentConquest?: {
+    // 需要的大陆征服度条件
+    continentName: string; // 大陆名称
+    minConquestProgress: number; // 最小征服进度 (0-100)
+  };
   probability?: number; // 触发概率 (0-1)
+  triggerOnce?: boolean; // 是否只触发一次
+  triggerOnFirstContact?: boolean; // 是否在初次接触时触发
 }
 
 // 事件奖励

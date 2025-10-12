@@ -251,6 +251,7 @@ export class FormationService {
           console.log(`清除人物 ${character.name} 的编制状态`);
           character.status = 'surrendered'; // 恢复为已投降状态
           character.troopDeployment = undefined;
+          character.formationPosition = undefined; // 清除位置信息
         }
       });
 
@@ -273,7 +274,9 @@ export class FormationService {
               paladinGoblins: captain.troops.哥布林圣骑士 || 0,
             };
             character.troopDeployment = troopDeployment;
-            console.log(`人物 ${character.name} 的部队编制:`, troopDeployment);
+            // 保存位置信息（1-6）
+            character.formationPosition = index + 1;
+            console.log(`人物 ${character.name} 的部队编制:`, troopDeployment, `位置: ${character.formationPosition}`);
           } else {
             console.warn(`未找到ID为 ${captain.id} 的人物`);
           }
@@ -307,7 +310,7 @@ export class FormationService {
         return [];
       }
 
-      const captainSlots: (Captain | null)[] = [];
+      const captainSlots: (Captain | null)[] = Array(6).fill(null);
       const characters = gameData.training.characters;
 
       // 查找所有已编制的人物
@@ -315,31 +318,41 @@ export class FormationService {
         (char: Character) => char.status === 'deployed' && char.troopDeployment,
       );
 
-      // 创建队长槽位数据（6个槽位）
-      for (let i = 0; i < 6; i++) {
-        const character = deployedCharacters[i];
-        if (character && character.troopDeployment) {
-          const captain: Captain = {
-            id: character.id,
-            name: character.name,
-            avatar: character.avatar || '',
-            level: character.level,
-            offspring: character.offspring,
-            attributes: character.attributes,
-            description: character.title || '',
-            isUsed: true,
-            troops: {
-              普通哥布林: character.troopDeployment.normalGoblins,
-              哥布林战士: character.troopDeployment.warriorGoblins,
-              哥布林萨满: character.troopDeployment.shamanGoblins,
-              哥布林圣骑士: character.troopDeployment.paladinGoblins,
-            },
-          };
-          captainSlots.push(captain);
+      console.log(
+        '找到已编制的人物:',
+        deployedCharacters.map(c => ({ name: c.name, position: c.formationPosition })),
+      );
+
+      // 根据位置信息恢复队长槽位数据
+      deployedCharacters.forEach((character: Character) => {
+        if (character.troopDeployment && character.formationPosition) {
+          const position = character.formationPosition - 1; // 转换为0-5的索引
+          if (position >= 0 && position < 6) {
+            const captain: Captain = {
+              id: character.id,
+              name: character.name,
+              avatar: character.avatar || '',
+              level: character.level,
+              offspring: character.offspring,
+              attributes: character.attributes,
+              description: character.title || '',
+              isUsed: true,
+              troops: {
+                普通哥布林: character.troopDeployment.normalGoblins,
+                哥布林战士: character.troopDeployment.warriorGoblins,
+                哥布林萨满: character.troopDeployment.shamanGoblins,
+                哥布林圣骑士: character.troopDeployment.paladinGoblins,
+              },
+            };
+            captainSlots[position] = captain;
+            console.log(`人物 ${character.name} 恢复到位置 ${character.formationPosition}`);
+          } else {
+            console.warn(`人物 ${character.name} 的位置信息无效: ${character.formationPosition}`);
+          }
         } else {
-          captainSlots.push(null);
+          console.warn(`人物 ${character.name} 缺少位置信息，跳过恢复`);
         }
-      }
+      });
 
       console.log('从存档系统加载部队编制数据:', captainSlots);
       return captainSlots;

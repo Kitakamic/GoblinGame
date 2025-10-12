@@ -128,6 +128,7 @@ export class HeroDeterminationService {
    * @param locationDescription 据点描述
    * @param continent 大陆名称
    * @param region 区域名称
+   * @param pictureResource 据点的图片资源信息
    * @returns 英雄人物生成提示词
    */
   static generateHeroPrompt(
@@ -136,6 +137,7 @@ export class HeroDeterminationService {
     locationDescription?: string,
     continent?: string,
     region?: string,
+    pictureResource?: Location['pictureResource'],
   ): string {
     // 获取区域描述信息
     let regionDescription = '';
@@ -153,33 +155,92 @@ export class HeroDeterminationService {
     const personalityStyle = this.rollPersonalityStylesCombination();
     console.log('🎲 [人物生成] 随机性格筛子结果:', personalityStyle);
 
-    return `<herorules>
-请为这个据点生成一个英雄人物，严格按照以下JSON格式输出，不要添加任何其他内容：
+    // 构建图片资源提示词
+    let pictureResourcePrompt = '';
+    if (pictureResource) {
+      console.log('🖼️ [人物生成] 据点图片资源信息:', {
+        id: pictureResource.id,
+        race: pictureResource.race,
+        class: pictureResource.class,
+        prompt: pictureResource.prompt.substring(0, 100) + '...',
+      });
+      pictureResourcePrompt = `
+人物外貌参考：
+- 种族：${pictureResource.race}
+- 职业：${pictureResource.class}
+- 绘图tags：${pictureResource.prompt}
 
-据点信息（以下信息请严格参考，增加代入感）：
-- 类型：${locationType}
-- 难度：${difficulty}/10
-- 描述：${locationDescription}
-- 大陆：${continent}
-- 区域：${region}:${regionDescription}
+请根据以上信息，在人物外貌描述中体现相应的视觉风格，确保人物形象绘图tags串基本一致。`;
+    }
 
-人物要求：
-1. 与据点类型和难度相匹配的实力
-2. 英雄的背景和身份应该与据点描述相符
-3. 严格按照以下JSON格式输出，不要添加任何其他内容
-4. **人物整体风格为：${personalityStyle}** - 请在人物的性格、外貌描述、成长经历、隐藏特质等各个方面都体现这种风格特征
-5. 人物的性格特征、行为表现、内心想法都应该与"${personalityStyle}"这一风格保持一致
-</herorules>
+    return `<namerules>
+命名规则总纲:
+
+  基本结构:
+    人类平民: 名 + 姓
+    人类贵族: 名 + 中间名(可选) + 家族姓氏
+    精灵: 名 (自然元素+星月/歌唱感) + 补充后缀
+    黑暗精灵: 名 (神秘/黑暗词根) + 阴沉后缀
+    狐人: 日式名 (优雅或活泼) + 地名/自然意象
+
+  名字生成:
+    词根来源:
+      - 古典神话: ["Dian", "Athena", "Minerv", "Lun", "Aur"]
+      - 圣经人物: ["Maria", "Elisab", "Rebec", "Sar", "Ann"]
+      - 花卉植物: ["Ros", "Lil", "Viola", "Jasm", "Peon"]
+      - 宝石矿物: ["Sapph", "Rubin", "Emer", "Pearl", "Topaz"]
+      - 天体星辰: ["Stell", "Auror", "Selene", "Vega", "Sol"]
+      - 美德寓意: ["Soph", "Victor", "Flor", "Const", "Adel"]
+      - 自然意象: ["Snow", "Moon", "Star", "Flame", "Shadow"]
+
+    变体后缀:
+      - 通用: ["a", "ia", "ina", "elle", "ara", "wyn", "ine", "is"]
+      - 精灵: ["iel", "wyn", "anor", "thir", "lith"]
+      - 黑暗精灵: ["dra", "zhar", "mour", "vash"]
+      - 狐人(日式): ["ko", "mi", "na", "maru"]
+
+    名字组合规则:
+      - 从词根池中选择 1-2 个音节
+      - 随机拼接一个种族风格化后缀
+      - 若为贵族/精灵，可额外添加修饰中间名
+      - 确保最终名字长度 ≤ 15 字符
+
+  姓氏生成:
+    前缀: ["De", "Van", "Von", "La", "O’"]
+    核心元素:
+      - 地名: ["Flor", "Vienn", "Amster", "Lyon", "Rosa"]
+      - 自然: ["Mont", "Stern", "Wild", "Eisen", "Val"]
+      - 动物: ["Leo", "Lup", "Aigle", "Swan", "Drak"]
+      - 职业: ["Smith", "Cook", "Miller", "Baker"]
+    后缀: ["berg", "stein", "heim", "rose", "val", "ford", "hart"]
+
+    姓氏组合规则:
+      - 姓氏 = 前缀 + " " + 核心 + 后缀
+      - 示例: Von Sternheim, De La Rosaval, Van Florhart
+
+  修饰与头衔:
+    中间名: ["Augusta", "Sebastian", "Margareta", "Alexandra"]
+    绰号: ["黄金之手", "银月", "赤焰", "冰心"]
+    地理头衔: ["of Montrose", "of Florencia", "of Lyonhart"]
+
+  生成要求:
+    - 每个名字唯一，不可重复
+    - 保持优雅高贵，避免现代俗气
+    - 名字与姓氏需协调发音
+    - 根据种族选择对应的风格化后缀
+    - 总长度控制在 15 字符以内
+</namerules>
+
 
 {
   "基础信息": {
-    "姓名": "人物姓名，参考命名规则",
-    "种族": "人类/狐族/永恒精灵/黑暗精灵/天使/魔族",
+    "姓名": "人物姓名，参考命名规则<namerules>",
+    "种族": "人类/狐族/永恒精灵/黑暗精灵",
     "年龄": 数字,
     "国家": "国家名称",
-    "身份": "具体职业身份，如"白玫瑰骑士团团长/翡翠王国公主等"，10个字以内",
+    "身份": "具体身份而非单纯的职业，如"白玫瑰骑士团团长/翡翠王国公主等"，10个字以内",
     "出身": "出身等级，只能选择：平民/贵族/王族",
-    "性格": ["性格1", "性格2", "性格3"，必须为五个**四字词语**，需要体现"${personalityStyle}"的特征],
+    "性格": ["性格1", "性格2"...必须为四个**四字词语**，需要体现"${personalityStyle}"的特征，但不要完全一样],
     "可战斗": true/false {可战斗属性：根据身份判断，例如：战士、骑士、法师等战斗职业为true，商人、工匠、学者等非战斗职业为false}
   },
   "外貌数据": {
@@ -187,7 +248,7 @@ export class HeroDeterminationService {
     "体重": 数字,
     "三围": "胸围-腰围-臀围，不需要带字母",
     "罩杯": "A/B/C/D/E/F/G",
-    "描述": "使用最少200字优美细致的语言，从头到脚由宏观到细节描述人物整体，包含体型、肌肤/头发颜色、长度/眼睛/面容细节/四肢，如同是在拍摄写真一般，要有画面感。外貌描述需要体现"${personalityStyle}"的气质特征"
+    "描述": "使用最少150字优美细致的语言，从头到脚由宏观到细节描述人物整体，包含体型、肌肤/头发颜色、长度/眼睛/面容细节/四肢，如同是在拍摄写真一般，要有画面感。外貌描述需要体现"${personalityStyle}"的气质特征"
     "衣着": {
       "头部": "头部装饰/帽子/头盔，所有衣着描述请使用**形容词+名词结构，例如深蓝色碎花裙**格式，且如果此部位未穿着可以不输出此行",
       "上装": "上装",
@@ -234,12 +295,25 @@ export class HeroDeterminationService {
   }
 }
 
-注意：
-1. 必须严格按照JSON格式输出
-2. 敏感点中只能有一个部位为true，其他都为false
-3. 所有字符串值用双引号包围
-4. 不要添加任何注释或额外内容
-5. ***禁止输出任何剧情，也不要开始剧情，正文只需要json人物信息***
+<herorules>
+请为这个据点生成一个英雄人物，严格按照JSON格式输出，不要添加任何其他内容：
+
+据点信息（以下信息请严格参考，增加代入感）：
+- 类型：${locationType}
+- 难度：${difficulty}/10
+- 描述：${locationDescription}
+- 大陆：${continent}
+- 区域：${region}:${regionDescription}
+${pictureResourcePrompt}
+
+人物要求：
+1. 与据点类型和难度相匹配的实力
+2. 英雄的背景和身份应该与据点描述相符
+3. 严格按照以下JSON格式输出，不要添加任何其他内容
+4. **人物整体风格为：${personalityStyle}** - 请在人物的性格、外貌描述、成长经历、隐藏特质等各个方面都体现这种风格特征
+5. 人物的性格特征、行为表现、内心想法都应该与"${personalityStyle}"这一风格保持一致
+6. **重要**：***人物的种族和基础外貌描述必须与图片Tags保持一致，但职业可以做参考，不要求完全一致，前提是符合Tags的人物装束***
+</herorules>
 `;
   }
 
@@ -248,12 +322,14 @@ export class HeroDeterminationService {
    * @param heroText 英雄人物文本
    * @param locationId 来源据点ID
    * @param locationType 据点类型
+   * @param pictureResource 据点的图片资源信息（可选）
    * @returns 解析后的人物对象
    */
   static async parseHeroCharacter(
     heroText: string,
     locationId: string,
     locationType: Location['type'],
+    pictureResource?: Location['pictureResource'],
   ): Promise<Character | null> {
     console.log('🚀 [人物生成] 开始处理英雄人物信息...');
     console.log('📍 [人物生成] 据点信息:', {
@@ -264,7 +340,7 @@ export class HeroDeterminationService {
 
     // 1. 解析JSON数据
     console.log('🔍 [人物生成] 步骤1: 开始解析JSON数据...');
-    const parsedData = CharacterParser.parseCharacterJson(heroText);
+    const parsedData = CharacterParser.parseCharacterJson(heroText, pictureResource);
     if (!parsedData) {
       console.error('❌ [人物生成] JSON解析失败，无法继续处理');
       return null;
@@ -283,33 +359,5 @@ export class HeroDeterminationService {
     }
 
     return character;
-  }
-
-  /**
-   * 根据据点类型获取英雄类型
-   * @param locationType 据点类型
-   * @returns 英雄类型
-   */
-  static getHeroTypeByLocation(locationType: Location['type']): string {
-    const heroTypes = this.getHeroTypesByLocation(locationType);
-    return heroTypes[Math.floor(Math.random() * heroTypes.length)];
-  }
-
-  /**
-   * 根据据点类型获取可能的英雄类型
-   * @param locationType 据点类型
-   * @returns 英雄类型列表
-   */
-  private static getHeroTypesByLocation(locationType: Location['type']): string[] {
-    const heroTypeMap: Record<Location['type'], string[]> = {
-      village: ['村姑', '村医', '教师', '民兵'],
-      town: ['女商人', '女贵族', '女骑士', '女法师'],
-      fortress: ['女将军', '女指挥官', '女战士', '女圣骑士'],
-      ruins: ['女冒险者', '女盗贼', '女法师', '女学者'],
-      dungeon: ['女祭司', '女法师', '女战士', '女盗贼'],
-      city: ['女贵族', '女骑士', '女法师', '女圣骑士', '公主', '女仆', '王后'],
-    };
-
-    return heroTypeMap[locationType] || ['女战士'];
   }
 }

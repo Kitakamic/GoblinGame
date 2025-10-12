@@ -248,6 +248,7 @@ import { WorldbookService } from './世界书管理/世界书服务';
 import HistoryModal from './历史记录/历史记录界面.vue';
 import SaveLoadModal from './存档管理/存档界面.vue';
 import { modularSaveManager } from './存档管理/模块化存档服务';
+import { continentExploreService } from './探索/服务/大陆探索服务';
 import { TimeParseService } from './服务/时间解析服务';
 import { PlayerLevelService } from './服务/玩家等级服务';
 import { BreedingService } from './服务/生育服务';
@@ -391,6 +392,10 @@ const initializeSaveSystem = async () => {
     // 初始化模块化存档管理器
     await modularSaveManager.init();
 
+    // 等待大陆探索服务初始化完成
+    console.log('🔍 [app.vue] 等待大陆探索服务初始化...');
+    await new Promise(resolve => setTimeout(resolve, 200)); // 等待200ms确保大陆探索服务初始化完成
+
     // 初始化资源世界书条目
     const currentResources = {
       gold: modularSaveManager.resources.value.gold || 0,
@@ -408,7 +413,12 @@ const initializeSaveSystem = async () => {
       conqueredRegions: modularSaveManager.resources.value.conqueredRegions || 0,
     };
 
-    await WorldbookService.initializeResourcesWorldbook(currentResources);
+    // 获取大陆数据
+    const continents = continentExploreService.continents.value || [];
+    console.log('🔍 [app.vue] 获取到的大陆数据:', continents);
+    console.log('🔍 [app.vue] 大陆数量:', continents.length);
+
+    await WorldbookService.initializeResourcesWorldbook(currentResources, continents);
     console.log('资源世界书条目初始化完成');
 
     isSaveSystemInitialized.value = true;
@@ -658,7 +668,14 @@ const handleInitGame = async () => {
       conqueredRegions: modularSaveManager.resources.value.conqueredRegions || 0,
     };
 
-    await WorldbookService.initializeResourcesWorldbook(currentResources);
+    // 等待大陆探索服务初始化完成
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // 获取大陆数据
+    const continents2 = continentExploreService.continents.value || [];
+    console.log('🔍 [app.vue] 新游戏获取到的大陆数据:', continents2);
+
+    await WorldbookService.initializeResourcesWorldbook(currentResources, continents2);
     console.log('新游戏资源世界书条目初始化完成');
 
     console.log('新游戏开始完成');
@@ -1074,7 +1091,10 @@ const endRound = async () => {
         conqueredRegions: modularSaveManager.resources.value.conqueredRegions || 0,
       };
 
-      await WorldbookService.updateResourcesWorldbook(currentResources);
+      // 获取大陆数据
+      const continents3 = continentExploreService.continents.value || [];
+
+      await WorldbookService.updateResourcesWorldbook(currentResources, continents3);
       console.log('资源世界书更新完成');
     } catch (error) {
       console.error('更新资源世界书失败:', error);
@@ -1149,8 +1169,11 @@ onMounted(async () => {
       conqueredRegions: modularSaveManager.resources.value.conqueredRegions || 0,
     };
 
+    // 获取大陆数据
+    const continents4 = continentExploreService.continents.value || [];
+
     // 更新资源世界书到初始状态
-    await WorldbookService.updateResourcesWorldbook(currentResources);
+    await WorldbookService.updateResourcesWorldbook(currentResources, continents4);
     console.log('资源世界书已更新到初始状态');
   } catch (error) {
     console.error('清理世界书失败:', error);
