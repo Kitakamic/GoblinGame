@@ -117,6 +117,7 @@ export class ContinentExploreService {
       requiredStars: parseInt(row['征服需要总星级']) || 0,
       unlockStars: parseInt(row['解锁星级']) || 0,
       capital: row['首都'] || '',
+      isCapitalConquered: false, // 默认首都未征服
       threatLevel: 0,
       locations: [],
     }));
@@ -485,16 +486,23 @@ export class ContinentExploreService {
         `区域 ${region.name} 征服进度: ${progress.toFixed(1)}% (${conqueredStars}/${region.requiredStars}星)`,
       );
 
-      // 检查区域是否完全征服
-      if (progress >= 100 && !region.isConquered) {
+      // 检查区域是否完全征服（需要满足星级要求和首都征服条件）
+      const isStarsConquered = progress >= 100;
+      const isCapitalConquered = !region.capital || region.isCapitalConquered;
+
+      if (isStarsConquered && isCapitalConquered && !region.isConquered) {
         region.isConquered = true;
-        console.log(`区域 ${region.name} 已完全征服`);
+        console.log(
+          `区域 ${region.name} 已完全征服（星级: ${conqueredStars}/${region.requiredStars}, 首都: ${region.capital ? (region.isCapitalConquered ? '已征服' : '未征服') : '无'})`,
+        );
 
         // 区域完全征服时增加行动力上限
         this.addActionPointsFromRegionConquest();
 
         // 检查是否可以解锁下一个区域
         this.checkNextRegionUnlock(regionName);
+      } else if (isStarsConquered && !isCapitalConquered) {
+        console.log(`区域 ${region.name} 星级已达标但首都 ${region.capital} 未征服，无法完全征服区域`);
       }
 
       // 更新对应的大陆征服进度
@@ -584,6 +592,36 @@ export class ContinentExploreService {
         }
       }
     });
+  }
+
+  // 检查据点是否为区域首都
+  public isLocationCapital(locationName: string, regionName: string): boolean {
+    const region = this.findRegionByName(regionName);
+    if (!region) {
+      return false;
+    }
+    return region.capital === locationName;
+  }
+
+  // 更新首都征服状态
+  public updateCapitalConquestStatus(regionName: string, isConquered: boolean): void {
+    try {
+      const region = this.findRegionByName(regionName);
+      if (!region) {
+        console.warn(`区域 ${regionName} 不存在`);
+        return;
+      }
+
+      region.isCapitalConquered = isConquered;
+      console.log(`区域 ${region.name} 首都 ${region.capital} 征服状态更新为: ${isConquered ? '已征服' : '未征服'}`);
+
+      // 重新计算区域征服进度
+      this.calculateRegionProgressFromLocations(regionName);
+
+      this.saveExploreData();
+    } catch (error) {
+      console.error('更新首都征服状态失败:', error);
+    }
   }
 
   // 重新计算所有区域的征服进度（供外部调用）
@@ -706,6 +744,7 @@ export class ContinentExploreService {
             if (!region.requiredStars) region.requiredStars = 0;
             if (!region.unlockStars) region.unlockStars = 0;
             if (!region.capital) region.capital = '';
+            if (region.isCapitalConquered === undefined) region.isCapitalConquered = false;
             if (!region.threatLevel) region.threatLevel = 0;
             if (!region.locations) region.locations = [];
           });
@@ -769,6 +808,7 @@ export class ContinentExploreService {
               requiredStars: Number(region.requiredStars) || 0,
               unlockStars: Number(region.unlockStars) || 0,
               capital: region.capital || '',
+              isCapitalConquered: Boolean(region.isCapitalConquered),
               threatLevel: Number(region.threatLevel) || 0,
               locations: region.locations || [],
             }))
@@ -801,6 +841,7 @@ export class ContinentExploreService {
           region.isUnlocked = false;
           region.isConquered = false;
           region.conquestProgress = 0;
+          region.isCapitalConquered = false;
           region.threatLevel = 0;
         });
       });

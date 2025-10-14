@@ -91,6 +91,14 @@
               </div>
               <span class="progress-text">{{ Math.round(region.conquestProgress) }}%</span>
             </div>
+            <!-- 首都征服状态 -->
+            <div v-if="region.capital" class="capital-status">
+              <span class="capital-icon">🏛️</span>
+              <span class="capital-name">{{ region.capital }}</span>
+              <span class="capital-conquest" :class="{ conquered: region.isCapitalConquered }">
+                {{ region.isCapitalConquered ? '已征服' : '未征服' }}
+              </span>
+            </div>
           </div>
           <div v-if="region.isConquered" class="conquered-badge">✅</div>
         </button>
@@ -130,6 +138,7 @@
                     {{ getDifficultyText(location.difficulty) }}
                   </span>
                   <span class="distance">{{ location.distance }}km</span>
+                  <span v-if="isLocationCapital(location)" class="capital-badge">🏛️首都</span>
                   <span class="status-badge" :class="getStatusClass(location)">
                     {{ getStatusText(location) }}
                   </span>
@@ -556,6 +565,13 @@ const getTotalEnemyTroops = (location: Location): number => {
 
   // 如果没有敌方单位数据，返回基础守军数量
   return location.baseGuards || 0;
+};
+
+// 检查据点是否为区域首都
+const isLocationCapital = (location: Location): boolean => {
+  const region = currentRegion.value;
+  if (!region) return false;
+  return region.capital === location.name;
 };
 
 const scoutLocation = async (location: Location) => {
@@ -1475,6 +1491,60 @@ onMounted(async () => {
           }
         }
       }
+
+      .capital-status {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 2px;
+        padding: 2px 4px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 3px;
+        font-size: 8px;
+
+        @media (max-width: 768px) {
+          gap: 2px;
+          padding: 1px 3px;
+          font-size: 7px;
+        }
+
+        .capital-icon {
+          font-size: 8px;
+          filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+
+          @media (max-width: 768px) {
+            font-size: 7px;
+          }
+        }
+
+        .capital-name {
+          color: #f0e6d2;
+          font-weight: 500;
+          opacity: 0.9;
+        }
+
+        .capital-conquest {
+          font-weight: 600;
+          padding: 1px 3px;
+          border-radius: 2px;
+          font-size: 7px;
+
+          @media (max-width: 768px) {
+            padding: 1px 2px;
+            font-size: 6px;
+          }
+
+          &.conquered {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+          }
+
+          &:not(.conquered) {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+          }
+        }
+      }
     }
 
     .conquered-badge {
@@ -1766,6 +1836,21 @@ onMounted(async () => {
               @media (max-width: 768px) {
                 font-size: 8px;
                 padding: 1px 3px;
+              }
+            }
+
+            .capital-badge {
+              padding: 1px 4px;
+              border-radius: 3px;
+              font-size: 9px;
+              font-weight: 600;
+              background: rgba(255, 215, 0, 0.2);
+              color: #ffd700;
+              border: 1px solid rgba(255, 215, 0, 0.4);
+
+              @media (max-width: 768px) {
+                padding: 1px 3px;
+                font-size: 8px;
               }
             }
 

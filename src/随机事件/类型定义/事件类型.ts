@@ -35,6 +35,7 @@ export interface EventTrigger {
   probability?: number; // 触发概率 (0-1)
   triggerOnce?: boolean; // 是否只触发一次
   triggerOnFirstContact?: boolean; // 是否在初次接触时触发
+  cooldownRounds?: number; // 冷却回合数，触发后多少回合内不会再次触发
 }
 
 // 事件奖励
@@ -94,4 +95,11 @@ export interface EventProcessResult {
   rewards?: EventReward[];
   penalties?: EventPenalty[];
   message: string;
+}
+
+// 事件历史记录
+export interface EventHistory {
+  eventId: string;
+  triggerRound: number;
+  cooldownUntil?: number; // 冷却结束回合数
 }

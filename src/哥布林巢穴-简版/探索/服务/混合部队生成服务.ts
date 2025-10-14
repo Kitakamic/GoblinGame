@@ -205,8 +205,8 @@ export class MixedTroopGenerationService {
       const enemyHeroes = location.rewards.heroes.filter(hero => hero.status === 'enemy' && hero.canCombat);
 
       for (const hero of enemyHeroes) {
-        // 英雄人物作为队长，分配适量部下
-        const heroTroopPercentage = 0.05 + Math.random() * 0.05; // 5-10%
+        // 英雄人物作为队长，分配更多部下（不低于30%）
+        const heroTroopPercentage = 0.3 + Math.random() * 0.1; // 30-40%
         const heroTroopCount = Math.max(1, Math.floor(remainingGuards * heroTroopPercentage));
 
         console.log(`[混合部队生成] 英雄单位 ${hero.name}:`, {
@@ -256,8 +256,8 @@ export class MixedTroopGenerationService {
 
     // 如果有特殊单位，在英雄单位之后分配
     if (specialUnit) {
-      // 自动分配特殊单位部队人数（占剩余守军的5-15%）
-      const specialTroopPercentage = 0.05 + Math.random() * 0.1; // 5-15%
+      // 自动分配特殊单位部队人数（占剩余守军的20-30%）
+      const specialTroopPercentage = 0.2 + Math.random() * 0.1; // 20-30%
       const specialTroopCount = Math.max(1, Math.floor(remainingGuards * specialTroopPercentage));
 
       console.log(`[混合部队生成] 特殊单位 ${specialUnit.name}:`, {

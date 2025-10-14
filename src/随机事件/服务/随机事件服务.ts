@@ -1,5 +1,12 @@
 import { roundStartEvents } from '../事件配置/回合开始事件';
-import { EventProcessResult, EventRarity, EventTriggerResult, EventType, RandomEvent } from '../类型定义/事件类型';
+import {
+  EventHistory,
+  EventProcessResult,
+  EventRarity,
+  EventTriggerResult,
+  EventType,
+  RandomEvent,
+} from '../类型定义/事件类型';
 
 /**
  * 随机事件服务
@@ -8,7 +15,7 @@ import { EventProcessResult, EventRarity, EventTriggerResult, EventType, RandomE
 export class RandomEventService {
   private static instance: RandomEventService;
   private registeredEvents: Map<string, RandomEvent> = new Map();
-  private eventHistory: string[] = [];
+  private eventHistory: EventHistory[] = []; // 改为存储详细的历史记录
 
   private constructor() {
     this.initializeEvents();
@@ -74,7 +81,7 @@ export class RandomEventService {
     const firstContactEvents = availableEvents.filter(event => event.trigger.triggerOnFirstContact);
     if (firstContactEvents.length > 0) {
       const selectedEvent = firstContactEvents[0]; // 选择第一个初见事件
-      this.eventHistory.push(selectedEvent.id);
+      this.recordEventTrigger(selectedEvent, currentRound);
       console.log(`触发初见事件: ${selectedEvent.name}`);
       return { triggered: true, event: selectedEvent };
     }
@@ -90,7 +97,7 @@ export class RandomEventService {
       // 选择触发的事件（基于概率权重）
       const selectedEvent = this.selectEventByProbability(availableEvents);
       if (selectedEvent) {
-        this.eventHistory.push(selectedEvent.id);
+        this.recordEventTrigger(selectedEvent, currentRound);
         return { triggered: true, event: selectedEvent };
       }
     }
@@ -141,7 +148,12 @@ export class RandomEventService {
     }
 
     // 检查是否只触发一次（如果已经触发过则不再触发）
-    if (trigger.triggerOnce && this.eventHistory.includes(event.id)) {
+    if (trigger.triggerOnce && this.hasEventTriggered(event.id)) {
+      return false;
+    }
+
+    // 检查CD冷却时间
+    if (trigger.cooldownRounds && this.isEventInCooldown(event.id, currentRound)) {
       return false;
     }
 
@@ -169,6 +181,83 @@ export class RandomEventService {
     }
 
     return events[events.length - 1];
+  }
+
+  /**
+   * 记录事件触发
+   */
+  private recordEventTrigger(event: RandomEvent, currentRound: number): void {
+    const cooldownRounds = event.trigger.cooldownRounds || 0;
+    const cooldownUntil = cooldownRounds > 0 ? currentRound + cooldownRounds : undefined;
+
+    this.eventHistory.push({
+      eventId: event.id,
+      triggerRound: currentRound,
+      cooldownUntil: cooldownUntil,
+    });
+
+    console.log(
+      `记录事件触发: ${event.name} (第${currentRound}回合)${cooldownUntil ? `, CD到第${cooldownUntil}回合` : ''}`,
+    );
+  }
+
+  /**
+   * 检查事件是否已触发过
+   */
+  private hasEventTriggered(eventId: string): boolean {
+    return this.eventHistory.some(history => history.eventId === eventId);
+  }
+
+  /**
+   * 检查事件是否在CD中
+   */
+  private isEventInCooldown(eventId: string, currentRound: number): boolean {
+    const eventHistory = this.eventHistory.find(history => history.eventId === eventId);
+    if (!eventHistory || !eventHistory.cooldownUntil) {
+      return false;
+    }
+
+    const isInCooldown = currentRound < eventHistory.cooldownUntil;
+    if (isInCooldown) {
+      console.log(`事件 ${eventId} 在CD中，冷却到第${eventHistory.cooldownUntil}回合 (当前第${currentRound}回合)`);
+    }
+
+    return isInCooldown;
+  }
+
+  /**
+   * 获取事件CD状态
+   */
+  public getEventCooldownStatus(
+    eventId: string,
+    currentRound: number,
+  ): { inCooldown: boolean; cooldownUntil?: number; remainingRounds?: number } {
+    const eventHistory = this.eventHistory.find(history => history.eventId === eventId);
+    if (!eventHistory || !eventHistory.cooldownUntil) {
+      return { inCooldown: false };
+    }
+
+    const inCooldown = currentRound < eventHistory.cooldownUntil;
+    const remainingRounds = inCooldown ? eventHistory.cooldownUntil - currentRound : 0;
+
+    return {
+      inCooldown,
+      cooldownUntil: eventHistory.cooldownUntil,
+      remainingRounds: remainingRounds > 0 ? remainingRounds : undefined,
+    };
+  }
+
+  /**
+   * 清理过期的CD记录（可选优化）
+   */
+  public cleanupExpiredCooldowns(currentRound: number): void {
+    this.eventHistory = this.eventHistory.filter(history => {
+      if (history.cooldownUntil && currentRound >= history.cooldownUntil) {
+        console.log(`清理过期CD: ${history.eventId} (CD已结束)`);
+        return false;
+      }
+      return true;
+    });
   }
 
   /**

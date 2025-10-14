@@ -10,8 +10,9 @@ export const roundStartEvents: RandomEvent[] = [
     type: EventType.RANDOM,
     rarity: EventRarity.COMMON,
     trigger: {
-      minRound: 1,
-      probability: 0.1,
+      minRound: 3,
+      probability: 0.2,
+      cooldownRounds: 5, // 触发后5回合内不会再次触发
     },
     dialogueConfig: {
       title: '📰 世界传闻',
@@ -25,8 +26,7 @@ export const roundStartEvents: RandomEvent[] = [
       ],
       onAIGenerate: async () => {
         // 仔细了解传闻的提示词
-        const prompt = `
-        请作为一个中立的叙述者，讲述世界上目前对于哥布林巢穴的传闻。
+        const prompt = `请作为一个中立的叙述者，讲述世界目前对于哥布林巢穴的传闻。
 
 指导原则：
 1. 参考世界书中的相关设定，如世界设定/大陆设定/势力种族设定/哥布林设定等
@@ -34,6 +34,7 @@ export const roundStartEvents: RandomEvent[] = [
 3. 用第三人称叙述，类似故事中的旁白，语言要生动真实，符合奇幻冒险色情游戏的风格
 4. 保持神秘和紧张的氛围
 5. 字数控制在400字左右
+6. 以**特拉希尔世界传闻录**为开头
 `;
 
         try {
@@ -137,8 +138,8 @@ export const roundStartEvents: RandomEvent[] = [
     trigger: {
       minRound: 1,
       requiredContinentConquest: {
-        continentName: '中央',
-        minConquestProgress: 1, // 只要开始入侵中央大陆就触发
+        continentName: '世界树圣域',
+        minConquestProgress: 1, // 只要开始入侵世界树圣域就触发
       },
       triggerOnce: true, // 只触发一次
       triggerOnFirstContact: true, // 初次接触时触发
@@ -334,6 +335,7 @@ export const roundStartEvents: RandomEvent[] = [
         minConquestProgress: 1, // 只要开始入侵赛菲亚大陆就可能触发
       },
       probability: 0.15, // 降低概率
+      cooldownRounds: 3, // 触发后3回合内不会再次触发
     },
     dialogueConfig: {
       title: '🏛️ 帝国反应',
@@ -396,10 +398,11 @@ export const roundStartEvents: RandomEvent[] = [
     trigger: {
       minRound: 8,
       requiredContinentConquest: {
-        continentName: '中央',
-        minConquestProgress: 1, // 只要开始入侵中央大陆就可能触发
+        continentName: '世界树圣域',
+        minConquestProgress: 1, // 只要开始入侵世界树圣域就可能触发
       },
       probability: 0.12, // 降低概率
+      cooldownRounds: 5, // 触发后5回合内不会再次触发
     },
     dialogueConfig: {
       title: '🌳 精灵议会',
@@ -467,6 +470,7 @@ export const roundStartEvents: RandomEvent[] = [
         minConquestProgress: 1, // 只要开始入侵瓦尔基里大陆就可能触发
       },
       probability: 0.14, // 降低概率
+      cooldownRounds: 4, // 触发后4回合内不会再次触发
     },
     dialogueConfig: {
       title: '🌑 暗影密会',
@@ -534,6 +538,7 @@ export const roundStartEvents: RandomEvent[] = [
         minConquestProgress: 1, // 只要开始入侵香草群岛就可能触发
       },
       probability: 0.1, // 降低概率
+      cooldownRounds: 6, // 触发后6回合内不会再次触发
     },
     dialogueConfig: {
       title: '🦊 九尾神社',
@@ -601,6 +606,7 @@ export const roundStartEvents: RandomEvent[] = [
         minConquestProgress: 1, // 只要开始入侵香草群岛就可能触发
       },
       probability: 0.18, // 降低概率
+      cooldownRounds: 2, // 触发后2回合内不会再次触发
     },
     dialogueConfig: {
       title: '🍁 红叶商盟',
@@ -666,6 +672,7 @@ export const roundStartEvents: RandomEvent[] = [
       minRound: 3,
       requiredThreat: 200,
       probability: 0.25,
+      cooldownRounds: 5, // 触发后2回合内不会再次触发
     },
     dialogueConfig: {
       title: '🚫 商路中断',
@@ -674,9 +681,8 @@ export const roundStartEvents: RandomEvent[] = [
       welcomeHint: '哥布林巢穴的扩张已经开始影响大陆间的贸易往来...',
       showCustomInput: false,
       initialOptions: [
-        { text: '了解中断详情', label: '详情', value: 'details' },
-        { text: '分析经济影响', label: '影响', value: 'impact' },
-        { text: '关注商队安全', label: '安全', value: 'safety' },
+        { text: '查看此事件', label: '查看', value: 'view' },
+        { text: '忽略此事件(不建议)', label: '忽略', value: 'ignore' },
       ],
       onAIGenerate: async () => {
         const prompt = `
@@ -731,6 +737,7 @@ export const roundStartEvents: RandomEvent[] = [
       minRound: 4,
       requiredThreat: 600,
       probability: 0.2,
+      cooldownRounds: 5, // 触发后3回合内不会再次触发
     },
     dialogueConfig: {
       title: '🏃 难民潮',
@@ -739,9 +746,8 @@ export const roundStartEvents: RandomEvent[] = [
       welcomeHint: '随着哥布林威胁的扩大，大量难民开始逃离家园，寻求安全...',
       showCustomInput: false,
       initialOptions: [
-        { text: '了解难民情况', label: '情况', value: 'situation' },
-        { text: '关注接收地区', label: '接收', value: 'reception' },
-        { text: '分析社会影响', label: '影响', value: 'social_impact' },
+        { text: '查看此事件', label: '查看', value: 'view' },
+        { text: '忽略此事件(不建议)', label: '忽略', value: 'ignore' },
       ],
       onAIGenerate: async () => {
         const prompt = `

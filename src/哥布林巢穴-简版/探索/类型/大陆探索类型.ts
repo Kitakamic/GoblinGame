@@ -41,6 +41,7 @@ export interface Region {
   requiredStars: number; // 征服需要总星级
   unlockStars: number; // 解锁星级
   capital: string; // 首都名称（可选）
+  isCapitalConquered: boolean; // 首都是否已征服
   // 威胁度
   threatLevel: number;
   // 据点列表

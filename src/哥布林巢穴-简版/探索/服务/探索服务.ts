@@ -633,6 +633,23 @@ export class ExploreService {
     }
   }
 
+  // 检查并更新首都征服状态
+  private async checkAndUpdateCapitalConquest(location: Location): Promise<void> {
+    try {
+      const { continentExploreService } = await import('./大陆探索服务');
+
+      // 检查据点是否为区域首都
+      const isCapital = continentExploreService.isLocationCapital(location.name, location.region || '');
+
+      if (isCapital) {
+        console.log(`据点 ${location.name} 是区域 ${location.region} 的首都，更新首都征服状态`);
+        continentExploreService.updateCapitalConquestStatus(location.region || '', true);
+      }
+    } catch (error) {
+      console.error('检查首都征服状态失败:', error);
+    }
+  }
+
   // 根据据点征服更新区域征服进度
   private async updateRegionProgressFromLocation(location: Location): Promise<void> {
     try {
@@ -700,6 +717,9 @@ export class ExploreService {
 
           // 根据据点等级增加威胁度
           this.addThreatFromConquest(location);
+
+          // 检查是否为区域首都
+          await this.checkAndUpdateCapitalConquest(location);
 
           // 触发区域征服进度的重新计算
           await this.updateRegionProgressFromLocation(location);
