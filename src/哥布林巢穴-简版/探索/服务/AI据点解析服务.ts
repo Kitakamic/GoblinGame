@@ -229,6 +229,7 @@ export class LocationParser {
             class: pictureResource.class,
             prompt: pictureResource.prompt,
             imageUrl: pictureResource.imageUrl,
+            generatedName: pictureResource.generatedName,
           };
         } else {
           console.warn(
@@ -427,6 +428,7 @@ export class LocationParser {
                 class: pictureResource.class,
                 prompt: pictureResource.prompt,
                 imageUrl: pictureResource.imageUrl,
+                generatedName: pictureResource.generatedName,
               };
             } else {
               console.warn(

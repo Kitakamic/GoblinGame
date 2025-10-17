@@ -323,12 +323,13 @@ export class NewBattleSystem {
     const critChance = 0.08 + attacker.attributes.intelligence * 0.003;
     const critical = Math.random() < critChance;
 
-    // 法术伤害计算：魔法单位使用智力值，防御力影响较小
-    const baseDamage = baseIntelligence - Math.floor(baseDefense * 0.5);
+    // 魔法伤害计算：无视50%防御，伤害系数0.8-1.2浮动
+    const effectiveDefense = Math.floor(baseDefense * 0.5); // 无视50%防御
+    const baseDamage = baseIntelligence - effectiveDefense;
 
-    // 魔法伤害随机倍数：1.0-1.5倍
-    const randomMultiplier = 1.0 + Math.random() * 0.5;
-    const damageMultiplier = critical ? 2.5 : randomMultiplier;
+    // 魔法伤害随机系数：0.8-1.2倍
+    const randomMultiplier = 0.8 + Math.random() * 0.4; // 0.8-1.2
+    const damageMultiplier = critical ? 2.0 : randomMultiplier;
 
     const finalDamage = Math.max(1, Math.floor(baseDamage * damageMultiplier));
 

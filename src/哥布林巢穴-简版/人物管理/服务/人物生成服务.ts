@@ -157,13 +157,22 @@ export class HeroDeterminationService {
 
     // 构建图片资源提示词
     let pictureResourcePrompt = '';
+    let generatedName = '';
     if (pictureResource) {
       console.log('🖼️ [人物生成] 据点图片资源信息:', {
         id: pictureResource.id,
         race: pictureResource.race,
         class: pictureResource.class,
         prompt: pictureResource.prompt.substring(0, 100) + '...',
+        generatedName: pictureResource.generatedName?.fullName || '未生成',
       });
+
+      // 使用生成的名称
+      if (pictureResource.generatedName?.fullName) {
+        generatedName = pictureResource.generatedName.fullName;
+        console.log('🎭 [人物生成] 使用生成的名称:', generatedName);
+      }
+
       pictureResourcePrompt = `
 人物外貌参考：
 - 种族：${pictureResource.race}
@@ -173,68 +182,12 @@ export class HeroDeterminationService {
 请根据以上信息，在人物外貌描述中体现相应的视觉风格，确保人物形象绘图tags串基本一致。`;
     }
 
-    return `<namerules>
-命名规则总纲:
-
-  基本结构:
-    人类平民: 名 + 姓
-    人类贵族: 名 + 中间名(可选) + 家族姓氏
-    精灵: 名 (自然元素+星月/歌唱感) + 补充后缀
-    黑暗精灵: 名 (神秘/黑暗词根) + 阴沉后缀
-    狐人: 日式名 (优雅或活泼) + 地名/自然意象
-
-  名字生成:
-    词根来源:
-      - 古典神话: ["Dian", "Athena", "Minerv", "Lun", "Aur"]
-      - 圣经人物: ["Maria", "Elisab", "Rebec", "Sar", "Ann"]
-      - 花卉植物: ["Ros", "Lil", "Viola", "Jasm", "Peon"]
-      - 宝石矿物: ["Sapph", "Rubin", "Emer", "Pearl", "Topaz"]
-      - 天体星辰: ["Stell", "Auror", "Selene", "Vega", "Sol"]
-      - 美德寓意: ["Soph", "Victor", "Flor", "Const", "Adel"]
-      - 自然意象: ["Snow", "Moon", "Star", "Flame", "Shadow"]
-
-    变体后缀:
-      - 通用: ["a", "ia", "ina", "elle", "ara", "wyn", "ine", "is"]
-      - 精灵: ["iel", "wyn", "anor", "thir", "lith"]
-      - 黑暗精灵: ["dra", "zhar", "mour", "vash"]
-      - 狐人(日式): ["ko", "mi", "na", "maru"]
-
-    名字组合规则:
-      - 从词根池中选择 1-2 个音节
-      - 随机拼接一个种族风格化后缀
-      - 若为贵族/精灵，可额外添加修饰中间名
-      - 确保最终名字长度 ≤ 15 字符
-
-  姓氏生成:
-    前缀: ["De", "Van", "Von", "La", "O’"]
-    核心元素:
-      - 地名: ["Flor", "Vienn", "Amster", "Lyon", "Rosa"]
-      - 自然: ["Mont", "Stern", "Wild", "Eisen", "Val"]
-      - 动物: ["Leo", "Lup", "Aigle", "Swan", "Drak"]
-      - 职业: ["Smith", "Cook", "Miller", "Baker"]
-    后缀: ["berg", "stein", "heim", "rose", "val", "ford", "hart"]
-
-    姓氏组合规则:
-      - 姓氏 = 前缀 + " " + 核心 + 后缀
-      - 示例: Von Sternheim, De La Rosaval, Van Florhart
-
-  修饰与头衔:
-    中间名: ["Augusta", "Sebastian", "Margareta", "Alexandra"]
-    绰号: ["黄金之手", "银月", "赤焰", "冰心"]
-    地理头衔: ["of Montrose", "of Florencia", "of Lyonhart"]
-
-  生成要求:
-    - 每个名字唯一，不可重复
-    - 保持优雅高贵，避免现代俗气
-    - 名字与姓氏需协调发音
-    - 根据种族选择对应的风格化后缀
-    - 总长度控制在 15 字符以内
-</namerules>
+    return `
 
 
 {
   "基础信息": {
-    "姓名": "人物姓名，参考命名规则<namerules>",
+    "姓名": "${generatedName}，请参考这个名称，可以适当根据人物身份进行修改，**注意优先音译，禁止直译**",
     "种族": "人类/狐族/永恒精灵/黑暗精灵",
     "年龄": 数字,
     "国家": "国家名称",

@@ -21,6 +21,7 @@
         :key="character.id"
         class="character-card"
         :class="[getRatingClass(character.rating || 'D'), { selected: selectedCharacter?.id === character.id }]"
+        :data-character-id="character.id"
         @click="openCharacterMenu(character)"
       >
         <!-- 人物肖像图片区域 -->
@@ -87,7 +88,7 @@
               disabled: false,
             }"
             :disabled="false"
-            title="换装（功能待实装）"
+            title="换装"
             @click="selectedCharacter && openOutfitMenu(selectedCharacter)"
           >
             <span class="btn-icon">👗</span>
@@ -154,9 +155,14 @@
           >
             <span class="btn-icon">⚔️</span>
           </button>
-          <!-- 堕落按钮 - 只在忠诚度达到100%且未堕落时显示 -->
+          <!-- 堕落按钮 - 只在忠诚度达到100%且未堕落且未编制时显示 -->
           <button
-            v-if="selectedCharacter && selectedCharacter.loyalty >= 100 && selectedCharacter.status !== 'surrendered'"
+            v-if="
+              selectedCharacter &&
+              selectedCharacter.loyalty >= 100 &&
+              selectedCharacter.status !== 'surrendered' &&
+              selectedCharacter.status !== 'deployed'
+            "
             class="wheel-btn corruption"
             :class="{ 'btn-5': true }"
             title="完成堕落"
@@ -216,6 +222,14 @@
       </div>
     </div>
 
+    <!-- 换装界面 -->
+    <OutfitInterface
+      :show="showOutfitModal"
+      :character="selectedCharacter"
+      @close="closeOutfitModal"
+      @save-outfit="saveOutfit"
+    />
+
     <!-- 手动调教界面（暂时接入选项式界面） -->
     <OptionTrainingInterface
       v-if="showManualTraining && selectedCharacter"
@@ -230,10 +244,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, ref } from 'vue';
+import { computed, nextTick, onActivated, onMounted, ref } from 'vue';
 import { WorldbookService } from '../世界书管理/世界书服务';
-import type { Character } from '../世界书管理/人物类型';
+import { AvatarSwitchService } from '../人物管理/服务/头像切换服务';
 import CharacterCardInterface from '../人物管理/界面/人物卡界面.vue';
+import OutfitInterface from '../人物管理/界面/换装界面.vue';
+import type { Character } from '../人物管理/类型/人物类型';
 import { modularSaveManager } from '../存档管理/模块化存档服务';
 import { ConfirmService } from '../服务/确认框服务';
 import { actionPointsService } from '../服务/行动力服务';
@@ -312,6 +328,7 @@ const showAvatarModal = ref(false);
 const showCharacterModal = ref(false);
 const showCharacterMenu = ref(false);
 const showManualTraining = ref(false);
+const showOutfitModal = ref(false);
 const avatarUrl = ref('');
 const editingCharacter = ref<Character | null>(null);
 
@@ -402,9 +419,15 @@ const loadTrainingData = async (forceReload = true) => {
     }
 
     // 始终采用全量替换，避免任何增量叠加
-    characters.value = allCharacters;
+    // 在加载数据时应用头像切换逻辑，确保头像与当前堕落值匹配
+    const processedCharacters = allCharacters.map(character => {
+      const avatarResult = AvatarSwitchService.handleCorruptionChange(character, character.loyalty);
+      return avatarResult.character;
+    });
+
+    characters.value = processedCharacters;
     lastLoadedSignature = signature;
-    console.log('全量重载人物数据:', allCharacters);
+    console.log('全量重载人物数据（已应用头像切换）:', processedCharacters);
 
     isDataLoaded.value = true; // 标记数据已加载
     console.log('当前总人物数量:', characters.value.length);
@@ -835,13 +858,35 @@ const closeManualTraining = () => {
   // selectedCharacter.value = null;
 };
 
-// 打开换装菜单（功能待实装）
+// 打开换装菜单
 const openOutfitMenu = (character: Character) => {
-  toastRef.value?.info(`${character.name} 的换装功能正在开发中，敬请期待！`, {
-    title: '功能开发中',
-    duration: 3000,
-  });
+  selectedCharacter.value = character;
+  showOutfitModal.value = true;
   showCharacterMenu.value = false;
+};
+
+// 关闭换装界面
+const closeOutfitModal = () => {
+  showOutfitModal.value = false;
+  selectedCharacter.value = null;
+};
+
+// 保存服装
+const saveOutfit = (character: Character) => {
+  // 更新本地人物数据
+  const index = characters.value.findIndex(c => c.id === character.id);
+  if (index > -1) {
+    characters.value[index] = character;
+  }
+
+  // 保存调教数据
+  saveTrainingData();
+
+  // 显示保存成功提示
+  toastRef.value?.success(`${character.name} 的服装已保存`, {
+    title: '保存成功',
+    duration: 2000,
+  });
 };
 
 // 更新人物数据（融合系统：手动调教结束后自动进行自动调教）
@@ -855,64 +900,89 @@ const updateCharacter = (updatedCharacter: Character) => {
     status: updatedCharacter.status,
   });
 
+  // 处理头像切换（基于堕落值变化）
+  const index = characters.value.findIndex(c => c.id === updatedCharacter.id);
+  const previousCharacter = index > -1 ? characters.value[index] : null;
+  const previousLoyalty = previousCharacter?.loyalty || 0;
+
+  const avatarResult = AvatarSwitchService.handleCorruptionChange(updatedCharacter, previousLoyalty);
+
+  if (avatarResult.switched) {
+    console.log(
+      `🖼️ 头像已切换: ${updatedCharacter.name} 堕落值从 ${previousLoyalty}% 变为 ${updatedCharacter.loyalty}%`,
+    );
+    console.log(`📊 堕落等级: ${AvatarSwitchService.getCorruptionLevelDescription(updatedCharacter.loyalty)}`);
+
+    // 显示头像切换提示
+    toastRef.value?.info(`${updatedCharacter.name} 的堕落值达到 ${updatedCharacter.loyalty}%，头像已切换！`, {
+      title: '头像切换',
+      duration: 3000,
+    });
+  }
+
+  // 使用头像切换后的人物对象
+  const finalCharacter = avatarResult.character;
+
   // 检查堕落值是否达到100%，提示玩家可以手动触发堕落
   if (
-    updatedCharacter.loyalty >= 100 &&
-    updatedCharacter.status !== 'surrendered' &&
-    updatedCharacter.status !== 'player' &&
-    updatedCharacter.status !== 'deployed'
+    finalCharacter.loyalty >= 100 &&
+    finalCharacter.status !== 'surrendered' &&
+    finalCharacter.status !== 'player' &&
+    finalCharacter.status !== 'deployed'
   ) {
-    console.log(`${updatedCharacter.name} 堕落值达到100%，可以手动触发堕落`);
+    console.log(`${finalCharacter.name} 堕落值达到100%，可以手动触发堕落`);
 
     // 显示堕落提示，但不自动转换状态
-    toastRef.value?.info(`${updatedCharacter.name} 堕落值已满，可以点击堕落按钮完成堕落！`, {
+    toastRef.value?.info(`${finalCharacter.name} 堕落值已满，可以点击堕落按钮完成堕落！`, {
       title: '堕落就绪',
       duration: 6000,
     });
   }
 
   // 更新本地人物数据
-  const index = characters.value.findIndex(c => c.id === updatedCharacter.id);
   if (index > -1) {
-    characters.value[index] = updatedCharacter;
+    characters.value[index] = finalCharacter;
     console.log('✅ 已更新人物列表中的数据');
+
+    // 强制触发响应式更新，确保头像变化能及时显示
+    forceRefreshCharacterAvatar(finalCharacter.id, finalCharacter.avatar || '');
   } else {
     console.warn('⚠️ 未找到人物在列表中的索引');
   }
 
   // 更新选中的人物
-  if (selectedCharacter.value?.id === updatedCharacter.id) {
-    selectedCharacter.value = updatedCharacter;
+  if (selectedCharacter.value?.id === finalCharacter.id) {
+    selectedCharacter.value = finalCharacter;
     console.log('✅ 更新选中的人物数据');
   }
 
   // 融合系统：手动调教结束后自动进行自动调教
-  if (updatedCharacter.status === 'imprisoned' && selectedCharacter.value?.id === updatedCharacter.id) {
+  if (finalCharacter.status === 'imprisoned' && selectedCharacter.value?.id === finalCharacter.id) {
     console.log('🎯 手动调教结束，开始自动调教流程...');
 
     // 设置调教状态
-    updatedCharacter.status = 'training';
-    updatedCharacter.lastTraining = new Date();
+    finalCharacter.status = 'training';
+    finalCharacter.lastTraining = new Date();
 
     // 调教立即消耗体力
-    updatedCharacter.stamina = Math.max(0, updatedCharacter.stamina - 20);
+    finalCharacter.stamina = Math.max(0, finalCharacter.stamina - 20);
 
     // 检查是否死亡
-    if (updatedCharacter.stamina <= 0) {
-      executeCharacter(updatedCharacter);
+    if (finalCharacter.stamina <= 0) {
+      executeCharacter(finalCharacter);
       return;
     }
 
     // 更新本地数据
     if (index > -1) {
-      characters.value[index] = updatedCharacter;
+      characters.value[index] = finalCharacter;
     }
-    if (selectedCharacter.value?.id === updatedCharacter.id) {
-      selectedCharacter.value = updatedCharacter;
+    if (selectedCharacter.value?.id === finalCharacter.id) {
+      selectedCharacter.value = finalCharacter;
     }
 
     // 显示融合调教提示
-    toastRef.value?.success(`${updatedCharacter.name} 手动调教完成，已自动开始调教流程，将在下回合完成`, {
+    toastRef.value?.success(`${finalCharacter.name} 手动调教完成，已自动开始调教流程，将在下回合完成`, {
       title: '融合调教',
       duration: 4000,
     });
@@ -932,6 +1002,24 @@ const updateCharacter = (updatedCharacter: Character) => {
 
 // 触发堕落
 const triggerCorruption = async (character: Character) => {
+  // 检查人物状态，已编制的人物无法堕落
+  if (character.status === 'deployed') {
+    toastRef.value?.warning(`${character.name} 已编制，无法进行堕落！`, {
+      title: '无法堕落',
+      duration: 3000,
+    });
+    return;
+  }
+
+  // 检查人物状态，已堕落的人物无法再次堕落
+  if (character.status === 'surrendered') {
+    toastRef.value?.warning(`${character.name} 已经堕落，无需再次堕落！`, {
+      title: '已堕落',
+      duration: 3000,
+    });
+    return;
+  }
+
   const confirmed = await ConfirmService.showWarning(
     `确定要让 ${character.name} 完成堕落吗？`,
     '确认堕落',
@@ -963,19 +1051,26 @@ const triggerCorruption = async (character: Character) => {
     character.status = 'surrendered';
     console.log(`${character.name} 已完成堕落，状态已更新为已堕落`);
 
+    // 切换到完全堕落头像
+    const corruptedCharacter = AvatarSwitchService.switchToFullyCorruptedAvatar(character);
+    console.log(`🖼️ ${character.name} 头像已切换到完全堕落状态`);
+
     // 更新世界书描述
-    await WorldbookService.updateCharacterEntry(character);
+    await WorldbookService.updateCharacterEntry(corruptedCharacter);
 
     // 更新本地人物数据
     const index = characters.value.findIndex(c => c.id === character.id);
     if (index > -1) {
-      characters.value[index] = character;
+      characters.value[index] = corruptedCharacter;
     }
 
     // 更新选中的人物
     if (selectedCharacter.value?.id === character.id) {
-      selectedCharacter.value = character;
+      selectedCharacter.value = corruptedCharacter;
     }
+
+    // 强制刷新头像显示
+    forceRefreshCharacterAvatar(corruptedCharacter.id, corruptedCharacter.avatar || '');
 
     // 保存数据到存档系统
     saveTrainingData();
@@ -983,7 +1078,7 @@ const triggerCorruption = async (character: Character) => {
 
     // 显示堕落完成提示
     toastRef.value?.success(
-      `堕落成功！${character.name} 已完全堕落，对主人绝对忠诚！威胁度增加：⚠️ +${threatReward}。`,
+      `堕落成功！${corruptedCharacter.name} 已完全堕落，对主人绝对忠诚！威胁度增加：⚠️ +${threatReward}。`,
       { title: '堕落完成', duration: 5000 },
     );
   }
@@ -1162,6 +1257,7 @@ const closeAvatarModal = () => {
 const setAvatarFromUrl = () => {
   if (editingCharacter.value && avatarUrl.value) {
     editingCharacter.value.avatar = avatarUrl.value;
+    forceRefreshCharacterAvatar(editingCharacter.value.id, avatarUrl.value);
     closeAvatarModal();
   }
 };
@@ -1175,6 +1271,7 @@ const handleFileUpload = (event: Event) => {
     reader.onload = e => {
       if (editingCharacter.value && e.target?.result) {
         editingCharacter.value.avatar = e.target.result as string;
+        forceRefreshCharacterAvatar(editingCharacter.value.id, e.target.result as string);
         closeAvatarModal();
       }
     };
@@ -1186,6 +1283,7 @@ const handleFileUpload = (event: Event) => {
 const setPresetAvatar = (preset: string) => {
   if (editingCharacter.value) {
     editingCharacter.value.avatar = preset;
+    forceRefreshCharacterAvatar(editingCharacter.value.id, preset);
     closeAvatarModal();
   }
 };
@@ -1194,6 +1292,23 @@ const setPresetAvatar = (preset: string) => {
 const handleImageError = (event: Event) => {
   const img = event.target as HTMLImageElement;
   img.style.display = 'none';
+};
+
+// 强制刷新人物头像显示
+const forceRefreshCharacterAvatar = (characterId: string, newAvatarUrl: string) => {
+  nextTick(() => {
+    const characterElement = document.querySelector(`[data-character-id="${characterId}"]`);
+    if (characterElement) {
+      const imgElement = characterElement.querySelector('.character-portrait img') as HTMLImageElement;
+      if (imgElement) {
+        // 添加时间戳防止缓存
+        const timestamp = new Date().getTime();
+        const separator = newAvatarUrl?.includes('?') ? '&' : '?';
+        imgElement.src = `${newAvatarUrl}${separator}t=${timestamp}`;
+        console.log(`🔄 强制刷新人物 ${characterId} 的头像显示`);
+      }
+    }
+  });
 };
 
 // 获取状态文本
@@ -1725,7 +1840,7 @@ onActivated(async () => {
   right: 0;
   z-index: 3;
   color: #ffd7a1;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 700;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   text-align: center;
@@ -1733,7 +1848,9 @@ onActivated(async () => {
   overflow: hidden;
   text-overflow: ellipsis;
   background: rgba(0, 0, 0, 0.6);
-  padding: 8px 4px;
+  padding: 6px 4px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 // 卡片收藏按钮
@@ -2104,6 +2221,7 @@ onActivated(async () => {
         width: 100%;
         height: 100%;
         object-fit: cover;
+        object-position: 50% 23%; /* 可以调整这个值来微调截取位置 */
       }
 
       .default-avatar {
@@ -2458,6 +2576,96 @@ onActivated(async () => {
   }
 }
 
+// 宽屏优化 - 增大人物卡片尺寸
+@media (min-width: 1400px) {
+  .characters-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+  }
+
+  .character-card {
+    width: 200px;
+    height: 400px;
+  }
+
+  .character-name {
+    font-size: 14px;
+    padding: 8px 6px;
+  }
+
+  .character-status-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+  }
+
+  .character-level-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+
+    .level-icon {
+      font-size: 9px;
+    }
+
+    .level-value {
+      font-size: 10px;
+    }
+  }
+
+  .favorite-btn-card {
+    width: 28px;
+    height: 28px;
+
+    .favorite-icon {
+      font-size: 16px;
+    }
+  }
+}
+
+// 超大屏优化
+@media (min-width: 1920px) {
+  .characters-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+  }
+
+  .character-card {
+    width: 180px;
+    height: 360px;
+  }
+
+  .character-name {
+    font-size: 16px;
+    padding: 10px 8px;
+  }
+
+  .character-status-badge {
+    font-size: 12px;
+    padding: 4px 10px;
+  }
+
+  .character-level-badge {
+    font-size: 12px;
+    padding: 4px 10px;
+
+    .level-icon {
+      font-size: 11px;
+    }
+
+    .level-value {
+      font-size: 12px;
+    }
+  }
+
+  .favorite-btn-card {
+    width: 32px;
+    height: 32px;
+
+    .favorite-icon {
+      font-size: 18px;
+    }
+  }
+}
+
 // 响应式设计
 @media (max-width: 1024px) {
   .characters-grid {
@@ -2475,7 +2683,7 @@ onActivated(async () => {
   }
 
   .character-name {
-    font-size: 12px;
+    font-size: 11px;
   }
 }
 
@@ -2495,7 +2703,7 @@ onActivated(async () => {
   }
 
   .character-name {
-    font-size: 11px;
+    font-size: 9px;
   }
 
   .character-status-bar {
@@ -2555,7 +2763,7 @@ onActivated(async () => {
   }
 
   .character-name {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .character-status-bar {
@@ -2589,7 +2797,7 @@ onActivated(async () => {
   }
 
   .character-name {
-    font-size: 9px;
+    font-size: 8px;
   }
 
   .character-status-bar {

@@ -18,7 +18,7 @@
             <!-- 左侧头像 -->
             <div class="character-avatar" :class="`rating-${(character.rating || 'D').toLowerCase()}`">
               <div class="avatar-container">
-                <img v-if="character.avatar" :src="character.avatar" :alt="character.name" />
+                <img v-if="getCurrentAvatar(character)" :src="getCurrentAvatar(character)" :alt="character.name" />
                 <div v-else class="default-avatar">
                   <span class="avatar-icon">👤</span>
                 </div>
@@ -433,10 +433,11 @@
 </template>
 
 <script setup lang="ts">
-import type { Character } from '../类型/人物类型';
 import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import { TimeParseService } from '../../服务/时间解析服务';
 import { BreedingService } from '../../服务/生育服务';
+import { AvatarSwitchService } from '../服务/头像切换服务';
+import type { Character } from '../类型/人物类型';
 
 // 定义组件属性
 interface Props {
@@ -473,6 +474,12 @@ const getStatusText = (status: string) => {
     deployed: '已编制',
   };
   return statusMap[status] || '未知';
+};
+
+// 获取当前应该显示的头像
+const getCurrentAvatar = (character: Character | null): string | undefined => {
+  if (!character) return undefined;
+  return AvatarSwitchService.getAvatarByCorruptionLevel(character);
 };
 
 // 获取堕落值样式类
@@ -1587,7 +1594,7 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
     .character-title {
       margin: 0;
       color: #ffd7a1;
-      font-size: 24px;
+      font-size: 18px;
       font-weight: 700;
       text-align: center;
       flex: 2;
@@ -1601,7 +1608,12 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       animation: titleGlow 3s ease-in-out infinite;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      min-width: 0;
     }
 
     .header-right {
@@ -2103,7 +2115,7 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
       padding-bottom: 6px;
 
       .character-title {
-        font-size: 18px;
+        font-size: 16px;
       }
 
       .edit-avatar-btn {

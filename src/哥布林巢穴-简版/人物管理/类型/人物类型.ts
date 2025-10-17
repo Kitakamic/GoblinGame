@@ -109,6 +109,8 @@ export interface CharacterAppearance {
   description?: string;
   /** 衣着信息 */
   clothing?: CharacterClothing;
+  /** 原始衣着信息（用于重置功能） */
+  originalClothing?: CharacterClothing;
 }
 
 // ==================== 敏感点相关类型 ====================
@@ -167,6 +169,10 @@ export interface Character {
   title: string;
   /** 头像 */
   avatar?: string;
+  /** 半堕落头像 */
+  corruptedAvatar?: string;
+  /** 完全堕落头像 */
+  fullyCorruptedAvatar?: string;
 
   // ========== 状态信息 ==========
   /** 当前状态 */

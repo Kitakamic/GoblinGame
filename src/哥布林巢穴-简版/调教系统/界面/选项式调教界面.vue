@@ -218,8 +218,10 @@
 </template>
 
 <script setup lang="ts">
+import toastr from 'toastr';
 import { nextTick, onMounted, onUnmounted, watch } from 'vue';
 import { WorldbookService } from '../../世界书管理/世界书服务';
+import { AvatarSwitchService } from '../../人物管理/服务/头像切换服务';
 import type { Character } from '../../人物管理/类型/人物类型';
 import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import { TimeParseService } from '../../服务/时间解析服务';
@@ -661,20 +663,39 @@ const generateAndHandleAIReply = async () => {
         // 生育值保持不变，不参与调教计算
       };
 
+      // 处理头像切换（基于堕落值变化）
+      const previousLoyalty = props.character.loyalty;
+      const avatarResult = AvatarSwitchService.handleCorruptionChange(updatedCharacter, previousLoyalty);
+
+      if (avatarResult.switched) {
+        console.log(
+          `🖼️ 头像已切换: ${props.character.name} 堕落值从 ${previousLoyalty}% 变为 ${newAttributes.loyalty}%`,
+        );
+        console.log(`📊 堕落等级: ${AvatarSwitchService.getCorruptionLevelDescription(newAttributes.loyalty)}`);
+
+        // 显示头像切换提示
+        toastr.info(`${props.character.name} 的堕落值达到 ${newAttributes.loyalty}%，头像已切换！`, '头像切换', {
+          timeOut: 3000,
+        });
+      }
+
+      // 使用头像切换后的人物对象
+      const finalCharacter = avatarResult.character;
+
       // 检查体力是否过低
-      if (AttributeChangeParseService.isStaminaTooLow(updatedCharacter.stamina)) {
-        updatedCharacter.status = 'training';
-        toastr.warning(`${updatedCharacter.name} 体力过低，无法继续调教！`);
+      if (AttributeChangeParseService.isStaminaTooLow(finalCharacter.stamina)) {
+        finalCharacter.status = 'training';
+        toastr.warning(`${finalCharacter.name} 体力过低，无法继续调教！`);
       }
 
       // 更新世界书信息
       console.log('更新世界书信息...');
-      await WorldbookService.updateCharacterEntry(updatedCharacter);
+      await WorldbookService.updateCharacterEntry(finalCharacter);
 
       // 保存人物数据到存档
       const currentTrainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
       const updatedCharacters = (currentTrainingData?.characters || []).map((char: any) =>
-        char.id === props.character.id ? updatedCharacter : char,
+        char.id === props.character.id ? finalCharacter : char,
       );
 
       modularSaveManager.updateModuleData({
@@ -691,7 +712,7 @@ const generateAndHandleAIReply = async () => {
       });
 
       // 通知父组件更新人物数据
-      emit('update-character', updatedCharacter);
+      emit('update-character', finalCharacter);
       console.log('📤 已通知父组件更新人物数据');
     } else {
       console.warn('⚠️ 属性变化解析失败或验证不通过');
@@ -845,27 +866,31 @@ const confirmCloseTraining = async () => {
     lastTraining: new Date(),
   };
 
+  // 处理头像切换（确保头像与当前堕落值匹配）
+  const avatarResult = AvatarSwitchService.handleCorruptionChange(updatedCharacter, updatedCharacter.loyalty);
+  const finalCharacter = avatarResult.character;
+
   console.log('🎯 调教界面关闭，设置人物状态为调教中');
 
   // 确保人物数据被更新到存档系统
   try {
     console.log('🔄 关闭调教界面，更新人物数据...');
     console.log('📊 当前人物数据:', {
-      id: updatedCharacter.id,
-      name: updatedCharacter.name,
-      loyalty: updatedCharacter.loyalty,
-      stamina: updatedCharacter.stamina,
-      maxStamina: updatedCharacter.maxStamina,
-      status: updatedCharacter.status,
+      id: finalCharacter.id,
+      name: finalCharacter.name,
+      loyalty: finalCharacter.loyalty,
+      stamina: finalCharacter.stamina,
+      maxStamina: finalCharacter.maxStamina,
+      status: finalCharacter.status,
     });
 
     // 更新世界书信息
-    await WorldbookService.updateCharacterEntry(updatedCharacter);
+    await WorldbookService.updateCharacterEntry(finalCharacter);
 
     // 保存人物数据到存档
     const currentTrainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
     const updatedCharacters = (currentTrainingData?.characters || []).map((char: any) =>
-      char.id === updatedCharacter.id ? updatedCharacter : char,
+      char.id === finalCharacter.id ? finalCharacter : char,
     );
 
     modularSaveManager.updateModuleData({
@@ -881,16 +906,16 @@ const confirmCloseTraining = async () => {
 
     console.log('✅ 人物数据已更新到存档系统');
     console.log('📊 最终人物数据:', {
-      loyalty: updatedCharacter.loyalty,
-      stamina: updatedCharacter.stamina,
-      status: updatedCharacter.status,
+      loyalty: finalCharacter.loyalty,
+      stamina: finalCharacter.stamina,
+      status: finalCharacter.status,
     });
   } catch (error) {
     console.error('❌ 更新人物数据失败:', error);
   }
 
   // 通知父组件更新人物数据
-  emit('update-character', updatedCharacter);
+  emit('update-character', finalCharacter);
 
   // 延迟关闭，确保父组件有时间处理更新
   setTimeout(() => {

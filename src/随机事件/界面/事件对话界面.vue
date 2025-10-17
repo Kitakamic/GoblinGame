@@ -60,7 +60,7 @@ const aiReplyContent = ref('');
 const saveConfirmMessage = computed(() => {
   if (!props.event) return '';
 
-  return `是否将"${props.event.name}"的故事内容保存到世界书中？\n\n✅ 已获取到AI回复内容\n\n这将帮助AI更好地了解游戏世界的发展历程。`;
+  return `是否将"${props.event.name}"的故事内容保存到世界书中？\n\n✅ 已获取到AI回复内容\n\n这将帮助AI更好地构建游戏世界的发展历程。`;
 });
 
 // 对话配置

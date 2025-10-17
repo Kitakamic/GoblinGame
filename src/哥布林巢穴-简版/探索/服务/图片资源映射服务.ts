@@ -1,3 +1,8 @@
+import {
+  characterNameGenerationService,
+  type GeneratedName,
+  type NameGenerationOptions,
+} from '../../人物管理/服务/人物名称生成服务';
 import picsheetData from '../../图片tags/Picsheet.csv?raw';
 
 /**
@@ -9,6 +14,7 @@ export interface PictureResource {
   class: string;
   prompt: string;
   imageUrl?: string; // 完整的图片URL
+  generatedName?: GeneratedName; // 生成的人物名称
 }
 
 /**
@@ -204,9 +210,14 @@ export class PictureResourceMappingService {
    * 随机选择一个匹配的图片资源（先选职业，再选图片）
    * @param locationType 据点类型
    * @param race 种族
+   * @param generateName 是否生成人物名称，默认为true
    * @returns 随机选择的图片资源，如果没有匹配的则返回null
    */
-  public getRandomMatchingPictureResource(locationType: string, race: string): PictureResource | null {
+  public getRandomMatchingPictureResource(
+    locationType: string,
+    race: string,
+    generateName: boolean = true,
+  ): PictureResource | null {
     console.log(`🎲 [随机选择] 开始随机选择图片资源（先选职业，再选图片）...`);
 
     // 第一步：根据据点类型获取允许的职业列表
@@ -257,12 +268,32 @@ export class PictureResourceMappingService {
       // 标记为已使用
       this.usedPictureIds.add(selectedResource.id);
 
+      // 生成人物名称（如果需要）
+      if (generateName) {
+        try {
+          const nameOptions: NameGenerationOptions = {
+            race: selectedResource.race,
+          };
+
+          const generatedName = characterNameGenerationService.generateName(nameOptions);
+          selectedResource.generatedName = generatedName;
+
+          console.log(`🎭 [名称生成] 为图片资源生成名称:`, {
+            id: selectedResource.id,
+            name: generatedName.fullName,
+          });
+        } catch (error) {
+          console.warn(`⚠️ [名称生成] 生成失败:`, error);
+        }
+      }
+
       console.log(`🎯 [图片选择] 第一优先级选择结果:`);
       console.log(`  - 匹配图片总数: ${matchingResources.length}`);
       console.log(`  - 未使用图片数: ${unusedMatchingResources.length}`);
       console.log(`  - 随机索引: ${randomPictureIndex}`);
       console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
       console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+      console.log(`  - 生成名称: ${selectedResource.generatedName?.fullName || '未生成'}`);
       console.log(`✅ [图片选择] 第一优先级选择完成`);
 
       return selectedResource;
@@ -291,10 +322,30 @@ export class PictureResourceMappingService {
 
         this.usedPictureIds.add(selectedResource.id);
 
+        // 生成人物名称（如果需要）
+        if (generateName) {
+          try {
+            const nameOptions: NameGenerationOptions = {
+              race: selectedResource.race,
+            };
+
+            const generatedName = characterNameGenerationService.generateName(nameOptions);
+            selectedResource.generatedName = generatedName;
+
+            console.log(`🎭 [名称生成] 降级策略生成名称:`, {
+              id: selectedResource.id,
+              name: generatedName.fullName,
+            });
+          } catch (error) {
+            console.warn(`⚠️ [名称生成] 降级策略生成失败:`, error);
+          }
+        }
+
         console.log(`🎯 [图片选择] 降级策略选择结果:`);
         console.log(`  - 降级职业: ${className}`);
         console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
         console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+        console.log(`  - 生成名称: ${selectedResource.generatedName?.fullName || '未生成'}`);
         console.log(`✅ [图片选择] 降级策略选择完成`);
 
         return selectedResource;
@@ -319,9 +370,29 @@ export class PictureResourceMappingService {
 
       this.usedPictureIds.add(selectedResource.id);
 
+      // 生成人物名称（如果需要）
+      if (generateName) {
+        try {
+          const nameOptions: NameGenerationOptions = {
+            race: selectedResource.race,
+          };
+
+          const generatedName = characterNameGenerationService.generateName(nameOptions);
+          selectedResource.generatedName = generatedName;
+
+          console.log(`🎭 [名称生成] 同种族降级生成名称:`, {
+            id: selectedResource.id,
+            name: generatedName.fullName,
+          });
+        } catch (error) {
+          console.warn(`⚠️ [名称生成] 同种族降级生成失败:`, error);
+        }
+      }
+
       console.log(`🎯 [图片选择] 同种族降级选择结果:`);
       console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
       console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+      console.log(`  - 生成名称: ${selectedResource.generatedName?.fullName || '未生成'}`);
       console.log(`✅ [图片选择] 同种族降级选择完成`);
 
       return selectedResource;
@@ -342,9 +413,29 @@ export class PictureResourceMappingService {
 
       this.usedPictureIds.add(selectedResource.id);
 
+      // 生成人物名称（如果需要）
+      if (generateName) {
+        try {
+          const nameOptions: NameGenerationOptions = {
+            race: selectedResource.race,
+          };
+
+          const generatedName = characterNameGenerationService.generateName(nameOptions);
+          selectedResource.generatedName = generatedName;
+
+          console.log(`🎭 [名称生成] 重置后生成名称:`, {
+            id: selectedResource.id,
+            name: generatedName.fullName,
+          });
+        } catch (error) {
+          console.warn(`⚠️ [名称生成] 重置后生成失败:`, error);
+        }
+      }
+
       console.log(`🔄 [图片选择] 重置后重新选择:`);
       console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
       console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+      console.log(`  - 生成名称: ${selectedResource.generatedName?.fullName || '未生成'}`);
 
       return selectedResource;
     }

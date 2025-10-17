@@ -49,6 +49,9 @@ export interface Location {
     class: string;
     prompt: string;
     imageUrl?: string; // 完整的图片URL
+    generatedName?: {
+      fullName: string;
+    }; // 生成的人物名称
   };
 }
 

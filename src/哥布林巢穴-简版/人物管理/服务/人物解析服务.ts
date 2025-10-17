@@ -50,6 +50,7 @@ export interface ParsedAppearance {
   cupSize: string;
   description: string;
   clothing?: ParsedClothing;
+  originalClothing?: ParsedClothing;
 }
 
 /** 解析后的隐藏特质 */
@@ -263,6 +264,9 @@ export class CharacterParser {
         console.log('⚠️ [人物解析] 衣着数据缺失，使用默认值');
       }
 
+      // 保存原始服装信息（深拷贝）
+      const originalClothing = JSON.parse(JSON.stringify(clothing));
+
       // 构建解析后的原始数据对象
       console.log('🏗️ [人物解析] 开始构建解析后的数据对象...');
       console.log('🔍 [人物解析] 开始严格验证基础信息...');
@@ -287,6 +291,7 @@ export class CharacterParser {
           cupSize: this.validateCupSize(data.外貌数据?.罩杯),
           description: this.validateRequiredString(data.外貌数据?.描述, '外貌描述'),
           clothing: Object.keys(clothing).length > 0 ? clothing : undefined,
+          originalClothing: Object.keys(originalClothing).length > 0 ? originalClothing : undefined,
         },
 
         // 敏感点信息

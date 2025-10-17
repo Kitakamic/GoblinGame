@@ -14,24 +14,55 @@ export class MixedTroopGenerationService {
    */
   private static readonly RACE_PORTRAIT_LIBRARY: Record<string, string[]> = {
     人类: [
-      'https://files.catbox.moe/w4h0vn.png',
-      'https://files.catbox.moe/5u7rwy.png',
-      'https://files.catbox.moe/8c2tot.png',
-      'https://files.catbox.moe/a0cpmj.png',
-      'https://files.catbox.moe/vx49re.png',
-      'https://files.catbox.moe/jawvdo.png',
+      'https://kitakamis.online/comunit_portaits/人类通用单位1.png',
+      'https://kitakamis.online/comunit_portaits/人类通用单位2.png',
+      'https://kitakamis.online/comunit_portaits/人类通用单位3.png',
+      'https://kitakamis.online/comunit_portaits/人类通用单位4.png',
+      'https://kitakamis.online/comunit_portaits/人类通用单位5.png',
+      'https://kitakamis.online/comunit_portaits/人类通用单位6.png',
+      'https://kitakamis.online/comunit_portaits/人类通用单位7.png',
+      'https://kitakamis.online/comunit_portaits/人类通用单位8.png',
+      'https://kitakamis.online/comunit_portaits/人类通用单位9.png',
     ],
     永恒精灵: [
-      'https://files.catbox.moe/ar7hp7.png',
-      'https://files.catbox.moe/82hnma.png',
-      'https://files.catbox.moe/tmcme9.png',
-      'https://files.catbox.moe/ws40v8.png',
-      'https://files.catbox.moe/jdkfsr.png',
-      'https://files.catbox.moe/cyvrs5.png',
-      'https://files.catbox.moe/qcdfzy.png',
+      'https://kitakamis.online/comunit_portaits/永恒精灵通用单位1.png',
+      'https://kitakamis.online/comunit_portaits/永恒精灵通用单位2.png',
+      'https://kitakamis.online/comunit_portaits/永恒精灵通用单位3.png',
+      'https://kitakamis.online/comunit_portaits/永恒精灵通用单位4.png',
     ],
-    黑暗精灵: ['', '', '', '', '', ''],
-    狐族: [],
+    黑暗精灵: [
+      'https://kitakamis.online/comunit_portaits/黑暗精灵通用单位1.png',
+      'https://kitakamis.online/comunit_portaits/黑暗精灵通用单位2.png',
+      'https://kitakamis.online/comunit_portaits/黑暗精灵通用单位3.png',
+      'https://kitakamis.online/comunit_portaits/黑暗精灵通用单位4.png',
+      'https://kitakamis.online/comunit_portaits/黑暗精灵通用单位5.png',
+      'https://kitakamis.online/comunit_portaits/黑暗精灵通用单位6.png',
+    ],
+    狐族: [
+      'https://kitakamis.online/comunit_portaits/狐族通用单位1.png',
+      'https://kitakamis.online/comunit_portaits/狐族通用单位2.png',
+      'https://kitakamis.online/comunit_portaits/狐族通用单位3.png',
+      'https://kitakamis.online/comunit_portaits/狐族通用单位4.png',
+      'https://kitakamis.online/comunit_portaits/狐族通用单位5.png',
+    ],
+    亡灵: [
+      'https://kitakamis.online/comunit_portaits/亡灵通用单位1.png',
+      'https://kitakamis.online/comunit_portaits/亡灵通用单位2.png',
+      'https://kitakamis.online/comunit_portaits/亡灵通用单位3.png',
+      'https://kitakamis.online/comunit_portaits/亡灵通用单位4.png',
+    ],
+    魔族: [
+      'https://kitakamis.online/comunit_portaits/魔族通用单位1.png',
+      'https://kitakamis.online/comunit_portaits/魔族通用单位2.png',
+      'https://kitakamis.online/comunit_portaits/魔族通用单位3.png',
+      'https://kitakamis.online/comunit_portaits/魔族通用单位4.png',
+    ],
+    天使: [
+      'https://kitakamis.online/comunit_portaits/天使通用单位1.png',
+      'https://kitakamis.online/comunit_portaits/天使通用单位2.png',
+      'https://kitakamis.online/comunit_portaits/天使通用单位3.png',
+      'https://kitakamis.online/comunit_portaits/天使通用单位4.png',
+    ],
   };
   /**
    * 为据点生成混合部队
@@ -47,7 +78,7 @@ export class MixedTroopGenerationService {
     specialUnit?: {
       name: string;
       race: string;
-      class: string;
+      unitType: string;
       troopCount: number;
       attributes: {
         attack: number;
@@ -186,7 +217,7 @@ export class MixedTroopGenerationService {
   ): Array<{
     name: string;
     race: string;
-    class: string;
+    unitType: string;
     troopCount: number;
     level: number;
     attributes: {
@@ -230,7 +261,7 @@ export class MixedTroopGenerationService {
           composition.push({
             name: hero.name,
             race: hero.race,
-            class: hero.title,
+            class: hero.unitType,
             troopCount: heroTroopCount,
             level: heroLevel, // 固定为1（堕落等级）
             avatar: heroAvatar, // 使用英雄自己的肖像
@@ -274,7 +305,7 @@ export class MixedTroopGenerationService {
       composition.push({
         name: specialUnit.name,
         race: specialUnit.race,
-        class: specialUnit.class,
+        class: specialUnit.unitType,
         troopCount: specialTroopCount,
         level: specialLevel,
         avatar: specialUnitAvatar,
@@ -305,7 +336,7 @@ export class MixedTroopGenerationService {
         composition.push({
           name: selectedMilitia.name,
           race: selectedMilitia.race,
-          class: selectedMilitia.title,
+          class: selectedMilitia.unitType,
           troopCount: militiaCount,
           level: selectedMilitia.level, // 使用实际等级
           avatar: militiaAvatar, // 使用民兵自己的头像
@@ -370,7 +401,7 @@ export class MixedTroopGenerationService {
         composition.push({
           name: unit.name,
           race: unit.race,
-          class: unit.title,
+          class: unit.unitType,
           troopCount: troopCount,
           level: unit.level,
           avatar: unitAvatar, // 使用单位自己的头像
@@ -507,7 +538,8 @@ export class MixedTroopGenerationService {
 
       // 检查是否已经选择了相同名称的单位
       const isDuplicate = selected.some(
-        unit => unit.name === selectedUnit.name && unit.race === selectedUnit.race && unit.title === selectedUnit.title,
+        unit =>
+          unit.name === selectedUnit.name && unit.race === selectedUnit.race && unit.unitType === selectedUnit.unitType,
       );
 
       if (!isDuplicate) {
@@ -534,7 +566,7 @@ export class MixedTroopGenerationService {
         id,
         name: composition.name,
         race: composition.race,
-        class: composition.class,
+        class: composition.unitType,
         level: composition.level,
         troopCount: composition.troopCount,
         attributes: {
@@ -770,7 +802,7 @@ export class MixedTroopGenerationService {
       }
 
       // 如果是普通单位，使用自己的单位类型
-      return this.getUnitTypeFromDatabase(composition.class, composition.race);
+      return this.getUnitTypeFromDatabase(composition.unitType, composition.race);
     } catch (error) {
       console.error(`[混合部队生成] 获取部队单位类型失败:`, error);
       return 'physical';
