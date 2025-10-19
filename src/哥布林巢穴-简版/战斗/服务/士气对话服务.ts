@@ -72,8 +72,8 @@ export class MoraleDialogueService {
 
     return {
       title: '战前对话',
-      subtitle: `通过言语降低敌方士气 - 当前士气：${currentMorale.toFixed(1)}% (${MoraleParseService.getMoraleStatusDescription(currentMorale)})`,
-      welcomeText: `你决定在战斗前与敌方进行对话，试图通过言语来削弱他们的士气...\n\n${enemyInfo}\n\n通过你的话语，敌方的士气会根据你的言辞效果而动态变化。`,
+      subtitle: `通过言语影响敌方士气 - 当前士气：${currentMorale.toFixed(1)}% (${MoraleParseService.getMoraleStatusDescription(currentMorale)})`,
+      welcomeText: `你决定在战斗前与敌方进行对话，试图通过言语来影响他们的士气...\n\n${enemyInfo}\n\n通过你的话语，敌方的士气会根据你的言辞效果而动态变化。你的话语可能削弱敌方士气，但也可能激怒他们使其更加坚定。`,
       welcomeHint: '选择你的策略来影响敌方士气，AI会根据你的话语内容动态调整士气',
       customPlaceholder: '输入你的话语...',
       characterName: context.enemyCharacters[0]?.name || '敌方角色', // 设置敌方角色名称
@@ -105,10 +105,12 @@ export class MoraleDialogueService {
       },
       onAIReply: async (aiResponse: string, characterName: string) => {
         // AI回复时，将用户输入和AI回复一起保存到世界书
-        // 这样可以避免两次写入导致的覆盖问题
+        // 通用对话界面现在会延迟保存，只在用户选择继续或关闭时才保存
         const userMessage = context.lastUserInput;
         if (userMessage) {
           await this.saveDialoguePairToWorldbook(userMessage, aiResponse, characterName, context);
+          // 清空暂存，防止重复保存
+          context.lastUserInput = undefined;
         }
       },
       onUserMessage: async (userMessage: string) => {
@@ -269,8 +271,11 @@ export class MoraleDialogueService {
 
     prompt += `## 战前对话模式规则:
 
-1. 注意：morale_changes.morale 应该是士气变化值（负数表示士气下降，正数表示士气上升），范围建议在-10到+10之间。
-2. 回复时请考虑敌方角色身份性格等信息
+1. 注意：morale_changes.morale 应该是士气变化值（负数表示士气下降，正数表示士气上升，0表示无变化），范围建议在-10到+10之间。
+2. 回复时请考虑敌方角色身份性格等信息，根据对话内容合理设置士气变化：
+   - 心理战术等可能降低敌方士气（负值）
+   - 但敌方也可能因为你的话语而更加愤怒和坚定（正值）
+   - 某些情况下对话可能对士气没有明显影响（0值）
 3. 根据据点难度和双方部队对比来调整对话内容和士气影响
 4. 剧情末尾必须包含以下json格式的选项内容（根据剧情发展，设置合适的选项）和士气变化值
 
@@ -388,7 +393,7 @@ export class MoraleDialogueService {
    */
   static updateDialogueSubtitle(config: MoraleDialogueConfig, newMorale: number): void {
     if (config) {
-      config.subtitle = `通过言语降低敌方士气 - 当前士气：${newMorale.toFixed(1)}% (${MoraleParseService.getMoraleStatusDescription(newMorale)})`;
+      config.subtitle = `通过言语影响敌方士气 - 当前士气：${newMorale.toFixed(1)}% (${MoraleParseService.getMoraleStatusDescription(newMorale)})`;
     }
   }
 }

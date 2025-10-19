@@ -13,8 +13,17 @@
           <button class="header-btn edit-btn" title="编辑当前页消息" @click="editCurrentPageMessage()">
             <span class="btn-icon">✏️</span>
           </button>
-          <button class="header-btn delete-btn" title="删除当前页消息" @click="deleteCurrentPageMessage()">
-            <span class="btn-icon">🗑️</span>
+          <!-- 删除按钮已隐藏 -->
+          <!-- <button class="header-btn delete-btn" title="删除当前页消息" @click="deleteCurrentPageMessage()">
+          <span class="btn-icon">🗑️</span>
+        </button> -->
+          <button
+            v-if="showRetryButton"
+            class="header-btn retry-btn"
+            title="重新生成AI回复"
+            @click="retryAIGeneration()"
+          >
+            <span class="btn-icon">🔄</span>
           </button>
           <button class="header-btn close-btn" title="关闭对话界面" @click="closeDialogue">
             <span class="btn-icon">✕</span>
@@ -230,6 +239,18 @@ const {
 
 const isSending = ref(false);
 
+// 重试状态
+const showRetryButton = ref(false);
+
+// 暂存当前对话对，不立即保存到世界书
+const currentDialoguePair = ref<{
+  userInput: string;
+  aiResponse: string;
+} | null>(null);
+
+// 暂存最后一次用户输入，用于与AI回复一起保存
+const lastUserInput = ref<string>('');
+
 // 选项结构
 const options = ref<DialogueOption[]>([]);
 
@@ -308,14 +329,12 @@ const submitCustomOption = async () => {
   addUserMessage(text);
   appendChoiceToCurrentPage(text);
 
-  // 调用用户消息回调，用于实时保存到世界书
-  if (props.dialogueConfig.onUserMessage) {
-    try {
-      await props.dialogueConfig.onUserMessage(text);
-    } catch (error) {
-      console.error('用户消息回调执行失败:', error);
-    }
-  }
+  // 先保存之前暂存的对话对
+  await savePendingDialogue();
+
+  // 暂存用户输入，等待AI回复后一起保存
+  lastUserInput.value = text;
+  console.log('📝 暂存用户自定义输入:', text);
 
   // 清空当前选项
   options.value = [];
@@ -361,14 +380,12 @@ const chooseOption = async (opt: DialogueOption) => {
     addUserMessage(choiceText);
     appendChoiceToCurrentPage(choiceText);
 
-    // 调用用户消息回调，用于实时保存到世界书
-    if (props.dialogueConfig.onUserMessage) {
-      try {
-        await props.dialogueConfig.onUserMessage(choiceText);
-      } catch (error) {
-        console.error('用户消息回调执行失败:', error);
-      }
-    }
+    // 先保存之前暂存的对话对
+    await savePendingDialogue();
+
+    // 暂存用户选择，等待AI回复后一起保存
+    lastUserInput.value = choiceText;
+    console.log('📝 暂存用户选择:', choiceText);
 
     // 清空当前选项
     options.value = [];
@@ -408,14 +425,12 @@ const chooseInitialOption = async (opt: DialogueOption) => {
   if (shouldContinue) {
     addUserMessage(choiceText);
 
-    // 调用用户消息回调，用于实时保存到世界书
-    if (props.dialogueConfig.onUserMessage) {
-      try {
-        await props.dialogueConfig.onUserMessage(choiceText);
-      } catch (error) {
-        console.error('用户消息回调执行失败:', error);
-      }
-    }
+    // 先保存之前暂存的对话对
+    await savePendingDialogue();
+
+    // 暂存用户初始选择，等待AI回复后一起保存
+    lastUserInput.value = choiceText;
+    console.log('📝 暂存用户初始选择:', choiceText);
 
     // 创建第一页并添加选择
     const formattedChoice = `<div class="choice-line"><span class="choice-prefix">→</span> ${safeFormatMessage(choiceText)}</div>`;
@@ -436,6 +451,7 @@ const chooseInitialOption = async (opt: DialogueOption) => {
 // 调用AI并处理回复
 const generateAndHandleAIReply = async () => {
   let aiResponse = '';
+  let isAISuccess = false;
 
   try {
     isSending.value = true;
@@ -451,16 +467,42 @@ const generateAndHandleAIReply = async () => {
       aiResponse = response;
     }
 
-    // 解析选项
+    // 检查AI回复是否为空或无效
+    if (!aiResponse || aiResponse.trim().length === 0) {
+      console.warn('⚠️ AI回复为空，跳过处理');
+      toastr.warning('AI回复为空，请重试');
+
+      // AI回复为空时，显示重试按钮而不是清空用户输入
+      if (lastUserInput.value) {
+        console.log('🔄 AI回复为空，显示重试按钮，保留用户输入:', lastUserInput.value);
+        showRetryButton.value = true;
+      }
+      return;
+    }
+
+    isAISuccess = true;
+
+    // 成功生成时显示重试按钮，允许重新生成
+    showRetryButton.value = true;
+
+    // 先应用酒馆正则处理（在解析选项之前）
+    const tavernProcessedResponse = formatAsTavernRegexedString(aiResponse, 'ai_output', 'display');
+    console.log('🎨 应用酒馆正则后的内容:', tavernProcessedResponse);
+
+    // 解析选项（从原始文本中，因为酒馆正则可能会影响JSON解析）
     const parsed = OptionParseService.parseNextStepOptions(aiResponse);
     options.value = parsed.options;
 
     // 保存选项到存档
     saveCurrentOptions();
 
-    // 剔除JSON数据，只保留角色回复内容
-    const cleanedResponse = removeJsonFromResponse(aiResponse);
-    const formattedResponse = formatAsTavernRegexedString(cleanedResponse, 'ai_output', 'display');
+    // 剔除JSON数据，只保留角色回复内容（使用已经酒馆正则处理过的文本）
+    const cleanedResponse = removeJsonFromResponse(tavernProcessedResponse);
+    console.log('🧹 清理后的回复内容:', cleanedResponse);
+
+    // 不再重复应用酒馆正则，因为已经处理过了
+    const formattedResponse = cleanedResponse;
+    console.log('🎨 最终显示内容:', formattedResponse);
 
     addAIMessage(formattedResponse, 'AI');
     pushAIPageWithoutScroll(formattedResponse);
@@ -468,17 +510,33 @@ const generateAndHandleAIReply = async () => {
     // 自动切换到最新页
     currentPageIndex.value = pages.value.length - 1;
 
-    // 调用AI回复回调，用于实时保存到世界书
-    if (props.dialogueConfig.onAIReply) {
-      try {
-        await props.dialogueConfig.onAIReply(formattedResponse, props.dialogueConfig.characterName || 'AI');
-      } catch (error) {
-        console.error('AI回复回调执行失败:', error);
+    // AI回复成功后，暂存用户输入和AI回复，等待用户下一步操作时再保存到世界书
+    if (isAISuccess && lastUserInput.value) {
+      currentDialoguePair.value = {
+        userInput: lastUserInput.value,
+        aiResponse: formattedResponse,
+      };
+      console.log('📝 暂存对话对，等待用户下一步操作时保存:', currentDialoguePair.value);
+
+      // 调用AI回复回调（用于处理副作用，如士气变化），但不保存到世界书
+      // 保存到世界书的操作延迟到用户下一步操作时进行
+      if (props.dialogueConfig.onAIReply) {
+        try {
+          await props.dialogueConfig.onAIReply(formattedResponse, props.dialogueConfig.characterName || 'AI');
+        } catch (error) {
+          console.error('AI回复回调执行失败:', error);
+        }
       }
     }
   } catch (error) {
     console.error('AI生成失败:', error);
-    toastr.error('AI生成失败', 'AI生成失败');
+    toastr.error('AI生成失败');
+
+    // AI生成失败时，显示重试按钮而不是清空用户输入
+    if (lastUserInput.value) {
+      console.log('🔄 AI生成失败，显示重试按钮，保留用户输入:', lastUserInput.value);
+      showRetryButton.value = true;
+    }
   } finally {
     isSending.value = false;
   }
@@ -541,8 +599,67 @@ const parseOptionsFromLastAIMessage = () => {
   }
 };
 
-const closeDialogue = () => {
-  // 消息已通过回调实时保存，不需要批量保存
+// 保存暂存的对话对到世界书
+const savePendingDialogue = async () => {
+  if (currentDialoguePair.value) {
+    console.log('💾 保存暂存的对话对到世界书:', currentDialoguePair.value);
+
+    // 如果配置了onUserMessage和onAIReply回调，则使用它们
+    if (props.dialogueConfig.onUserMessage) {
+      try {
+        await props.dialogueConfig.onUserMessage(currentDialoguePair.value.userInput);
+      } catch (error) {
+        console.error('保存用户消息失败:', error);
+      }
+    }
+
+    if (props.dialogueConfig.onAIReply) {
+      try {
+        await props.dialogueConfig.onAIReply(
+          currentDialoguePair.value.aiResponse,
+          props.dialogueConfig.characterName || 'AI',
+        );
+      } catch (error) {
+        console.error('保存AI回复失败:', error);
+      }
+    }
+
+    currentDialoguePair.value = null;
+    console.log('✅ 对话对已保存');
+  }
+};
+
+// 重试AI生成
+const retryAIGeneration = async () => {
+  console.log('🔄 用户点击重试按钮，重新生成AI回复');
+
+  // 清除暂存的AI回复
+  currentDialoguePair.value = null;
+
+  // 删除当前页面的AI回复显示
+  if (pages.value.length > 0 && currentPageIndex.value < pages.value.length) {
+    console.log('🗑️ 删除当前页面的AI回复显示');
+    pages.value.splice(currentPageIndex.value, 1);
+    // 调整页面索引
+    if (currentPageIndex.value >= pages.value.length) {
+      currentPageIndex.value = Math.max(0, pages.value.length - 1);
+    }
+  }
+
+  // 删除最后一条AI消息
+  const lastAIIndex = messages.value.findLastIndex(msg => msg.role === 'assistant');
+  if (lastAIIndex >= 0) {
+    messages.value.splice(lastAIIndex, 1);
+  }
+
+  // 重新生成
+  await generateAndHandleAIReply();
+};
+
+const closeDialogue = async () => {
+  // 先保存暂存的对话对
+  await savePendingDialogue();
+
   if (props.dialogueConfig.onDialogueClose) {
     props.dialogueConfig.onDialogueClose();
   }
@@ -593,11 +710,11 @@ const editCurrentPageMessage = () => {
 };
 
 // 删除当前页消息
-const deleteCurrentPageMessage = () => {
-  if (currentPageIndex.value >= 0 && currentPageIndex.value < pages.value.length) {
-    showDeleteConfirm.value = true;
-  }
-};
+// const deleteCurrentPageMessage = () => {
+//   if (currentPageIndex.value >= 0 && currentPageIndex.value < pages.value.length) {
+//     showDeleteConfirm.value = true;
+//   }
+// };
 
 // 确认删除消息
 const confirmDeleteMessage = () => {
@@ -767,6 +884,34 @@ const safeFormatMessage = (content: string) => {
     background: linear-gradient(135deg, #9a4c3c, #75362c);
     transform: translateY(-2px);
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  &.retry-btn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-color: rgba(245, 158, 11, 0.7);
+    animation: pulse 2s infinite;
+
+    .btn-icon {
+      color: #fef3c7;
+    }
+
+    &:hover {
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      border-color: rgba(251, 191, 36, 0.8);
+      transform: scale(1.1);
+    }
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
   }
 }
 

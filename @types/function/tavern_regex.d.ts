@@ -20,12 +20,24 @@ type FormatAsTavernRegexedStringOption = {
  * const message = getChatMessages(-1)[0];
  * const result = formatAsTavernRegexedString(message.message, 'ai_output', 'display', { depth: 0 });
  */
+/**
+ * 对 `text` 应用酒馆正则
+ *
+ * @param text 要应用酒馆正则的文本
+ * @param source 文本来源, 例如来自用户输入或 AI 输出. 对应于酒馆正则的`作用范围`选项.
+ * @param destination 文本将作为什么而使用, 例如用于显示或作为提示词. 对应于酒馆正则的`仅格式显示`和`仅格式提示词`选项.
+ * @param option 可选选项
+ *   - `depth?:number`: 文本所在的深度; 不填则不考虑酒馆正则的`深度`选项: 无论该深度是否在酒馆正则的`最小深度`和`最大深度`范围内都生效
+ *   - `character_name?:string`: 角色卡名称; 不填则使用当前角色卡名称
+ *
+ * @returns 应用酒馆正则后的文本字符串
+ */
 declare function formatAsTavernRegexedString(
   text: string,
   source: 'user_input' | 'ai_output' | 'slash_command' | 'world_info' | 'reasoning',
   destination: 'display' | 'prompt',
-  { depth, character_name }?: FormatAsTavernRegexedStringOption,
-);
+  option?: FormatAsTavernRegexedStringOption,
+): string;
 
 type TavernRegex = {
   id: string;
