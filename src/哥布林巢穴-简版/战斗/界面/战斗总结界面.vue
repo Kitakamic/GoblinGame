@@ -95,6 +95,9 @@ const emit = defineEmits<Emits>();
 const isGenerating = ref(false);
 const summaryContent = ref('');
 
+// 暂存当前总结，不立即保存到世界书
+const pendingSummary = ref<string | null>(null);
+
 // 格式化总结内容
 const formattedSummary = computed(() => {
   if (!summaryContent.value) return '';
@@ -105,6 +108,26 @@ const formattedSummary = computed(() => {
   });
 });
 
+// 生成战斗总结（不保存到世界书的版本）
+const generateSummaryWithoutSaving = async (): Promise<string> => {
+  // 构建战斗总结提示词
+  const prompt = BattleSummaryService.buildBattleSummaryPrompt(props.summaryConfig.battleData);
+
+  // 调用AI生成总结
+  const response = await window.TavernHelper.generate({
+    user_input: prompt,
+  });
+
+  // 应用酒馆正则处理AI回复
+  console.log('🧹 原始AI回复:', response);
+  const regexResponse = formatAsTavernRegexedString(response, 'ai_output', 'display');
+  console.log('🎨 应用酒馆正则后的回复:', regexResponse);
+
+  // 解析AI回复
+  const summary = BattleSummaryService.parseBattleSummary(regexResponse);
+  return summary;
+};
+
 // 生成战斗总结
 const generateSummary = async () => {
   if (isGenerating.value) return;
@@ -112,17 +135,24 @@ const generateSummary = async () => {
   try {
     isGenerating.value = true;
 
-    // 使用战斗总结服务生成总结
-    const result = await BattleSummaryService.generateBattleSummary(props.summaryConfig.battleData);
+    // 先保存之前暂存的总结
+    await savePendingSummary();
 
-    summaryContent.value = result.summary;
+    // 生成新总结（不立即保存到世界书）
+    const summary = await generateSummaryWithoutSaving();
+
+    summaryContent.value = summary;
+
+    // 暂存新生成的总结，等待关闭时保存
+    pendingSummary.value = summary;
+    console.log('📝 暂存战斗总结，等待关闭时保存');
 
     // 调用生成回调
     if (props.summaryConfig.onSummaryGenerated) {
-      props.summaryConfig.onSummaryGenerated(result.summary);
+      props.summaryConfig.onSummaryGenerated(summary);
     }
 
-    emit('summary-generated', result.summary);
+    emit('summary-generated', summary);
   } catch (error) {
     console.error('生成战斗总结失败:', error);
     toastr.error('生成战斗总结失败', 'AI生成失败');
@@ -131,19 +161,48 @@ const generateSummary = async () => {
   }
 };
 
+// 保存暂存的总结到世界书
+const savePendingSummary = async () => {
+  if (pendingSummary.value) {
+    console.log('💾 保存暂存的战斗总结到世界书');
+
+    try {
+      await BattleSummaryService.saveBattleSummaryToWorldbook(props.summaryConfig.battleData, pendingSummary.value);
+
+      // 调用保存回调
+      if (props.summaryConfig.onSummarySaved) {
+        props.summaryConfig.onSummarySaved(pendingSummary.value);
+      }
+
+      emit('summary-saved', pendingSummary.value);
+
+      pendingSummary.value = null;
+      console.log('✅ 战斗总结已保存');
+    } catch (error) {
+      console.error('❌ 保存战斗总结失败:', error);
+    }
+  }
+};
+
 // 重新生成总结
 const regenerateSummary = async () => {
+  console.log('🔄 用户点击重新生成按钮，清除暂存并重新生成');
+
+  // 清除暂存的总结
+  pendingSummary.value = null;
+
   // 清空当前内容
   summaryContent.value = '';
 
-  // 重新生成（会自动覆盖世界书中的记录）
-  // generateBattleSummary 会调用 saveBattleSummaryToWorldbook
-  // 由于使用固定 UID，新记录会覆盖旧记录
+  // 重新生成（不会立即保存，等待关闭时保存）
   await generateSummary();
 };
 
 // 关闭总结界面
-const closeSummary = () => {
+const closeSummary = async () => {
+  // 先保存暂存的总结
+  await savePendingSummary();
+
   if (props.summaryConfig.onClose) {
     props.summaryConfig.onClose();
   }

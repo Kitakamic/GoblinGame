@@ -242,8 +242,6 @@
                 <option value="1">1个据点</option>
                 <option value="2">2个据点</option>
                 <option value="3">3个据点</option>
-                <option value="4">4个据点</option>
-                <option value="5">5个据点</option>
               </select>
             </div>
 

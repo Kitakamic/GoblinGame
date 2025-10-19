@@ -87,7 +87,7 @@ export class BattleSummaryService {
   /**
    * 构建战斗总结提示词
    */
-  private static buildBattleSummaryPrompt(battleData: BattleSummaryData): string {
+  static buildBattleSummaryPrompt(battleData: BattleSummaryData): string {
     // 添加调试信息
     console.log('=== 战斗总结服务调试信息 ===');
     console.log('战斗数据:', battleData);
@@ -250,7 +250,7 @@ export class BattleSummaryService {
   /**
    * 解析AI生成的战斗总结
    */
-  private static parseBattleSummary(response: string): string {
+  static parseBattleSummary(response: string): string {
     console.log('🔧 parseBattleSummary 被调用:', {
       responseLength: response?.length || 0,
       responsePreview: response?.substring(0, 100) || '无内容',
@@ -452,7 +452,7 @@ export class BattleSummaryService {
    * @param battleData 战斗数据
    * @param summary 战斗总结内容
    */
-  private static async saveBattleSummaryToWorldbook(battleData: BattleSummaryData, summary: string): Promise<void> {
+  static async saveBattleSummaryToWorldbook(battleData: BattleSummaryData, summary: string): Promise<void> {
     try {
       console.log('🔧 开始保存战斗总结到世界书:', {
         summary: summary ? '有内容' : '无内容',
