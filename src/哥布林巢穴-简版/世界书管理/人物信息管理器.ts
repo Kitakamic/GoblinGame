@@ -227,7 +227,7 @@ export class CharacterWorldbookManager {
       })),
       breedingRecords: character.breedingRecords || [],
       combatAttributes: {
-        level: character.level,
+        level: Math.floor(character.offspring / 10),
         baseAttributes: character.attributes,
         deployedAttributes: character.deployedAttributes,
         troopDeployment: character.troopDeployment,

@@ -13,10 +13,12 @@ export class PlayerLevelService {
     try {
       const gameData = modularSaveManager.getCurrentGameData();
       if (!gameData) {
+        console.log('没有游戏数据，返回默认等级1');
         return 1; // 默认等级
       }
 
       const characters = gameData.training.characters;
+      console.log(`总人物数量: ${characters.length}`);
 
       // 筛选出我方人物（排除玩家角色和敌方角色）
       const myCharacters = characters.filter(
@@ -24,12 +26,21 @@ export class PlayerLevelService {
           character.status !== 'player' && character.status !== 'enemy' && character.status !== 'uncaptured',
       );
 
+      console.log(`我方人物数量: ${myCharacters.length}`);
+      console.log(
+        '我方人物详情:',
+        myCharacters.map(c => ({ name: c.name, offspring: c.offspring, level: Math.floor(c.offspring / 10) })),
+      );
+
       if (myCharacters.length === 0) {
+        console.log('没有我方人物，返回默认等级1');
         return 1; // 没有我方人物时返回默认等级
       }
 
       // 计算所有我方人物的等级，取最高值
-      const maxLevel = Math.max(...myCharacters.map((character: Character) => Math.floor(character.offspring / 10)));
+      const levels = myCharacters.map((character: Character) => Math.floor(character.offspring / 10));
+      const maxLevel = Math.max(...levels);
+      console.log(`计算出的等级: ${levels}, 最高等级: ${maxLevel}`);
 
       return Math.max(1, maxLevel); // 确保等级至少为1
     } catch (error) {
@@ -45,14 +56,19 @@ export class PlayerLevelService {
     try {
       const gameData = modularSaveManager.getCurrentGameData();
       if (!gameData) {
+        console.log('没有游戏数据，无法更新玩家等级');
         return;
       }
 
       const playerCharacter = gameData.training.characters.find((char: Character) => char.id === 'player-1');
+      console.log('找到玩家角色:', playerCharacter ? '是' : '否');
 
       if (playerCharacter) {
         const newLevel = this.getMaxLevelFromMyCharacters();
+        const oldLevel = playerCharacter.level;
         playerCharacter.level = newLevel;
+
+        console.log(`玩家角色等级更新: ${oldLevel} -> ${newLevel}`);
 
         // 更新存档
         modularSaveManager.updateModuleData({
@@ -61,6 +77,8 @@ export class PlayerLevelService {
         });
 
         console.log(`玩家角色等级已更新为: ${newLevel}`);
+      } else {
+        console.log('未找到玩家角色 (id: player-1)');
       }
     } catch (error) {
       console.error('更新玩家角色等级失败:', error);
@@ -94,8 +112,14 @@ export class PlayerLevelService {
     const currentPlayerLevel = this.getPlayerLevel();
     const maxLevelFromMyCharacters = this.getMaxLevelFromMyCharacters();
 
-    if (maxLevelFromMyCharacters > currentPlayerLevel) {
+    console.log(`检查玩家等级更新: 当前等级=${currentPlayerLevel}, 我方最高等级=${maxLevelFromMyCharacters}`);
+
+    // 如果等级不同，就更新（不一定要更高才更新）
+    if (maxLevelFromMyCharacters !== currentPlayerLevel) {
+      console.log(`需要更新玩家等级: ${currentPlayerLevel} -> ${maxLevelFromMyCharacters}`);
       this.updatePlayerLevel();
+    } else {
+      console.log(`玩家等级无需更新: ${currentPlayerLevel} = ${maxLevelFromMyCharacters}`);
     }
   }
 }

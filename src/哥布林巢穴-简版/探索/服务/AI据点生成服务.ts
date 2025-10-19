@@ -17,8 +17,9 @@ export class AILocationGenerationService {
 2. 目标类型要多样化（村庄、城镇、城市、要塞、废墟、地牢）
 3. 难度要合理分布，奖励要与难度匹配
 4. ***pecialUnit不允许是人物，只允许是部队***
+5. ***此模式只输出侦察json数据，无需输出剧情正文***
 
-<json>
+\`\`\`json
 {
   "name": "{据点名称}",
   "type": "{城镇|村庄|城市|要塞|废墟|地牢}",
@@ -46,9 +47,9 @@ export class AILocationGenerationService {
       "speed": {速度，10-50范围},
       "health": {生命值，100-200范围}
     }
-  },
+  }
 }
-</json>
+\`\`\`
 `;
 
   /**

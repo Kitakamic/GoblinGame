@@ -716,7 +716,7 @@ export class CharacterAttributeCalculator {
         maxFertility: fertility,
 
         // 战斗属性
-        level: heroLevel,
+        level: Math.floor(0 / 10), // 初始等级基于后代数量，新角色为0级
         attributes,
         deployedAttributes: undefined,
         troopDeployment: undefined,

@@ -687,11 +687,11 @@ const startTraining = async (character: Character) => {
   // 调教立即消耗体力
   character.stamina = Math.max(0, character.stamina - 20);
 
-  // 检查是否死亡
-  if (character.stamina <= 0) {
-    executeCharacter(character);
-    return;
-  }
+  // 检查是否死亡 - 已注释掉
+  // if (character.stamina <= 0) {
+  //   executeCharacter(character);
+  //   return;
+  // }
 
   // 调教效果将在回合结束时处理
   // 这里只设置状态，不自动结束
@@ -752,17 +752,20 @@ const startFertility = async (character: Character) => {
   // 分配交配间
   const assignedRoom = availableBreedingRooms[0];
   character.locationId = assignedRoom.id;
+
+  // 保存原始状态，用于生育完成后恢复
+  character.originalStatus = character.status;
   character.status = 'breeding';
   showCharacterMenu.value = false;
 
   // 交配立即消耗体力
   character.stamina = Math.max(0, character.stamina - 20);
 
-  // 检查是否死亡
-  if (character.stamina <= 0) {
-    executeCharacter(character);
-    return;
-  }
+  // 检查是否死亡 - 已注释掉
+  // if (character.stamina <= 0) {
+  //   executeCharacter(character);
+  //   return;
+  // }
 
   // 交配效果将在回合结束时处理
   // 这里只设置状态，不自动结束
@@ -890,7 +893,7 @@ const saveOutfit = (character: Character) => {
 };
 
 // 更新人物数据（融合系统：手动调教结束后自动进行自动调教）
-const updateCharacter = (updatedCharacter: Character) => {
+const updateCharacter = (updatedCharacter: Character, shouldTriggerAutoTraining: boolean = true) => {
   console.log('🔄 开始更新人物数据...');
   console.log('📊 接收到的更新数据:', {
     id: updatedCharacter.id,
@@ -957,7 +960,20 @@ const updateCharacter = (updatedCharacter: Character) => {
   }
 
   // 融合系统：手动调教结束后自动进行自动调教
-  if (finalCharacter.status === 'imprisoned' && selectedCharacter.value?.id === finalCharacter.id) {
+  console.log('🔍 检查自动调教条件:', {
+    shouldTriggerAutoTraining,
+    characterStatus: finalCharacter.status,
+    isImprisonedOrTraining: finalCharacter.status === 'imprisoned' || finalCharacter.status === 'training',
+    selectedCharacterId: selectedCharacter.value?.id,
+    finalCharacterId: finalCharacter.id,
+    isSameCharacter: selectedCharacter.value?.id === finalCharacter.id,
+  });
+
+  if (
+    shouldTriggerAutoTraining &&
+    (finalCharacter.status === 'imprisoned' || finalCharacter.status === 'training') &&
+    selectedCharacter.value?.id === finalCharacter.id
+  ) {
     console.log('🎯 手动调教结束，开始自动调教流程...');
 
     // 设置调教状态
@@ -965,13 +981,15 @@ const updateCharacter = (updatedCharacter: Character) => {
     finalCharacter.lastTraining = new Date();
 
     // 调教立即消耗体力
+    const oldStamina = finalCharacter.stamina;
     finalCharacter.stamina = Math.max(0, finalCharacter.stamina - 20);
+    console.log(`💪 体力扣除: ${oldStamina} -> ${finalCharacter.stamina} (扣除20点)`);
 
-    // 检查是否死亡
-    if (finalCharacter.stamina <= 0) {
-      executeCharacter(finalCharacter);
-      return;
-    }
+    // 检查是否死亡 - 已注释掉
+    // if (finalCharacter.stamina <= 0) {
+    //   executeCharacter(finalCharacter);
+    //   return;
+    // }
 
     // 更新本地数据
     if (index > -1) {
@@ -1391,6 +1409,21 @@ const batchBreeding = async () => {
     return;
   }
 
+  // 如果繁殖间数量不足，显示确认框
+  if (availableBreedingRooms.length < eligibleCharacters.length) {
+    const confirmed = await ConfirmService.showWarning(
+      `检测到繁殖间数量不足！`,
+      '确认批量生育',
+      `当前有 ${eligibleCharacters.length} 个人物符合生育条件，但只有 ${availableBreedingRooms.length} 个繁殖间可用。\n\n继续操作将按优先级为前 ${availableBreedingRooms.length} 个人物分配繁殖间，剩余 ${eligibleCharacters.length - availableBreedingRooms.length} 个人物将无法进行生育。\n\n是否继续？`,
+    );
+
+    if (!confirmed) {
+      // 返还行动力（用户取消）
+      actionPointsService.refundActionPoints('batchBreeding');
+      return;
+    }
+  }
+
   let successCount = 0;
   let roomIndex = 0;
 
@@ -1410,16 +1443,19 @@ const batchBreeding = async () => {
     // 分配交配间
     const assignedRoom = availableBreedingRooms[roomIndex];
     character.locationId = assignedRoom.id;
+
+    // 保存原始状态，用于生育完成后恢复
+    character.originalStatus = character.status;
     character.status = 'breeding';
 
     // 交配立即消耗体力
     character.stamina = Math.max(0, character.stamina - 20);
 
-    // 检查是否死亡
-    if (character.stamina <= 0) {
-      executeCharacter(character);
-      continue;
-    }
+    // 检查是否死亡 - 已注释掉
+    // if (character.stamina <= 0) {
+    //   executeCharacter(character);
+    //   continue;
+    // }
 
     successCount++;
     roomIndex++;
@@ -1488,7 +1524,7 @@ onActivated(async () => {
 
 <style scoped lang="scss">
 .training-panel {
-  height: 710px;
+  height: calc(100vh - 90px);
   width: 100%;
   max-width: 100%;
   padding: 16px;
@@ -1772,6 +1808,17 @@ onActivated(async () => {
   font-weight: 600;
   text-align: center;
   z-index: 3;
+  @media (min-width: 769px) {
+    top: 8px;
+    right: 8px;
+    padding: 4px 6px;
+    font-size: 10px;
+    border-radius: 4px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 
   &.imprisoned {
     background: rgba(34, 197, 94, 0.8);
@@ -1821,14 +1868,29 @@ onActivated(async () => {
   align-items: center;
   gap: 2px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  @media (min-width: 769px) {
+    top: 28px; // 避免与状态标识重叠
+    right: 8px;
+    padding: 4px 6px;
+    font-size: 10px;
+    border-radius: 4px;
+    gap: 3px;
+    height: 18px;
+  }
 
   .level-icon {
     font-size: 7px;
+    @media (min-width: 769px) {
+      font-size: 8px;
+    }
   }
 
   .level-value {
     font-size: 8px;
     font-weight: 700;
+    @media (min-width: 769px) {
+      font-size: 10px;
+    }
   }
 }
 
@@ -1851,6 +1913,10 @@ onActivated(async () => {
   padding: 6px 4px;
   max-width: 100%;
   min-width: 0;
+  @media (min-width: 769px) {
+    font-size: 16px;
+    padding: 8px 6px;
+  }
 }
 
 // 卡片收藏按钮
@@ -2189,14 +2255,22 @@ onActivated(async () => {
   width: 280px;
   height: 280px;
   animation: wheelSpinIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  @media (min-width: 1024px) {
+    width: 420px;
+    height: 420px;
+  }
+  @media (min-width: 1440px) {
+    width: 520px;
+    height: 520px;
+  }
 
   .wheel-center {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 120px;
-    height: 120px;
+    width: 160px;
+    height: 160px;
     background: linear-gradient(135deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));
     border: 3px solid rgba(205, 133, 63, 0.6);
     border-radius: 50%;
@@ -2210,8 +2284,8 @@ onActivated(async () => {
     z-index: 10;
 
     .character-avatar {
-      width: 80px;
-      height: 80px;
+      width: 110px;
+      height: 110px;
       border-radius: 50%;
       overflow: hidden;
       border: 3px solid rgba(205, 133, 63, 0.6);
@@ -2233,7 +2307,7 @@ onActivated(async () => {
         justify-content: center;
 
         .avatar-icon {
-          font-size: 32px;
+          font-size: 42px;
           opacity: 0.8;
         }
       }
@@ -2241,16 +2315,16 @@ onActivated(async () => {
 
     .close-wheel-btn {
       position: absolute;
-      bottom: 150px;
-      left: 110%;
+      bottom: 200px;
+      left: 115%;
       transform: translateX(-50%);
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       background: rgba(220, 38, 38, 0.9);
       border: none;
       border-radius: 50%;
       color: #fff;
-      font-size: 14px;
+      font-size: 16px;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -2272,15 +2346,15 @@ onActivated(async () => {
 
     .wheel-btn {
       position: absolute;
-      width: 60px;
-      height: 60px;
+      width: 80px;
+      height: 80px;
       border: none;
       border-radius: 50%;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
+      font-size: 28px;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       z-index: 5;
@@ -2308,7 +2382,7 @@ onActivated(async () => {
       // 按钮位置 - 均匀圆形分布（5个按钮围绕中心，半径100px，避免被中心头像遮挡）
       &.btn-0 {
         // 0度 - 正上方
-        top: calc(50% - 115px);
+        top: calc(50% - 155px);
         left: 50%;
         transform: translateX(-50%);
         background: linear-gradient(135deg, #4a90e2, #357abd);
@@ -2327,8 +2401,8 @@ onActivated(async () => {
 
       &.btn-1 {
         // 72度 - 右上（换装按钮）
-        top: calc(50% - 70px);
-        right: calc(50% - 105px);
+        top: calc(50% - 90px);
+        right: calc(50% - 145px);
         background: linear-gradient(135deg, #e91e63, #c2185b);
         border: 2px solid rgba(233, 30, 99, 0.6);
 
@@ -2340,8 +2414,8 @@ onActivated(async () => {
 
       &.btn-2 {
         // 144度 - 右下
-        bottom: calc(50% - 90px);
-        right: calc(50% - 90px);
+        bottom: calc(50% - 120px);
+        right: calc(50% - 120px);
         background: linear-gradient(135deg, #6d2c2c, #4a1f1f);
         border: 2px solid rgba(255, 80, 80, 0.6);
 
@@ -2353,8 +2427,8 @@ onActivated(async () => {
 
       &.btn-3 {
         // 216度 - 左下
-        bottom: calc(50% - 90px);
-        left: calc(50% - 90px);
+        bottom: calc(50% - 120px);
+        left: calc(50% - 120px);
         background: linear-gradient(135deg, #e91e63, #c2185b);
         border: 2px solid rgba(233, 30, 99, 0.6);
 
@@ -2366,8 +2440,8 @@ onActivated(async () => {
 
       &.btn-4 {
         // 288度 - 左上（手动调教按钮）
-        top: calc(50% - 70px);
-        left: calc(50% - 105px);
+        top: calc(50% - 90px);
+        left: calc(50% - 145px);
         background: linear-gradient(135deg, #8a3c2c, #65261c);
         border: 2px solid rgba(255, 120, 60, 0.6);
 
@@ -2379,7 +2453,7 @@ onActivated(async () => {
 
       &.btn-5 {
         // 360度 - 正下方（堕落按钮）
-        bottom: calc(50% - 115px);
+        bottom: calc(50% - 155px);
         left: 50%;
         transform: translateX(-50%);
         background: linear-gradient(135deg, #ff6b35, #e55a2b);
@@ -2577,7 +2651,7 @@ onActivated(async () => {
 }
 
 // 宽屏优化 - 增大人物卡片尺寸
-@media (min-width: 1400px) {
+@media (min-width: 1440px) {
   .characters-grid {
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 16px;
@@ -2591,24 +2665,6 @@ onActivated(async () => {
   .character-name {
     font-size: 14px;
     padding: 8px 6px;
-  }
-
-  .character-status-badge {
-    font-size: 10px;
-    padding: 3px 8px;
-  }
-
-  .character-level-badge {
-    font-size: 10px;
-    padding: 3px 8px;
-
-    .level-icon {
-      font-size: 9px;
-    }
-
-    .level-value {
-      font-size: 10px;
-    }
   }
 
   .favorite-btn-card {
@@ -2636,24 +2692,6 @@ onActivated(async () => {
   .character-name {
     font-size: 16px;
     padding: 10px 8px;
-  }
-
-  .character-status-badge {
-    font-size: 12px;
-    padding: 4px 10px;
-  }
-
-  .character-level-badge {
-    font-size: 12px;
-    padding: 4px 10px;
-
-    .level-icon {
-      font-size: 11px;
-    }
-
-    .level-value {
-      font-size: 12px;
-    }
   }
 
   .favorite-btn-card {
@@ -2743,74 +2781,6 @@ onActivated(async () => {
 
     .batch-action {
       justify-content: center;
-    }
-  }
-}
-
-@media (max-width: 480px) {
-  .characters-grid {
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-    gap: 6px;
-  }
-
-  .character-card {
-    width: 90px;
-    height: 180px;
-  }
-
-  .character-portrait {
-    height: 100%;
-  }
-
-  .character-name {
-    font-size: 9px;
-  }
-
-  .character-status-bar {
-    padding: 1px 2px;
-
-    .stat-item {
-      .stat-icon {
-        font-size: 4px;
-      }
-
-      .stat-bar {
-        height: 1px;
-      }
-    }
-  }
-}
-
-@media (max-width: 360px) {
-  .characters-grid {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 4px;
-  }
-
-  .character-card {
-    width: 80px;
-    height: 160px;
-  }
-
-  .character-portrait {
-    height: 100%;
-  }
-
-  .character-name {
-    font-size: 8px;
-  }
-
-  .character-status-bar {
-    padding: 1px;
-
-    .stat-item {
-      .stat-icon {
-        font-size: 3px;
-      }
-
-      .stat-bar {
-        height: 1px;
-      }
     }
   }
 }

@@ -43,7 +43,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'S',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 38, // 攻击力：物理攻击能力，战士类角色较高
             defense: 32, // 防御力：物理防御能力，坦克类角色较高
@@ -193,7 +193,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'A',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 42, // 攻击力：物理攻击能力，战士类角色较高
             defense: 38, // 防御力：物理防御能力，坦克类角色较高
@@ -343,7 +343,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'S',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 35, // 攻击力：物理攻击能力，战士类角色较高
             defense: 28, // 防御力：物理防御能力，坦克类角色较高
@@ -493,7 +493,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'S',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 32, // 攻击力：物理攻击能力，战士类角色较高
             defense: 26, // 防御力：物理防御能力，坦克类角色较高
@@ -643,7 +643,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'A',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 48, // 攻击力：物理攻击能力，战士类角色较高
             defense: 24, // 防御力：物理防御能力，坦克类角色较高
@@ -793,7 +793,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'S',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 40, // 攻击力：物理攻击能力，战士类角色较高
             defense: 35, // 防御力：物理防御能力，坦克类角色较高
@@ -943,7 +943,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'S',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 45, // 攻击力：物理攻击能力，战士类角色较高
             defense: 40, // 防御力：物理防御能力，坦克类角色较高
@@ -1093,7 +1093,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'S',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 42, // 攻击力：物理攻击能力，战士类角色较高
             defense: 45, // 防御力：物理防御能力，坦克类角色较高
@@ -1243,7 +1243,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'A',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 35, // 攻击力：物理攻击能力，战士类角色较高
             defense: 32, // 防御力：物理防御能力，坦克类角色较高
@@ -1393,7 +1393,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'S',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 50, // 攻击力：物理攻击能力，战士类角色较高
             defense: 48, // 防御力：物理防御能力，坦克类角色较高
@@ -1543,7 +1543,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
           offspring: 0,
           rating: 'S',
           favorite: false,
-          level: 1,
+          level: 0, // 初始等级基于后代数量，新角色为0级
           attributes: {
             attack: 60, // 攻击力：物理攻击能力，战士类角色较高
             defense: 55, // 防御力：物理防御能力，坦克类角色较高

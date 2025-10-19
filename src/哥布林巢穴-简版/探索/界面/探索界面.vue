@@ -41,7 +41,7 @@
     <div class="continent-tabs">
       <div class="tabs-container">
         <button
-          v-for="continent in unlockedContinents"
+          v-for="continent in allContinents"
           :key="continent.name"
           class="continent-tab"
           :class="{
@@ -63,12 +63,13 @@
             </div>
           </div>
           <div v-if="continent.isConquered" class="conquered-badge">✅</div>
+          <div v-else-if="!continent.isUnlocked" class="locked-badge">🔒</div>
         </button>
       </div>
     </div>
 
     <!-- 区域选项卡 -->
-    <div v-if="unlockedRegions.length > 0" class="region-tabs">
+    <div v-if="unlockedRegions.length > 0 && currentContinent?.isUnlocked" class="region-tabs">
       <div class="tabs-container">
         <button
           v-for="region in unlockedRegions"
@@ -101,6 +102,7 @@
             </div>
           </div>
           <div v-if="region.isConquered" class="conquered-badge">✅</div>
+          <div v-else-if="!region.isUnlocked" class="locked-badge">🔒</div>
         </button>
       </div>
     </div>
@@ -413,12 +415,11 @@ const formatNumber = (num: number): string => {
 };
 
 // 大陆相关计算属性
-const unlockedContinents = computed(() => {
+const allContinents = computed(() => {
   console.log('🔍 [探索界面] 大陆数据:', continentExploreService.continents.value);
   console.log('🔍 [探索界面] 大陆数量:', continentExploreService.continents.value.length);
-  const unlocked = continentExploreService.continents.value.filter(continent => continent.isUnlocked);
-  console.log('🔍 [探索界面] 解锁的大陆:', unlocked);
-  return unlocked;
+  // 显示所有大陆，包括未解锁的（类似区域的处理方式）
+  return continentExploreService.continents.value;
 });
 
 const currentContinent = computed(() => {
@@ -1252,6 +1253,10 @@ onMounted(async () => {
     .tab-content {
       flex: 1;
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
 
       .tab-name {
         font-size: 12px;
@@ -1271,6 +1276,7 @@ onMounted(async () => {
         display: flex;
         align-items: center;
         gap: 8px;
+        width: 100%;
 
         .progress-bar {
           flex: 1;
@@ -1314,6 +1320,28 @@ onMounted(async () => {
       display: flex;
       align-items: center;
       justify-content: center;
+
+      @media (max-width: 768px) {
+        font-size: 10px;
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    .locked-badge {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      font-size: 12px;
+      background: rgba(107, 114, 128, 0.2);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #6b7280;
+      border: 1px solid rgba(107, 114, 128, 0.3);
 
       @media (max-width: 768px) {
         font-size: 10px;
@@ -1379,7 +1407,7 @@ onMounted(async () => {
     overflow: hidden;
 
     @media (max-width: 768px) {
-      min-width: 120px;
+      min-width: 150px;
       padding: 6px 8px;
       gap: 6px;
     }
@@ -1443,6 +1471,10 @@ onMounted(async () => {
     .tab-content {
       flex: 1;
       min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
 
       .tab-name {
         font-size: 11px;
@@ -1462,6 +1494,7 @@ onMounted(async () => {
         display: flex;
         align-items: center;
         gap: 8px;
+        width: 100%;
 
         .progress-bar {
           flex: 1;
@@ -1495,25 +1528,31 @@ onMounted(async () => {
       .capital-status {
         display: flex;
         align-items: center;
+        justify-content: center;
         gap: 4px;
         margin-top: 2px;
         padding: 2px 4px;
         background: rgba(0, 0, 0, 0.2);
         border-radius: 3px;
-        font-size: 8px;
+        font-size: 9px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        width: 100%;
 
         @media (max-width: 768px) {
           gap: 2px;
           padding: 1px 3px;
           font-size: 7px;
+          max-width: 100%;
         }
 
         .capital-icon {
-          font-size: 8px;
+          font-size: 9px;
           filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 
           @media (max-width: 768px) {
-            font-size: 7px;
+            font-size: 8px;
           }
         }
 
@@ -1521,13 +1560,19 @@ onMounted(async () => {
           color: #f0e6d2;
           font-weight: 500;
           opacity: 0.9;
+          flex-shrink: 1;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
         }
 
         .capital-conquest {
           font-weight: 600;
           padding: 1px 3px;
           border-radius: 2px;
-          font-size: 7px;
+          font-size: 8px;
+          flex-shrink: 0;
 
           @media (max-width: 768px) {
             padding: 1px 2px;
@@ -1651,7 +1696,7 @@ onMounted(async () => {
 
 .explore-content {
   .explore-scroll-container {
-    height: 450px;
+    height: calc(100vh - 365px);
     overflow-y: auto;
     padding: 12px;
     margin-top: 12px;
@@ -1661,7 +1706,7 @@ onMounted(async () => {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 
     @media (max-width: 768px) {
-      height: calc(100vh - 300px);
+      height: calc(100vh - 310px);
       padding: 8px;
       margin-top: 8px;
     }
@@ -2071,11 +2116,13 @@ onMounted(async () => {
   border-radius: 16px;
   width: 95%;
   height: 95%;
-  max-width: 1400px;
-  max-height: 900px;
+  max-width: 1800px;
+  max-height: 1200px;
   overflow: hidden;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
   animation: modalSlideIn 0.3s ease-out;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 768px) {
@@ -2125,8 +2172,10 @@ onMounted(async () => {
 }
 
 .battle-modal .modal-content {
-  height: calc(100% - 5px);
+  flex: 1;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .attack-modal-overlay {

@@ -1,4 +1,5 @@
 import type { Character, TroopDeployment } from '../../人物管理/类型/人物类型';
+import { databaseService } from '../../存档管理/数据库服务';
 import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import { GOBLIN_UNIT_CHARACTERS } from '../类型/单位数据表';
 import type { BattleUnit } from '../类型/战斗属性';
@@ -332,7 +333,7 @@ export class FormationService {
               id: character.id,
               name: character.name,
               avatar: character.avatar || '',
-              level: character.level,
+              level: Math.floor(character.offspring / 10),
               offspring: character.offspring,
               attributes: character.attributes,
               description: character.title || '',
@@ -365,13 +366,37 @@ export class FormationService {
   // ==================== 栏目式存档功能 ====================
 
   /**
-   * 获取所有保存的部队配置
+   * 获取当前存档ID
+   */
+  private static getCurrentArchiveId(): string {
+    try {
+      // 从数据库服务获取当前存档ID
+      const currentSaveId = databaseService.getCurrentSaveId();
+      if (currentSaveId) {
+        return currentSaveId;
+      }
+
+      // 如果没有当前存档ID，尝试从游戏数据获取
+      const gameData = modularSaveManager.getCurrentGameData();
+      if (gameData) {
+        // 使用默认槽位0作为存档ID
+        return 'slot_0';
+      }
+
+      console.warn('没有找到游戏数据，使用默认存档ID');
+      return 'slot_0';
+    } catch (error) {
+      console.error('获取存档ID失败:', error);
+      return 'slot_0';
+    }
+  }
+
+  /**
+   * 获取所有保存的部队配置（仅限当前存档）
    */
   static getFormationConfigs(): FormationConfig[] {
     try {
-      const configs = localStorage.getItem('goblin-nest-formation-configs');
-      if (!configs) return [];
-      return JSON.parse(configs);
+      return this.loadConfigsFromArchive();
     } catch (error) {
       console.error('获取部队配置列表失败:', error);
       return [];
@@ -381,18 +406,20 @@ export class FormationService {
   /**
    * 保存部队配置
    */
-  static saveFormationConfig(config: Omit<FormationConfig, 'id' | 'createdAt' | 'lastModified'>): string {
+  static saveFormationConfig(config: Omit<FormationConfig, 'id' | 'createdAt' | 'lastModified' | 'archiveId'>): string {
     try {
       const configs = this.getFormationConfigs();
+      const currentArchiveId = this.getCurrentArchiveId();
       const newConfig: FormationConfig = {
         ...config,
         id: `config_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         createdAt: Date.now(),
         lastModified: Date.now(),
+        archiveId: currentArchiveId,
       };
 
       configs.push(newConfig);
-      localStorage.setItem('goblin-nest-formation-configs', JSON.stringify(configs));
+      this.saveConfigsToArchive(configs);
 
       console.log('部队配置已保存:', newConfig);
       return newConfig.id;
@@ -405,7 +432,10 @@ export class FormationService {
   /**
    * 更新部队配置
    */
-  static updateFormationConfig(configId: string, updates: Partial<Omit<FormationConfig, 'id' | 'createdAt'>>): boolean {
+  static updateFormationConfig(
+    configId: string,
+    updates: Partial<Omit<FormationConfig, 'id' | 'createdAt' | 'archiveId'>>,
+  ): boolean {
     try {
       const configs = this.getFormationConfigs();
       const configIndex = configs.findIndex(config => config.id === configId);
@@ -421,7 +451,7 @@ export class FormationService {
         lastModified: Date.now(),
       };
 
-      localStorage.setItem('goblin-nest-formation-configs', JSON.stringify(configs));
+      this.saveConfigsToArchive(configs);
       console.log('部队配置已更新:', configs[configIndex]);
       return true;
     } catch (error) {
@@ -443,7 +473,7 @@ export class FormationService {
         return false;
       }
 
-      localStorage.setItem('goblin-nest-formation-configs', JSON.stringify(filteredConfigs));
+      this.saveConfigsToArchive(filteredConfigs);
       console.log('部队配置已删除:', configId);
       return true;
     } catch (error) {
@@ -465,6 +495,13 @@ export class FormationService {
         return Array(6).fill(null);
       }
 
+      // 验证配置是否属于当前存档
+      const currentArchiveId = this.getCurrentArchiveId();
+      if (config.archiveId && config.archiveId !== currentArchiveId) {
+        console.error('配置不属于当前存档，无法加载');
+        return Array(6).fill(null);
+      }
+
       console.log('加载部队配置:', config);
       return config.captainSlots;
     } catch (error) {
@@ -479,10 +516,111 @@ export class FormationService {
   static getFormationConfig(configId: string): FormationConfig | null {
     try {
       const configs = this.getFormationConfigs();
-      return configs.find(c => c.id === configId) || null;
+      const config = configs.find(c => c.id === configId);
+
+      if (!config) return null;
+
+      // 验证配置是否属于当前存档
+      const currentArchiveId = this.getCurrentArchiveId();
+      if (config.archiveId && config.archiveId !== currentArchiveId) {
+        console.error('配置不属于当前存档');
+        return null;
+      }
+
+      return config;
     } catch (error) {
       console.error('获取部队配置详情失败:', error);
       return null;
+    }
+  }
+
+  // ==================== 存档集成功能 ====================
+
+  /**
+   * 保存当前部队编制到存档
+   */
+  static saveCurrentFormationToArchive(captainSlots: (Captain | null)[]): void {
+    try {
+      const gameData = modularSaveManager.getCurrentGameData();
+      if (!gameData) {
+        console.warn('没有找到游戏数据，无法保存部队编制');
+        return;
+      }
+
+      // 更新部队编制数据
+      gameData.formation.currentFormation = captainSlots;
+
+      // 更新存档
+      modularSaveManager.updateModuleData({
+        moduleName: 'formation',
+        data: gameData.formation,
+      });
+
+      console.log('部队编制已保存到存档');
+    } catch (error) {
+      console.error('保存部队编制到存档失败:', error);
+    }
+  }
+
+  /**
+   * 从存档加载当前部队编制
+   */
+  static loadCurrentFormationFromArchive(): (Captain | null)[] {
+    try {
+      const gameData = modularSaveManager.getCurrentGameData();
+      if (!gameData || !gameData.formation) {
+        console.log('没有找到存档中的部队编制数据，返回空编制');
+        return Array(6).fill(null);
+      }
+
+      return gameData.formation.currentFormation || Array(6).fill(null);
+    } catch (error) {
+      console.error('从存档加载部队编制失败:', error);
+      return Array(6).fill(null);
+    }
+  }
+
+  /**
+   * 保存配置列表到存档
+   */
+  static saveConfigsToArchive(configs: FormationConfig[]): void {
+    try {
+      const gameData = modularSaveManager.getCurrentGameData();
+      if (!gameData) {
+        console.warn('没有找到游戏数据，无法保存配置列表');
+        return;
+      }
+
+      // 更新配置列表数据
+      gameData.formation.savedConfigs = configs;
+
+      // 更新存档
+      modularSaveManager.updateModuleData({
+        moduleName: 'formation',
+        data: gameData.formation,
+      });
+
+      console.log('配置列表已保存到存档');
+    } catch (error) {
+      console.error('保存配置列表到存档失败:', error);
+    }
+  }
+
+  /**
+   * 从存档加载配置列表
+   */
+  static loadConfigsFromArchive(): FormationConfig[] {
+    try {
+      const gameData = modularSaveManager.getCurrentGameData();
+      if (!gameData || !gameData.formation) {
+        console.log('没有找到存档中的配置列表数据，返回空列表');
+        return [];
+      }
+
+      return gameData.formation.savedConfigs || [];
+    } catch (error) {
+      console.error('从存档加载配置列表失败:', error);
+      return [];
     }
   }
 }

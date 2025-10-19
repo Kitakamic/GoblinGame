@@ -25,7 +25,7 @@
           <div class="character-stats">
             <div class="stat-item">
               <div class="stat-header">
-                <span class="stat-label">忠诚度</span>
+                <span class="stat-label">堕落值</span>
                 <span class="stat-value">{{ character.loyalty }}%</span>
               </div>
               <div class="stat-bar">
@@ -52,8 +52,12 @@
         <button class="header-btn edit-btn" title="编辑当前页消息" @click="editCurrentPageMessage()">
           <span class="btn-icon">✏️</span>
         </button>
-        <button class="header-btn delete-btn" title="删除当前页消息" @click="deleteCurrentPageMessage()">
+        <!-- 删除按钮已隐藏 -->
+        <!-- <button class="header-btn delete-btn" title="删除当前页消息" @click="deleteCurrentPageMessage()">
           <span class="btn-icon">🗑️</span>
+        </button> -->
+        <button v-if="showRetryButton" class="header-btn retry-btn" title="重新生成AI回复" @click="retryAIGeneration()">
+          <span class="btn-icon">🔄</span>
         </button>
         <button class="header-btn close-btn" title="关闭调教界面" @click="closeTraining">
           <span class="btn-icon">✕</span>
@@ -194,7 +198,7 @@
       :show="showCloseConfirm"
       title="结束调教"
       message="确定要结束本次调教吗？"
-      details="结束调教后，角色将进入调教中状态，本回合无法再次开启调教对话。"
+      details="结束调教后，角色将进入调教中状态，本回合无法再次开启调教对话。（即使不进行对话直接结束，也会些许增长堕落值）"
       confirm-text="确定结束"
       cancel-text="继续调教"
       type="warning"
@@ -214,12 +218,14 @@
       @confirm="confirmDeleteMessage"
       @cancel="cancelDeleteMessage"
     />
+
+    <!-- 自定义弹窗提示 -->
+    <ToastContainer ref="toastRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import toastr from 'toastr';
-import { nextTick, onMounted, onUnmounted, watch } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { WorldbookService } from '../../世界书管理/世界书服务';
 import { AvatarSwitchService } from '../../人物管理/服务/头像切换服务';
 import type { Character } from '../../人物管理/类型/人物类型';
@@ -227,6 +233,7 @@ import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import { TimeParseService } from '../../服务/时间解析服务';
 import { MessageService } from '../../消息模块/消息服务';
 import { useMessageChat } from '../../消息模块/消息聊天';
+import ToastContainer from '../../组件/弹窗提示.vue';
 import CustomConfirm from '../../组件/自定义确认框.vue';
 import { AttributeChangeParseService } from '../服务/属性变化解析服务';
 import { OptionParseService } from '../服务/选项解析服务';
@@ -237,7 +244,7 @@ interface Props {
 }
 
 interface Emits {
-  (e: 'update-character', character: Character): void;
+  (e: 'update-character', character: Character, shouldTriggerAutoTraining?: boolean): void;
   (e: 'close'): void;
 }
 
@@ -300,9 +307,22 @@ const isSending = ref(false);
 // 暂存最后一次用户输入，用于与AI回复一起保存
 const lastUserInput = ref<string>('');
 
+// 弹窗提示引用
+const toastRef = ref<InstanceType<typeof ToastContainer>>();
+
 // 确认框状态
 const showCloseConfirm = ref(false);
 const showDeleteConfirm = ref(false);
+
+// 重试状态
+const showRetryButton = ref(false);
+const retryMessage = ref('');
+
+// 暂存当前对话对，不立即保存到世界书
+const currentDialoguePair = ref<{
+  userInput: string;
+  aiResponse: string;
+} | null>(null);
 
 // 选项结构
 const options = ref<TrainingOption[]>([]);
@@ -377,7 +397,7 @@ const submitCustomOption = async () => {
   // 检查体力限制
   if (AttributeChangeParseService.isStaminaTooLow(props.character.stamina)) {
     console.log('⚠️ 体力过低，无法继续调教');
-    toastr.warning(`${props.character.name} 体力过低，无法继续调教！`);
+    toastRef.value?.warning(`${props.character.name} 体力过低，无法继续调教！`);
     closeCustomInputPanel();
     return;
   }
@@ -387,6 +407,9 @@ const submitCustomOption = async () => {
 
   // 作为选择附加并继续
   addUserMessageWithGameTime(text);
+
+  // 先保存之前暂存的对话对
+  await savePendingDialogue();
 
   // 暂存用户输入，等待AI回复后一起保存
   lastUserInput.value = text;
@@ -458,16 +481,21 @@ onUnmounted(async () => {});
 const buildUserPrompt = (): string => {
   const latestUserMessage = messages.value.filter(msg => msg.role === 'user').pop();
   if (latestUserMessage) {
-    return `[当前调教角色: ${props.character.name}]\n
+    return `## 调教模式输出规则:
 
-# 调教模式输出规则
+1. ***正文末尾必须按照示例输出 JSON 格式的选项和忠诚度（堕落进度）以及体力值变化，并用 [OPTIONS_JSON] 标签包裹***
+2. 此时女性人物已然被俘，但根据其性格和身份，每个人有着鲜明的态度表现和心理活动，*避免完全的抵抗/顺从/投降心理*
+3. 文字风格: 黑暗/色情/奇幻，每次输出必须包含大段女性人物的对话和独白，以此构建人物剧情动态变化的基础，并严格遵守内容优先级构建内容
+  正文内容优先级:
+    1. **角色对话（比重极大）**: 通过大段的长对话来勾勒角色的语言底色，表现其对于被俘虏处境的态度和语言风格
+    2. **内心独白（比重较大）**: 在场景/动作/神态，甚至是对话之中，插入足量的内心独白（不使用引号，而是*包裹）来描绘人物心中的信念与精神变化
+    3. 动作描写与肢体语言（比重中等）
+    4. 场景互动（比重中等）
+    5. 环境细节（比重较小）
+4. 最终指导: 回复字数在500-800字之间，调教模式下人物的状态是循序渐进的，不要在一次回复中出现人物的完全变化（如完全不再抵抗/堕落/投降等），而是为下一次预留足够的变化空间，直到坠入深渊
 
-在剧情输出结尾严格输出 JSON 格式，并用 [OPTIONS_JSON] 标签包裹。要求：
-- 仅输出 3 个选项，且 strategy 固定为 保守/激进/平稳
-- text 为给{{user}}参考的选项
-- 同时输出角色根据剧情变化的*忠诚度*和*体力*属性数据，格式如下：
 
-输出格式示例：
+示例：
 [OPTIONS_JSON]
 {
   "options":[
@@ -476,11 +504,15 @@ const buildUserPrompt = (): string => {
     {"strategy":"平稳","text":"保持当前节奏，观察她的反应"}
   ],
   "attribute_changes": {
-    "loyalty": 忠诚度变化值（-5到5之间的整数）,
-    "stamina": 体力变化值（-20到5之间的整数，通常为负数）
+    "loyalty": 忠诚度（堕落进度）变化值（-5到10之间的整数）,
+    "stamina": 体力变化值（-15到5之间的整数，通常为负数）
   }
 }
 [/OPTIONS_JSON]
+
+[当前调教角色: ${props.character.name}]
+
+
 ${latestUserMessage.content}
 `;
   }
@@ -573,13 +605,16 @@ const chooseOption = async (opt: TrainingOption) => {
   // 检查体力限制
   if (AttributeChangeParseService.isStaminaTooLow(props.character.stamina)) {
     console.log('⚠️ 体力过低，无法继续调教');
-    toastr.warning(`${props.character.name} 体力过低，无法继续调教！`);
+    toastRef.value?.warning(`${props.character.name} 体力过低，无法继续调教！`);
     return;
   }
 
   const choiceText = opt.text; // 不包含标签，只使用文本
 
   addUserMessageWithGameTime(choiceText);
+
+  // 先保存之前暂存的对话对
+  await savePendingDialogue();
 
   // 暂存用户选择，等待AI回复后一起保存
   lastUserInput.value = choiceText;
@@ -606,6 +641,9 @@ const chooseInitialOption = async (opt: TrainingOption) => {
 
   addUserMessageWithGameTime(choiceText);
 
+  // 先保存之前暂存的对话对
+  await savePendingDialogue();
+
   // 暂存用户初始选择，等待AI回复后一起保存
   lastUserInput.value = choiceText;
   console.log('📝 暂存用户初始选择:', choiceText);
@@ -631,18 +669,42 @@ const generateAndHandleAIReply = async () => {
       user_input: buildUserPrompt(),
     });
 
+    // 检查AI回复是否为空或无效
+    if (!response || response.trim().length === 0) {
+      console.warn('⚠️ AI回复为空，跳过处理');
+      toastRef.value?.warning('AI回复为空，请重试', { title: '生成失败' });
+
+      // AI回复为空时，显示重试按钮而不是清空用户输入
+      if (lastUserInput.value) {
+        console.log('🔄 AI回复为空，显示重试按钮，保留用户输入:', lastUserInput.value);
+        showRetryButton.value = true;
+        retryMessage.value = 'AI回复为空，点击重试按钮重新生成';
+      }
+      return;
+    }
+
     aiResponse = response;
     isAISuccess = true;
+
+    // 成功生成时显示重试按钮，允许重新生成
+    showRetryButton.value = true;
+    retryMessage.value = '点击重试按钮重新生成AI回复';
 
     // 先解析选项（从原始文本中）
     const parsed = OptionParseService.parseNextStepOptions(aiResponse);
     options.value = parsed.options;
+    console.log('🎯 设置选项到 options.value:', options.value);
+    console.log('📊 选项数量:', options.value.length);
 
     // 解析并应用属性变化
     console.log('🔍 开始解析AI回复中的属性变化...');
     console.log('📝 AI回复内容:', aiResponse);
 
-    const attributeChanges = AttributeChangeParseService.parseAttributeChanges(aiResponse);
+    // 先应用酒馆正则处理，再解析属性变化
+    const tavernProcessedResponse = formatAsTavernRegexedString(aiResponse, 'ai_output', 'display');
+    console.log('🎨 应用酒馆正则后的内容:', tavernProcessedResponse);
+
+    const attributeChanges = AttributeChangeParseService.parseAttributeChanges(tavernProcessedResponse);
     console.log('📊 解析到的属性变化:', attributeChanges);
 
     if (attributeChanges && AttributeChangeParseService.validateAttributeChanges(attributeChanges)) {
@@ -674,8 +736,9 @@ const generateAndHandleAIReply = async () => {
         console.log(`📊 堕落等级: ${AvatarSwitchService.getCorruptionLevelDescription(newAttributes.loyalty)}`);
 
         // 显示头像切换提示
-        toastr.info(`${props.character.name} 的堕落值达到 ${newAttributes.loyalty}%，头像已切换！`, '头像切换', {
-          timeOut: 3000,
+        toastRef.value?.info(`${props.character.name} 的堕落值达到 ${newAttributes.loyalty}%，头像已切换！`, {
+          title: '头像切换',
+          duration: 3000,
         });
       }
 
@@ -685,7 +748,7 @@ const generateAndHandleAIReply = async () => {
       // 检查体力是否过低
       if (AttributeChangeParseService.isStaminaTooLow(finalCharacter.stamina)) {
         finalCharacter.status = 'training';
-        toastr.warning(`${finalCharacter.name} 体力过低，无法继续调教！`);
+        toastRef.value?.warning(`${finalCharacter.name} 体力过低，无法继续调教！`);
       }
 
       // 更新世界书信息
@@ -711,9 +774,9 @@ const generateAndHandleAIReply = async () => {
         stamina: newAttributes.stamina,
       });
 
-      // 通知父组件更新人物数据
-      emit('update-character', finalCharacter);
-      console.log('📤 已通知父组件更新人物数据');
+      // 通知父组件更新人物数据（但不触发自动调教）
+      emit('update-character', finalCharacter, false);
+      console.log('📤 已通知父组件更新人物数据（不触发自动调教）');
     } else {
       console.warn('⚠️ 属性变化解析失败或验证不通过');
       console.log('📊 解析结果:', attributeChanges);
@@ -727,29 +790,69 @@ const generateAndHandleAIReply = async () => {
     // 保存选项到存档
     saveCurrentOptions();
 
-    // 剔除JSON数据，只保留角色回复内容
-    const cleanedResponse = removeJsonFromResponse(aiResponse);
+    // 剔除JSON数据，只保留角色回复内容（使用已经酒馆正则处理过的文本）
+    const cleanedResponse = removeJsonFromResponse(tavernProcessedResponse);
     console.log('🧹 清理后的回复内容:', cleanedResponse);
 
-    const formattedResponse = formatAsTavernRegexedString(cleanedResponse, 'ai_output', 'display');
-    console.log('🎨 应用酒馆正则后的内容:', formattedResponse);
-    console.log('🔄 内容是否发生变化:', cleanedResponse !== formattedResponse);
+    // 不再重复应用酒馆正则，因为已经处理过了
+    const formattedResponse = cleanedResponse;
+    console.log('🎨 最终显示内容:', formattedResponse);
 
     addAIMessageWithGameTime(formattedResponse, props.character.name);
     // 追加新书页并自动切换到下一页
     pushAIPage(formattedResponse);
 
-    // AI回复成功后，将用户输入和AI回复作为一对保存到世界书
+    // AI回复成功后，暂存用户输入和AI回复，等待用户下一步操作时再保存到世界书
     if (isAISuccess && lastUserInput.value) {
-      await saveTrainingPairToWorldbook(lastUserInput.value, formattedResponse);
-      lastUserInput.value = ''; // 清空暂存
+      currentDialoguePair.value = {
+        userInput: lastUserInput.value,
+        aiResponse: formattedResponse,
+      };
+      console.log('📝 暂存对话对，等待用户下一步操作时保存:', currentDialoguePair.value);
     }
   } catch (error) {
     console.error('AI生成失败:', error);
-    toastr.error('AI生成失败', 'AI生成失败');
+    toastRef.value?.error('AI生成失败', { title: 'AI生成失败' });
+
+    // AI生成失败时，显示重试按钮而不是清空用户输入
+    if (lastUserInput.value) {
+      console.log('🔄 AI生成失败，显示重试按钮，保留用户输入:', lastUserInput.value);
+      showRetryButton.value = true;
+      retryMessage.value = 'AI生成失败，点击重试按钮重新生成';
+    }
   } finally {
     isSending.value = false;
   }
+};
+
+// 保存暂存的对话对到世界书
+const savePendingDialogue = async () => {
+  if (currentDialoguePair.value) {
+    console.log('💾 保存暂存的对话对到世界书:', currentDialoguePair.value);
+    await saveTrainingPairToWorldbook(currentDialoguePair.value.userInput, currentDialoguePair.value.aiResponse);
+    currentDialoguePair.value = null;
+  }
+};
+
+// 重试AI生成
+const retryAIGeneration = async () => {
+  console.log('🔄 用户点击重试按钮，重新生成AI回复');
+
+  // 清除暂存的AI回复
+  currentDialoguePair.value = null;
+
+  // 删除当前页面的AI回复显示
+  if (pages.value.length > 0 && currentPageIndex.value < pages.value.length) {
+    console.log('🗑️ 删除当前页面的AI回复显示');
+    pages.value.splice(currentPageIndex.value, 1);
+    // 调整页面索引
+    if (currentPageIndex.value >= pages.value.length) {
+      currentPageIndex.value = Math.max(0, pages.value.length - 1);
+    }
+  }
+
+  // 重新生成
+  await generateAndHandleAIReply();
 };
 
 // 将用户输入和AI回复作为一对保存到世界书
@@ -857,6 +960,9 @@ const closeTraining = async () => {
 const confirmCloseTraining = async () => {
   showCloseConfirm.value = false;
 
+  // 先保存暂存的对话对
+  await savePendingDialogue();
+
   // 消息已通过世界书服务自动保存
 
   // 创建更新后的人物对象，设置为调教中状态
@@ -914,8 +1020,8 @@ const confirmCloseTraining = async () => {
     console.error('❌ 更新人物数据失败:', error);
   }
 
-  // 通知父组件更新人物数据
-  emit('update-character', finalCharacter);
+  // 通知父组件更新人物数据（关闭时触发自动调教）
+  emit('update-character', finalCharacter, true);
 
   // 延迟关闭，确保父组件有时间处理更新
   setTimeout(() => {
@@ -993,12 +1099,12 @@ const editCurrentPageMessage = () => {
 };
 
 // 删除当前页消息
-const deleteCurrentPageMessage = () => {
-  const messageIndex = getCurrentPageMessageIndex();
-  if (messageIndex >= 0 && messageIndex < messages.value.length) {
-    showDeleteConfirm.value = true;
-  }
-};
+// const deleteCurrentPageMessage = () => {
+//   const messageIndex = getCurrentPageMessageIndex();
+//   if (messageIndex >= 0 && messageIndex < messages.value.length) {
+//     showDeleteConfirm.value = true;
+//   }
+// };
 
 // 确认删除消息
 const confirmDeleteMessage = () => {
@@ -1171,6 +1277,7 @@ const handleImageError = (event: Event) => {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    object-position: center top;
     transition: transform 0.3s ease;
   }
 
@@ -1318,6 +1425,34 @@ const handleImageError = (event: Event) => {
     font-size: 16px;
     font-weight: bold;
   }
+
+  &.retry-btn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border-color: rgba(245, 158, 11, 0.7);
+    animation: pulse 2s infinite;
+
+    .btn-icon {
+      color: #fef3c7;
+    }
+
+    &:hover {
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      border-color: rgba(251, 191, 36, 0.8);
+      transform: scale(1.1);
+    }
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
 }
 
 /* 书籍外壳与分页 */
@@ -1382,6 +1517,27 @@ const handleImageError = (event: Event) => {
   border-radius: 8px;
   padding: 16px 20px;
 
+  /* 宽屏优化 */
+  @media (min-width: 1400px) {
+    max-width: 1200px;
+    padding: 20px 30px;
+  }
+
+  @media (min-width: 1600px) {
+    max-width: 1400px;
+    padding: 24px 40px;
+  }
+
+  @media (min-width: 1920px) {
+    max-width: 1600px;
+    padding: 28px 50px;
+  }
+
+  @media (min-width: 2560px) {
+    max-width: 1800px;
+    padding: 32px 60px;
+  }
+
   @media (max-width: 768px) {
     padding: 12px;
     max-width: 100%;
@@ -1394,6 +1550,31 @@ const handleImageError = (event: Event) => {
   line-height: 1.85;
   letter-spacing: 0.3px;
   text-rendering: optimizeLegibility;
+
+  /* 宽屏优化 */
+  @media (min-width: 1400px) {
+    font-size: 19px;
+    line-height: 1.9;
+    letter-spacing: 0.35px;
+  }
+
+  @media (min-width: 1600px) {
+    font-size: 20px;
+    line-height: 1.95;
+    letter-spacing: 0.4px;
+  }
+
+  @media (min-width: 1920px) {
+    font-size: 21px;
+    line-height: 2;
+    letter-spacing: 0.45px;
+  }
+
+  @media (min-width: 2560px) {
+    font-size: 22px;
+    line-height: 2.05;
+    letter-spacing: 0.5px;
+  }
 
   @media (max-width: 768px) {
     font-size: 16px;
@@ -1503,6 +1684,27 @@ const handleImageError = (event: Event) => {
   margin: 0 auto;
   padding: 20px;
   background: rgba(40, 26, 20, 0.3);
+
+  /* 宽屏优化 */
+  @media (min-width: 1400px) {
+    max-width: 1200px;
+    padding: 24px 30px;
+  }
+
+  @media (min-width: 1600px) {
+    max-width: 1400px;
+    padding: 28px 40px;
+  }
+
+  @media (min-width: 1920px) {
+    max-width: 1600px;
+    padding: 32px 50px;
+  }
+
+  @media (min-width: 2560px) {
+    max-width: 1800px;
+    padding: 36px 60px;
+  }
   border: 1px solid rgba(205, 133, 63, 0.25);
   border-radius: 12px;
 }

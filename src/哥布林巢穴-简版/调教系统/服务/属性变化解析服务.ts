@@ -17,22 +17,45 @@ export interface ParsedAttributeChanges {
 export class AttributeChangeParseService {
   /**
    * 解析AI输出的属性变化数据
+   * 注意：调用此方法前需要先应用酒馆正则处理文本
+   * 支持 [OPTIONS_JSON] 标签格式和 ```json 代码块格式
    */
-  static parseAttributeChanges(aiResponse: string): AttributeChange | null {
+  static parseAttributeChanges(processedResponse: string): AttributeChange | null {
     console.log('🔍 开始解析属性变化数据...');
-    console.log('📝 AI回复内容:', aiResponse);
+    console.log('📝 已处理的AI回复内容:', processedResponse);
+
+    let jsonStr = '';
 
     try {
-      // 提取JSON数据
-      const jsonMatch = aiResponse.match(/\[OPTIONS_JSON\]([\s\S]*?)\[\/OPTIONS_JSON\]/);
-      if (!jsonMatch) {
-        console.warn('❌ 未找到OPTIONS_JSON标签');
-        console.log('📄 完整AI回复:', aiResponse);
-        return null;
-      }
+      // 首先尝试匹配 [OPTIONS_JSON] 标签格式
+      const tagMatch = processedResponse.match(/\[OPTIONS_JSON\]([\s\S]*?)\[\/OPTIONS_JSON\]/);
+      if (tagMatch) {
+        const tagContent = tagMatch[1].trim();
+        console.log('📋 提取的标签内容:', tagContent);
 
-      const jsonStr = jsonMatch[1].trim();
-      console.log('📋 提取的JSON字符串:', jsonStr);
+        // 检查标签内容是否包含```json代码块
+        const codeBlockMatch = tagContent.match(/```json\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+          // 嵌套格式：标签内包含代码块
+          jsonStr = codeBlockMatch[1].trim();
+          console.log('📋 使用嵌套格式（标签+代码块）提取的JSON字符串:', jsonStr);
+        } else {
+          // 纯标签格式：直接使用标签内容
+          jsonStr = tagContent;
+          console.log('📋 使用纯标签格式提取的JSON字符串:', jsonStr);
+        }
+      } else {
+        // 如果没找到标签格式，尝试匹配独立的```json代码块格式
+        const codeBlockMatch = processedResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+          jsonStr = codeBlockMatch[1].trim();
+          console.log('📋 使用独立代码块格式提取的JSON字符串:', jsonStr);
+        } else {
+          console.warn('❌ 未找到OPTIONS_JSON标签或```json代码块');
+          console.log('📄 完整处理后的回复:', processedResponse);
+          return null;
+        }
+      }
 
       const data = JSON.parse(jsonStr);
       console.log('📊 解析的JSON数据:', data);
@@ -47,7 +70,10 @@ export class AttributeChangeParseService {
       return null;
     } catch (error) {
       console.error('❌ 解析属性变化数据失败:', error);
-      console.log('📄 原始AI回复:', aiResponse);
+      console.log('📄 处理后的回复:', processedResponse);
+      console.log('🔍 尝试提取的JSON字符串:', jsonStr);
+      console.log('📊 JSON字符串长度:', jsonStr.length);
+      console.log('📊 JSON字符串前100字符:', jsonStr.substring(0, 100));
       return null;
     }
   }

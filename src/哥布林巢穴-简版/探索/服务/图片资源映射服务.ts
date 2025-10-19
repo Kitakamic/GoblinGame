@@ -43,6 +43,57 @@ export class PictureResourceMappingService {
   // 图片URL前缀
   private static readonly IMAGE_URL_PREFIX = 'https://kitakamis.online/portraits/';
 
+  // 种族到职业的映射关系（基于角色绘制生成器的种族特色职业体系）
+  private readonly RACE_TO_CLASS_MAPPING: Record<string, string[]> = {
+    人类: [
+      // 共通职业
+      '法师',
+      '医师',
+      '吟游诗人',
+      // 人类特色职业 - 体现军事霸权和贵族文化
+      '骑士', // 精英骑士，体现军事霸权
+      '牧师', // 圣职者，体现宗教文化
+      '女王', // 统治者
+      '公主', // 皇室成员
+      '王后', // 皇室成员
+      '战士', // 军事人员
+      '学者', // 知识阶层
+      '商人', // 贸易人员
+      '盗贼', // 地下人员
+      '教师', // 教育者
+      '女仆',
+    ],
+    永恒精灵: [
+      // 永恒精灵特色职业 - 体现自然和谐和魔法传承 - 无共通职业
+      '德鲁伊', // 自然魔法使用者
+      '游侠', // 森林守护者
+      '祭司', // 自然信仰者
+      '元素使', // 元素使
+      '精灵侍女', // 精灵侍女
+    ],
+    黑暗精灵: [
+      // 黑暗精灵特色职业 - 体现黑暗魔法和军事文化
+      '奴主', // 奴隶主
+      '女奴', // 黑暗女奴，类似女仆，但衣着更加暴露，性奴隶
+      '血法师', // 血法师
+      '巫灵姐妹', // 持鞭近战
+      '狂战士', // 狂战士，暴露盔甲
+      '暗影刺客', // 暗影刺客
+    ],
+    狐族: [
+      // 共通职业
+      '医师',
+      '吟游诗人',
+      // 狐族特色职业 - 体现神信仰和贸易文化
+      '巫女', // 九尾神信仰者
+      '姬武士', // 狐族武士
+      '领主', // 狐族领主
+      '海贼', // 海上劫掠者
+      '船长', // 狐族船长
+      '歌妓', // 狐族歌妓
+    ],
+  };
+
   // 据点类型到职业的映射关系（基于角色绘制生成器的种族特色职业体系）
   private readonly LOCATION_TYPE_TO_CLASS_MAPPING: LocationTypeToClassMapping = {
     town: ['商人', '教师', '学者', '医师', '吟游诗人', '法师', '战士', '盗贼'], // 城镇：商业、教育、医疗、娱乐、魔法、军事、地下活动
@@ -207,6 +258,32 @@ export class PictureResourceMappingService {
   }
 
   /**
+   * 根据种族和据点类型获取有效的职业列表
+   * @param race 种族
+   * @param locationType 据点类型
+   * @returns 有效的职业列表
+   */
+  private getValidClassesForRaceAndLocation(race: string, locationType: string): string[] {
+    // 获取据点类型允许的职业
+    const locationClasses = this.LOCATION_TYPE_TO_CLASS_MAPPING[locationType as keyof LocationTypeToClassMapping] || [];
+
+    // 获取种族允许的职业
+    const raceClasses = this.RACE_TO_CLASS_MAPPING[race] || [];
+
+    // 取交集，确保职业既符合据点类型又符合种族限制
+    const validClasses = locationClasses.filter(cls => raceClasses.includes(cls));
+
+    console.log(`🔍 [职业验证] 种族 "${race}" + 据点类型 "${locationType}" 职业验证:`, {
+      据点允许职业: locationClasses,
+      种族允许职业: raceClasses,
+      有效职业: validClasses,
+      验证结果: validClasses.length > 0 ? '通过' : '失败',
+    });
+
+    return validClasses;
+  }
+
+  /**
    * 随机选择一个匹配的图片资源（先选职业，再选图片）
    * @param locationType 据点类型
    * @param race 种族
@@ -220,20 +297,20 @@ export class PictureResourceMappingService {
   ): PictureResource | null {
     console.log(`🎲 [随机选择] 开始随机选择图片资源（先选职业，再选图片）...`);
 
-    // 第一步：根据据点类型获取允许的职业列表
-    const allowedClasses = this.LOCATION_TYPE_TO_CLASS_MAPPING[locationType as keyof LocationTypeToClassMapping] || [];
-    console.log(`🎯 [职业选择] 据点类型 "${locationType}" 对应的职业列表:`, allowedClasses);
+    // 第一步：根据种族和据点类型获取有效的职业列表
+    const validClasses = this.getValidClassesForRaceAndLocation(race, locationType);
+    console.log(`🎯 [职业选择] 种族 "${race}" + 据点类型 "${locationType}" 的有效职业列表:`, validClasses);
 
-    if (allowedClasses.length === 0) {
-      console.log(`❌ [职业选择] 据点类型 "${locationType}" 没有对应的职业`);
+    if (validClasses.length === 0) {
+      console.log(`❌ [职业选择] 种族 "${race}" 在据点类型 "${locationType}" 中没有有效的职业组合`);
       return null;
     }
 
     // 第二步：随机选择一个职业
-    const randomClassIndex = Math.floor(Math.random() * allowedClasses.length);
-    const selectedClass = allowedClasses[randomClassIndex];
+    const randomClassIndex = Math.floor(Math.random() * validClasses.length);
+    const selectedClass = validClasses[randomClassIndex];
     console.log(`🎲 [职业选择] 随机选择职业:`, {
-      候选职业数: allowedClasses.length,
+      候选职业数: validClasses.length,
       随机索引: randomClassIndex,
       选中职业: selectedClass,
     });
@@ -302,7 +379,7 @@ export class PictureResourceMappingService {
     console.log(`⚠️ [图片选择] 该职业的所有图片都已使用，尝试降级策略...`);
 
     // 降级策略：尝试其他职业
-    const otherClasses = allowedClasses.filter(className => className !== selectedClass);
+    const otherClasses = validClasses.filter((className: string) => className !== selectedClass);
     console.log(`🔄 [降级策略] 开始尝试其他职业:`, otherClasses);
 
     for (const className of otherClasses) {

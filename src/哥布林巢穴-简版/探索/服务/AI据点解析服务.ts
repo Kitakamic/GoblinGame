@@ -52,12 +52,16 @@ export class LocationParser {
       console.log('🔧 [据点解析器] 应用酒馆正则清理文本...');
       const regexedText = formatAsTavernRegexedString(cleanText, 'ai_output', 'display');
       console.log('🔧 [据点解析器] 酒馆正则处理前长度:', cleanText.length);
+      console.log('🔧 [据点解析器] 酒馆正则处理前开头:', cleanText.substring(0, 100) + '...');
       console.log('🔧 [据点解析器] 酒馆正则处理后长度:', regexedText.length);
+      console.log('🔧 [据点解析器] 酒馆正则处理后开头:', regexedText.substring(0, 100) + '...');
       console.log('🔧 [据点解析器] 酒馆正则处理是否有效:', cleanText !== regexedText);
 
       if (cleanText !== regexedText) {
         cleanText = regexedText;
         console.log('✅ [据点解析器] 酒馆正则处理完成，使用清理后的文本');
+        console.log('✅ [据点解析器] 清理后文本长度:', cleanText.length);
+        console.log('✅ [据点解析器] 清理后文本开头:', cleanText.substring(0, 100) + '...');
       } else {
         console.log('ℹ️ [据点解析器] 酒馆正则未改变文本，继续使用原始文本');
       }
@@ -461,30 +465,10 @@ export class LocationParser {
   private static extractJsonFromText(text: string): string {
     console.log('🔍 [JSON提取器] 开始提取JSON数据');
     console.log('📝 [JSON提取器] 输入文本长度:', text.length);
-    console.log('📝 [JSON提取器] 输入文本开头:', text.substring(0, 50) + '...');
+    console.log('📝 [JSON提取器] 输入文本开头:', text.substring(0, 100) + '...');
+    console.log('📝 [JSON提取器] 输入文本结尾:', '...' + text.substring(Math.max(0, text.length - 100)));
 
-    // 1. 处理带标签的JSON格式 (新增)
-    console.log('🔧 [JSON提取器] 检查是否包含<json>标签...');
-    if (text.includes('<json>')) {
-      console.log('✅ [JSON提取器] 找到<json>标签');
-      const jsonStart = text.indexOf('<json>') + 6; // '<json>'.length = 6
-      const jsonEnd = text.indexOf('</json>', jsonStart);
-      console.log('🔧 [JSON提取器] JSON开始位置:', jsonStart);
-      console.log('🔧 [JSON提取器] JSON结束位置:', jsonEnd);
-
-      if (jsonEnd !== -1) {
-        const extracted = text.substring(jsonStart, jsonEnd).trim();
-        console.log('✅ [JSON提取器] 成功从<json>标签提取JSON，长度:', extracted.length);
-        console.log('✅ [JSON提取器] 提取的JSON开头:', extracted.substring(0, 50) + '...');
-        return extracted;
-      } else {
-        console.log('❌ [JSON提取器] 未找到结束的</json>标签');
-      }
-    } else {
-      console.log('❌ [JSON提取器] 未找到<json>标签');
-    }
-
-    // 2. 处理Markdown代码块格式
+    // 1. 处理Markdown代码块格式 (```json)
     console.log('🔧 [JSON提取器] 检查是否包含```json标记...');
     if (text.includes('```json')) {
       console.log('✅ [JSON提取器] 找到```json标记');
@@ -496,7 +480,7 @@ export class LocationParser {
       if (jsonEnd !== -1) {
         const extracted = text.substring(jsonStart, jsonEnd).trim();
         console.log('✅ [JSON提取器] 成功提取JSON，长度:', extracted.length);
-        console.log('✅ [JSON提取器] 提取的JSON开头:', extracted.substring(0, 50) + '...');
+        console.log('✅ [JSON提取器] 提取的JSON开头:', extracted.substring(0, 100) + '...');
         return extracted;
       } else {
         console.log('❌ [JSON提取器] 未找到结束的```标记');
@@ -505,7 +489,7 @@ export class LocationParser {
       console.log('❌ [JSON提取器] 未找到```json标记');
     }
 
-    // 3. 处理普通代码块格式
+    // 2. 处理普通代码块格式 (```)
     console.log('🔧 [JSON提取器] 检查是否包含普通```标记...');
     if (text.includes('```')) {
       console.log('✅ [JSON提取器] 找到普通```标记');
@@ -519,7 +503,7 @@ export class LocationParser {
       if (jsonStart !== -1 && jsonEnd !== -1) {
         const extracted = text.substring(jsonStart, jsonEnd).trim();
         console.log('✅ [JSON提取器] 从普通代码块提取JSON，长度:', extracted.length);
-        console.log('✅ [JSON提取器] 提取的JSON开头:', extracted.substring(0, 50) + '...');
+        console.log('✅ [JSON提取器] 提取的JSON开头:', extracted.substring(0, 100) + '...');
         return extracted;
       } else {
         console.log('❌ [JSON提取器] 普通代码块中未找到有效的JSON');
@@ -528,13 +512,77 @@ export class LocationParser {
       console.log('❌ [JSON提取器] 未找到普通```标记');
     }
 
-    // 4. 查找JSON对象或数组
+    // 3. 查找JSON对象或数组 (无包裹格式) - 改进的正则表达式
+    console.log('🔧 [JSON提取器] 使用改进的正则表达式查找JSON对象...');
+
+    // 尝试匹配完整的JSON对象，考虑嵌套的大括号
+    let braceCount = 0;
+    let jsonStart = -1;
+    let jsonEnd = -1;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (char === '{') {
+        if (braceCount === 0) {
+          jsonStart = i;
+        }
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0 && jsonStart !== -1) {
+          jsonEnd = i;
+          break;
+        }
+      }
+    }
+
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      const extracted = text.substring(jsonStart, jsonEnd + 1).trim();
+      console.log('✅ [JSON提取器] 通过大括号计数匹配到JSON对象，长度:', extracted.length);
+      console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
+      return extracted;
+    } else {
+      console.log('❌ [JSON提取器] 大括号计数未匹配到JSON对象');
+    }
+
+    // 4. 尝试匹配JSON数组
+    console.log('🔧 [JSON提取器] 使用大括号计数查找JSON数组...');
+    let bracketCount = 0;
+    let arrayStart = -1;
+    let arrayEnd = -1;
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      if (char === '[') {
+        if (bracketCount === 0) {
+          arrayStart = i;
+        }
+        bracketCount++;
+      } else if (char === ']') {
+        bracketCount--;
+        if (bracketCount === 0 && arrayStart !== -1) {
+          arrayEnd = i;
+          break;
+        }
+      }
+    }
+
+    if (arrayStart !== -1 && arrayEnd !== -1) {
+      const extracted = text.substring(arrayStart, arrayEnd + 1).trim();
+      console.log('✅ [JSON提取器] 通过方括号计数匹配到JSON数组，长度:', extracted.length);
+      console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
+      return extracted;
+    } else {
+      console.log('❌ [JSON提取器] 方括号计数未匹配到JSON数组');
+    }
+
+    // 5. 最后的正则表达式尝试
     console.log('🔧 [JSON提取器] 使用正则表达式查找JSON对象...');
     const jsonObjectMatch = text.match(/\{[\s\S]*\}/);
     if (jsonObjectMatch) {
       const extracted = jsonObjectMatch[0].trim();
       console.log('✅ [JSON提取器] 通过正则匹配到JSON对象，长度:', extracted.length);
-      console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 50) + '...');
+      console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
       return extracted;
     } else {
       console.log('❌ [JSON提取器] 正则未匹配到JSON对象');
@@ -545,7 +593,7 @@ export class LocationParser {
     if (jsonArrayMatch) {
       const extracted = jsonArrayMatch[0].trim();
       console.log('✅ [JSON提取器] 通过正则匹配到JSON数组，长度:', extracted.length);
-      console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 50) + '...');
+      console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
       return extracted;
     } else {
       console.log('❌ [JSON提取器] 正则未匹配到JSON数组');
@@ -554,7 +602,8 @@ export class LocationParser {
     console.log('⚠️ [JSON提取器] 所有方法都失败，返回原始文本');
     const fallback = text.trim();
     console.log('⚠️ [JSON提取器] 返回文本长度:', fallback.length);
-    console.log('⚠️ [JSON提取器] 返回文本开头:', fallback.substring(0, 50) + '...');
+    console.log('⚠️ [JSON提取器] 返回文本开头:', fallback.substring(0, 100) + '...');
+    console.log('⚠️ [JSON提取器] 返回文本结尾:', '...' + fallback.substring(Math.max(0, fallback.length - 100)));
     return fallback;
   }
 

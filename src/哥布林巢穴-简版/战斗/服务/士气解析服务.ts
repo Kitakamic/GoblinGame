@@ -18,16 +18,37 @@ export class MoraleParseService {
     console.log('📝 AI回复内容:', aiResponse);
 
     try {
-      // 提取JSON数据
-      const jsonMatch = aiResponse.match(/\[OPTIONS_JSON\]([\s\S]*?)\[\/OPTIONS_JSON\]/);
-      if (!jsonMatch) {
-        console.warn('❌ 未找到OPTIONS_JSON标签');
-        console.log('📄 完整AI回复:', aiResponse);
-        return { moraleChange: 0, reason: '未找到士气数据', confidence: 0 };
-      }
+      let jsonStr = '';
 
-      const jsonStr = jsonMatch[1].trim();
-      console.log('📋 提取的JSON字符串:', jsonStr);
+      // 首先尝试匹配 [OPTIONS_JSON] 标签格式
+      const tagMatch = aiResponse.match(/\[OPTIONS_JSON\]([\s\S]*?)\[\/OPTIONS_JSON\]/);
+      if (tagMatch) {
+        const tagContent = tagMatch[1].trim();
+        console.log('📋 提取的标签内容:', tagContent);
+
+        // 检查标签内容是否包含```json代码块
+        const codeBlockMatch = tagContent.match(/```json\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+          // 嵌套格式：标签内包含代码块
+          jsonStr = codeBlockMatch[1].trim();
+          console.log('📋 使用嵌套格式（标签+代码块）提取的JSON字符串:', jsonStr);
+        } else {
+          // 纯标签格式：直接使用标签内容
+          jsonStr = tagContent;
+          console.log('📋 使用纯标签格式提取的JSON字符串:', jsonStr);
+        }
+      } else {
+        // 如果没找到标签格式，尝试匹配独立的```json代码块格式
+        const codeBlockMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+          jsonStr = codeBlockMatch[1].trim();
+          console.log('📋 使用独立代码块格式提取的JSON字符串:', jsonStr);
+        } else {
+          console.warn('❌ 未找到OPTIONS_JSON标签或```json代码块');
+          console.log('📄 完整AI回复:', aiResponse);
+          return { moraleChange: 0, reason: '未找到士气数据', confidence: 0 };
+        }
+      }
 
       const data = JSON.parse(jsonStr);
       console.log('📊 解析的JSON数据:', data);

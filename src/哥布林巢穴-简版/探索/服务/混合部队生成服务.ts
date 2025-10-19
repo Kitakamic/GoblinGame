@@ -183,15 +183,16 @@ export class MixedTroopGenerationService {
     // 根据难度和类型确定种类数量
     let baseCount = 2;
 
-    // 根据星级难度调整：1-2星=2种，3-4星=3种，5-6星=4种，7-8星=5种，9-10星=6种
+    // 根据星级难度调整：1-2星=3种，3-4星=4种，5-6星=5种，7-8星=6种，9-10星=6种
+    // 提高低难度据点的类型数量，避免部队分配不足
     if (difficulty <= 2) {
-      baseCount = 2;
+      baseCount = 3; // 从2改为3，确保有基础部队
     } else if (difficulty <= 4) {
-      baseCount = 3;
-    } else if (difficulty <= 6) {
       baseCount = 4;
-    } else if (difficulty <= 8) {
+    } else if (difficulty <= 6) {
       baseCount = 5;
+    } else if (difficulty <= 8) {
+      baseCount = 6;
     } else {
       baseCount = 6;
     }
@@ -359,8 +360,10 @@ export class MixedTroopGenerationService {
       location && location.rewards?.heroes
         ? location.rewards.heroes.filter(hero => hero.status === 'enemy' && hero.canCombat).length
         : 0;
-    const baseTroopTypes =
-      troopTypesCount - (specialUnit ? 1 : 0) - (location && this.shouldAddMilitia(location) ? 1 : 0) - heroCount;
+    const baseTroopTypes = Math.max(
+      1,
+      troopTypesCount - (specialUnit ? 1 : 0) - (location && this.shouldAddMilitia(location) ? 1 : 0) - heroCount,
+    );
 
     console.log(`[混合部队生成] 部队类型分配:`, {
       总类型数: troopTypesCount,
@@ -747,7 +750,7 @@ export class MixedTroopGenerationService {
     const selectedTroop = sortedByLevel[0]; // 直接选择等级最高的
 
     console.log(`[混合部队生成] 为队长 ${captain.name} 选择部下:`, {
-      队长等级: captain.level || 1,
+      队长等级: Math.floor(captain.offspring / 10),
       队长种族: captain.race,
       候选单位: availableUnits.map(u => ({ name: u.name, level: u.level, race: u.race })),
       选中单位: selectedTroop.name,
@@ -796,6 +799,11 @@ export class MixedTroopGenerationService {
    */
   private static getUnitTypeForComposition(composition: any): string {
     try {
+      // 如果是特殊单位（AI生成的），直接使用其unitType
+      if (composition.isSpecial && composition.class) {
+        return composition.class === 'magical' ? 'magical' : 'physical';
+      }
+
       // 如果是队长单位（英雄或特殊单位），使用其部下的单位类型
       if (composition.isCaptain && composition.troops) {
         return this.getUnitTypeFromDatabase(composition.troops.type, composition.race);
@@ -817,6 +825,12 @@ export class MixedTroopGenerationService {
       // 获取该种族的所有单位
       const raceUnits = getUnitsByRace(race);
 
+      // 如果获取不到单位数据，返回默认类型
+      if (!raceUnits || raceUnits.length === 0) {
+        console.warn(`[混合部队生成] 未找到种族 ${race} 的单位数据，使用默认类型`);
+        return 'physical';
+      }
+
       // 尝试通过名称匹配
       let matchingUnit = raceUnits.find(unit => unit.name === unitClass);
 
@@ -827,7 +841,9 @@ export class MixedTroopGenerationService {
 
       // 如果还是没找到，尝试模糊匹配
       if (!matchingUnit) {
-        matchingUnit = raceUnits.find(unit => unit.name.includes(unitClass) || unitClass.includes(unit.name));
+        matchingUnit = raceUnits.find(
+          unit => unit.name && unitClass && (unit.name.includes(unitClass) || unitClass.includes(unit.name)),
+        );
       }
 
       if (matchingUnit) {

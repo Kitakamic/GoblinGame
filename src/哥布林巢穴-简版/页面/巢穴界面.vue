@@ -72,9 +72,7 @@
               <div v-else-if="isNextUnlockSlot(index, 'breeding')" class="next-unlock-slot">
                 <div class="expand-icon">+</div>
                 <div class="expand-text">开通槽位</div>
-                <div class="expand-cost">
-                  {{ getSlotCost(index, 'breeding').gold }}💰 {{ getSlotCost(index, 'breeding').food }}🍖
-                </div>
+                <div class="expand-cost">{{ getSlotCost(index).gold }}💰 {{ getSlotCost(index).food }}🍖</div>
               </div>
 
               <!-- 锁定槽位 -->
@@ -130,9 +128,7 @@
               <div v-else-if="isNextUnlockSlot(index, 'resource')" class="next-unlock-slot">
                 <div class="expand-icon">+</div>
                 <div class="expand-text">开通槽位</div>
-                <div class="expand-cost">
-                  {{ getSlotCost(index, 'resource').gold }}💰 {{ getSlotCost(index, 'resource').food }}🍖
-                </div>
+                <div class="expand-cost">{{ getSlotCost(index).gold }}💰 {{ getSlotCost(index).food }}🍖</div>
               </div>
 
               <!-- 锁定槽位 -->
@@ -161,7 +157,10 @@
           @click="selectBuilding(building)"
         >
           <div class="option-icon">{{ building.icon }}</div>
-          <div class="option-name">{{ building.name }}</div>
+          <div class="option-texts">
+            <div class="option-name">{{ building.name }}</div>
+            <div class="option-desc">{{ building.description }}</div>
+          </div>
           <div class="option-cost">{{ building.cost.gold }}💰 {{ building.cost.food }}🍖</div>
         </div>
       </div>
@@ -324,7 +323,7 @@ const resourceBuildings: Building[] = [
     id: 'food',
     name: '食物间',
     icon: '🍖',
-    description: '每回合生成食物',
+    description: '每回合+20食物',
     cost: { gold: 100, food: 50 },
     category: 'resource',
     income: { food: 20 },
@@ -334,11 +333,29 @@ const resourceBuildings: Building[] = [
     id: 'trade',
     name: '贸易间',
     icon: '💰',
-    description: '每回合生成金钱',
+    description: '每回合+30金钱',
     cost: { gold: 150, food: 30 },
     category: 'resource',
     income: { gold: 30 },
     effects: [{ type: 'gold', icon: '💰', description: '每回合+30金钱' }],
+  },
+  {
+    id: 'food_warehouse',
+    name: '食物仓库',
+    icon: '🏚️',
+    description: '提高食物储存，食物总收入+10%',
+    cost: { gold: 200, food: 120 },
+    category: 'resource',
+    effects: [{ type: 'food_multiplier', icon: '🍖', description: '食物收入+10%' }],
+  },
+  {
+    id: 'gold_hall',
+    name: '金币大厅',
+    icon: '🏦',
+    description: '改善金币储存，金币总收入+10%',
+    cost: { gold: 260, food: 80 },
+    category: 'resource',
+    effects: [{ type: 'gold_multiplier', icon: '💰', description: '金钱收入+10%' }],
   },
 ];
 
@@ -393,6 +410,17 @@ const totalIncome = computed(() => {
     }
   });
 
+  // 应用加成：每座食物仓库使食物收入+10%，每座金币大厅使金钱收入+10%
+  const foodWarehouseCount = resourceSlots.value.filter(s => s.building?.id === 'food_warehouse').length;
+  const goldHallCount = resourceSlots.value.filter(s => s.building?.id === 'gold_hall').length;
+
+  if (foodWarehouseCount > 0) {
+    totalFood = Math.round(totalFood * Math.pow(1.1, foodWarehouseCount));
+  }
+  if (goldHallCount > 0) {
+    totalGold = Math.round(totalGold * Math.pow(1.1, goldHallCount));
+  }
+
   return { gold: totalGold, food: totalFood };
 });
 
@@ -406,15 +434,14 @@ const initializeSlots = () => {
 
   // 初始化繁殖间槽位
   breedingSlots.value = [];
-  // 第一个槽位默认开通并放置繁殖间
+  // 前两个槽位默认开通，首槽位放置繁殖间
   breedingSlots.value.push({
     building: breedingBuildings.find(b => b.id === 'breeding') || null,
     unlocked: true,
   });
-  // 添加一个可开通的槽位
   breedingSlots.value.push({
     building: null,
-    unlocked: false,
+    unlocked: true,
   });
 
   // 初始化资源建筑槽位
@@ -460,27 +487,15 @@ const addNewSlot = (type: SlotType) => {
 /**
  * 获取槽位开通成本
  */
-const getSlotCost = (index: number, type: SlotType): SlotCost => {
-  if (type === 'breeding') {
-    // 繁殖间成本基于现有繁殖间数量
-    const existingBreedingCount = breedingSlots.value.filter(slot => slot.building?.id === 'breeding').length;
-    const baseGold = 50;
-    const baseFood = 30;
-    const multiplier = existingBreedingCount; // 每个繁殖间增加成本
-    return {
-      gold: baseGold + multiplier * 25,
-      food: baseFood + multiplier * 15,
-    };
-  } else {
-    // 资源建筑保持原有逻辑
-    const baseGold = 200;
-    const baseFood = 100;
-    const multiplier = Math.max(0, index - 1); // 前2个槽位免费
-    return {
-      gold: baseGold + multiplier * 50,
-      food: baseFood + multiplier * 20,
-    };
-  }
+const getSlotCost = (index: number): SlotCost => {
+  // 繁殖间和资源建筑使用相同的槽位开通成本逻辑：前2个槽位免费，其后逐渐增加
+  const baseGold = 200;
+  const baseFood = 100;
+  const multiplier = Math.max(0, index - 1); // 前2个槽位免费
+  return {
+    gold: baseGold + multiplier * 50,
+    food: baseFood + multiplier * 20,
+  };
 };
 
 // ==================== 槽位状态管理 ====================
@@ -495,7 +510,7 @@ const handleSlotClick = (index: number, type: SlotType) => {
   if (!slot.unlocked) {
     // 检查是否可以开通（按顺序开通）
     if (canUnlockSlot(index, type)) {
-      const cost = getSlotCost(index, type);
+      const cost = getSlotCost(index);
 
       // 检查资源是否足够
       if (canAffordSlotExpansion(cost)) {
@@ -532,11 +547,11 @@ const canUnlockSlot = (index: number, type: SlotType) => {
   const slots = type === 'breeding' ? breedingSlots.value : resourceSlots.value;
 
   if (type === 'breeding') {
-    // 繁殖间：只有第一个槽位默认开通，其他需要按顺序开通
-    if (index === 0) return true; // 第一个槽位默认开通
+    // 繁殖间：与资源建筑相同，前2个槽位默认开通
+    if (index < 2) return true;
 
     // 检查前面的槽位是否都已开通
-    for (let i = 1; i < index; i++) {
+    for (let i = 2; i < index; i++) {
       if (!slots[i].unlocked) {
         return false;
       }
@@ -564,8 +579,8 @@ const isNextUnlockSlot = (index: number, type: SlotType) => {
   if (slots[index].unlocked) return false;
 
   if (type === 'breeding') {
-    // 繁殖间：从索引1开始查找第一个未开通的槽位
-    for (let i = 1; i < slots.length; i++) {
+    // 繁殖间：与资源建筑相同，从索引2开始查找第一个未开通的槽位
+    for (let i = 2; i < slots.length; i++) {
       if (!slots[i].unlocked) {
         return i === index;
       }
@@ -911,7 +926,7 @@ onActivated(() => {
 // ==================== 基础容器样式 ====================
 
 .nest-container {
-  height: 710px;
+  height: calc(100vh - 90px);
   width: 100%;
   max-width: 100%;
   padding: 16px;
@@ -968,6 +983,9 @@ onActivated(() => {
       color: #22c55e;
       font-size: 12px;
       font-weight: 600;
+      @media (min-width: 769px) {
+        font-size: 16px;
+      }
     }
   }
 
@@ -976,6 +994,9 @@ onActivated(() => {
     font-size: 10px;
     font-weight: 500;
     margin-left: 4px;
+    @media (min-width: 769px) {
+      font-size: 12px;
+    }
   }
 }
 
@@ -997,6 +1018,9 @@ onActivated(() => {
     font-weight: 600;
     transition: all 0.2s ease;
     flex: 1;
+    @media (min-width: 769px) {
+      font-size: 16px;
+    }
 
     &:hover {
       background: linear-gradient(180deg, rgba(44, 30, 24, 0.9), rgba(28, 20, 17, 0.95));
@@ -1170,6 +1194,9 @@ onActivated(() => {
     @media (max-width: 768px) {
       font-size: 12px;
     }
+    @media (min-width: 769px) {
+      font-size: 18px;
+    }
   }
 
   .building-income {
@@ -1196,6 +1223,9 @@ onActivated(() => {
         color: #22c55e;
         font-size: 10px;
         font-weight: 600;
+        @media (min-width: 769px) {
+          font-size: 16px;
+        }
       }
     }
   }
@@ -1247,11 +1277,17 @@ onActivated(() => {
         overflow: hidden;
         text-overflow: ellipsis;
         max-width: 100%;
+        @media (min-width: 769px) {
+          font-size: 16px;
+        }
       }
 
       .occupant-status {
         color: #ff6b6b;
         font-size: 8px;
+        @media (min-width: 769px) {
+          font-size: 16px;
+        }
       }
     }
 
@@ -1264,6 +1300,9 @@ onActivated(() => {
         color: #90ee90;
         font-weight: 600;
         font-size: 8px;
+        @media (min-width: 769px) {
+          font-size: 16px;
+        }
       }
     }
   }
@@ -1333,6 +1372,9 @@ onActivated(() => {
     @media (max-width: 768px) {
       font-size: 10px;
     }
+    @media (min-width: 769px) {
+      font-size: 16px;
+    }
   }
 
   .expand-cost {
@@ -1376,6 +1418,9 @@ onActivated(() => {
     // 移动端优化
     @media (max-width: 768px) {
       font-size: 10px;
+    }
+    @media (min-width: 769px) {
+      font-size: 16px;
     }
   }
 }
@@ -1460,16 +1505,38 @@ onActivated(() => {
       font-size: 24px;
     }
 
-    .option-name {
-      color: #ffd7a1;
-      font-weight: 600;
-      font-size: 16px;
+    .option-texts {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
       flex: 1;
+
+      .option-name {
+        color: #ffd7a1;
+        font-weight: 600;
+        font-size: 16px;
+        line-height: 1.1;
+        @media (min-width: 769px) {
+          font-size: 18px;
+        }
+      }
+
+      .option-desc {
+        color: #9ca3af;
+        font-size: 12px;
+        line-height: 1.2;
+        @media (min-width: 769px) {
+          font-size: 14px;
+        }
+      }
     }
 
     .option-cost {
       color: #87ceeb;
       font-size: 13px;
+      @media (min-width: 769px) {
+        font-size: 15px;
+      }
     }
   }
 }

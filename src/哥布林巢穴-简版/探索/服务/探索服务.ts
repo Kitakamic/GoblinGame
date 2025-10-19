@@ -142,8 +142,11 @@ export class ExploreService {
       baseGuards,
       specialUnit
         ? {
-            ...specialUnit,
+            name: specialUnit.name,
+            race: specialUnit.race,
+            unitType: specialUnit.class, // 将class映射为unitType
             troopCount: 0, // 特殊单位的部队数量将由生成服务自动计算
+            attributes: specialUnit.attributes,
           }
         : undefined,
       currentTurn,

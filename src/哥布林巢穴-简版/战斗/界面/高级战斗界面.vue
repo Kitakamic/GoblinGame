@@ -96,14 +96,9 @@
                 </button>
                 <!-- 胜利时显示收获按钮 -->
                 <button v-if="battleResult?.victory" class="harvest-btn" @click="showRewards">🎁 开始收获</button>
-              </div>
-
-              <!-- 失败界面 -->
-              <div v-if="!battleResult?.victory" class="defeat-section">
-                <div class="defeat-actions">
-                  <button class="retreat-btn" @click="retreat">🏃 撤退</button>
-                  <button class="retry-btn" @click="retryBattle">🔄 再来一次</button>
-                </div>
+                <!-- 失败时显示撤退和重来按钮 -->
+                <button v-if="!battleResult?.victory" class="retreat-btn" @click="retreat">🏃 撤退</button>
+                <button v-if="!battleResult?.victory" class="retry-btn" @click="retryBattle">🔄 再来一次</button>
               </div>
             </div>
 
@@ -1822,6 +1817,9 @@ onMounted(() => {
 .advanced-battle-interface.modal-mode {
   height: 100%;
   background: transparent;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .battle-header-modal {
@@ -2272,6 +2270,7 @@ onMounted(() => {
   gap: 1rem;
   padding: 1rem;
   overflow: hidden;
+  min-height: 0;
 }
 
 @media (min-width: 769px) {
@@ -2282,17 +2281,55 @@ onMounted(() => {
   }
 }
 
+/* 高分辨率屏幕优化 */
+@media (min-width: 1920px) {
+  .battle-main {
+    max-height: 1000px;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  .battle-main {
+    max-height: 1400px;
+    gap: 1.5rem;
+    padding: 1rem 1.5rem;
+  }
+}
+
 .battle-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 1rem;
   overflow: hidden;
+  min-height: 0;
 }
 
 @media (min-width: 769px) {
   .battle-content {
     gap: 0.15rem;
+  }
+}
+
+/* 高分辨率屏幕优化 - 战斗内容区域 */
+@media (min-width: 1920px) {
+  .battle-content {
+    gap: 1rem;
+    flex-direction: column;
+  }
+}
+
+@media (min-width: 2560px) {
+  .battle-content {
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 3840px) {
+  .battle-content {
+    gap: 2rem;
   }
 }
 
@@ -2383,6 +2420,9 @@ onMounted(() => {
   border-radius: 10px;
   padding: 1rem;
   overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (min-width: 769px) {
@@ -2390,11 +2430,58 @@ onMounted(() => {
     flex: 0 0 275px;
     overflow-x: auto;
     overflow-y: hidden;
+    min-height: 300px;
+    max-height: 100%;
   }
 
   .enemies-panel {
     flex: 0 0 275px;
     margin-top: 0;
+    min-height: 300px;
+    max-height: 100%;
+  }
+}
+
+/* 高分辨率屏幕优化 - 单位面板宽度和高度 */
+@media (min-width: 1920px) {
+  .units-panel {
+    flex: 0 0 350px;
+    min-height: 400px;
+    max-height: 100%;
+  }
+
+  .enemies-panel {
+    flex: 0 0 350px;
+    min-height: 400px;
+    max-height: 100%;
+  }
+}
+
+@media (min-width: 2560px) {
+  .units-panel {
+    flex: 0 0 450px;
+    min-height: 600px;
+    max-height: 100%;
+  }
+
+  .enemies-panel {
+    flex: 0 0 450px;
+    min-height: 600px;
+    max-height: 100%;
+  }
+}
+
+@media (min-width: 3840px) {
+  .units-panel {
+    flex: 0 0 600px;
+    min-height: 900px;
+    max-height: 100%;
+  }
+
+  .enemies-panel {
+    flex: 0 0 600px;
+    min-height: 900px;
+    max-height: 100%;
   }
 }
 
@@ -2438,6 +2525,8 @@ onMounted(() => {
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   align-content: start;
+  flex: 1;
+  min-height: 0;
 }
 
 @media (min-width: 769px) {
@@ -2448,6 +2537,8 @@ onMounted(() => {
     align-content: center;
     justify-content: center;
     width: 100%;
+    flex: 1;
+    min-height: 0;
   }
 }
 
@@ -2473,9 +2564,36 @@ onMounted(() => {
 @media (min-width: 769px) {
   .unit-card {
     width: auto;
-    height: 240px;
+    height: 100%;
     margin-left: 20px;
     flex: 1;
+    min-height: 200px;
+    max-height: 400px;
+  }
+}
+
+/* 高分辨率屏幕优化 - 单位卡片高度 */
+@media (min-width: 1920px) {
+  .unit-card {
+    height: 100%;
+    min-height: 300px;
+    max-height: 500px;
+  }
+}
+
+@media (min-width: 2560px) {
+  .unit-card {
+    height: 100%;
+    min-height: 400px;
+    max-height: 600px;
+  }
+}
+
+@media (min-width: 3840px) {
+  .unit-card {
+    height: 100%;
+    min-height: 400px;
+    max-height: 600px;
   }
 }
 
@@ -3396,100 +3514,78 @@ onMounted(() => {
   }
 }
 
-/* 失败界面样式 */
-.defeat-section {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0.3rem;
-  height: 100%;
+/* 撤退和重来按钮样式 */
+.retreat-btn,
+.retry-btn {
+  padding: 0.8rem 1.5rem;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  white-space: nowrap;
   position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  min-width: 140px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-  .defeat-actions {
-    display: flex;
-    gap: 0.6rem;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+  }
+
+  &:hover::before {
+    left: 100%;
+  }
+}
+
+.retreat-btn {
+  background: linear-gradient(135deg, rgba(107, 114, 128, 0.4), rgba(75, 85, 99, 0.4));
+  border: 2px solid rgba(107, 114, 128, 0.6);
+  color: #d1d5db;
+
+  &:hover {
+    background: linear-gradient(135deg, rgba(107, 114, 128, 0.6), rgba(75, 85, 99, 0.6));
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 6px 20px rgba(107, 114, 128, 0.4);
+    border-color: rgba(107, 114, 128, 0.8);
+    color: #f3f4f6;
+  }
+}
+
+.retry-btn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb, #1d4ed8);
+  border: 2px solid rgba(59, 130, 246, 0.8);
+  color: #ffffff;
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+
+  &:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8, #1e40af);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(59, 130, 246, 0.6);
+    border-color: rgba(59, 130, 246, 1);
   }
 }
 
 @media (min-width: 769px) {
-  .defeat-section .defeat-actions {
-    flex-wrap: nowrap;
-    gap: 0.8rem;
-  }
-
-  .defeat-section .retreat-btn,
-  .defeat-section .retry-btn {
+  .retreat-btn,
+  .retry-btn {
     min-width: 120px;
     height: 44px;
     padding: 0.6rem 1.2rem;
     font-size: 0.9rem;
-  }
-
-  .retreat-btn,
-  .retry-btn {
-    padding: 0.8rem 1.5rem;
-    border-radius: 12px;
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: 700;
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
-    white-space: nowrap;
-    position: relative;
-    overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-    min-width: 140px;
-    height: 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-      transition: left 0.5s ease;
-    }
-
-    &:hover::before {
-      left: 100%;
-    }
-  }
-
-  .retreat-btn {
-    background: linear-gradient(135deg, rgba(107, 114, 128, 0.4), rgba(75, 85, 99, 0.4));
-    border: 2px solid rgba(107, 114, 128, 0.6);
-    color: #d1d5db;
-
-    &:hover {
-      background: linear-gradient(135deg, rgba(107, 114, 128, 0.6), rgba(75, 85, 99, 0.6));
-      transform: translateY(-2px) scale(1.01);
-      box-shadow: 0 6px 20px rgba(107, 114, 128, 0.4);
-      border-color: rgba(107, 114, 128, 0.8);
-      color: #f3f4f6;
-    }
-  }
-
-  .retry-btn {
-    background: linear-gradient(135deg, #3b82f6, #2563eb, #1d4ed8);
-    border: 2px solid rgba(59, 130, 246, 0.8);
-    color: #ffffff;
-    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
-
-    &:hover {
-      background: linear-gradient(135deg, #2563eb, #1d4ed8, #1e40af);
-      transform: translateY(-3px) scale(1.02);
-      box-shadow: 0 8px 25px rgba(59, 130, 246, 0.6);
-      border-color: rgba(59, 130, 246, 1);
-    }
   }
 }
 

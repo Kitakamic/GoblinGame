@@ -559,9 +559,17 @@ export class ContinentExploreService {
   // 根据区域征服增加行动力上限
   private addActionPointsFromRegionConquest(): void {
     try {
-      // 每征服一个区域，增加1点行动力上限
+      // 每征服一个区域，增加1点行动力上限，但上限最高为10
       const currentMax = modularSaveManager.resources.value.maxActionPoints;
-      const newMax = currentMax + 1;
+      const MAX_ACTION_POINTS_LIMIT = 10;
+
+      // 如果已经达到上限，不再增加
+      if (currentMax >= MAX_ACTION_POINTS_LIMIT) {
+        console.log(`行动力上限已达到最大值 ${MAX_ACTION_POINTS_LIMIT}，无法继续增加`);
+        return;
+      }
+
+      const newMax = Math.min(currentMax + 1, MAX_ACTION_POINTS_LIMIT);
 
       // 更新最大行动力
       modularSaveManager.setResource('maxActionPoints', newMax);

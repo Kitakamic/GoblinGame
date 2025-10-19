@@ -60,4 +60,6 @@ export interface FormationConfig {
   captainSlots: (Captain | null)[];
   createdAt: number;
   lastModified: number;
+  /** 存档ID，用于区分不同存档的配置 */
+  archiveId: string;
 }

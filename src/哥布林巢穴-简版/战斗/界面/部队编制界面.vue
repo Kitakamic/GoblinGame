@@ -43,7 +43,7 @@
                 <!-- 等级标识 - 放在操作按钮下面 -->
                 <div class="captain-level-badge">
                   <span class="level-icon">⭐</span>
-                  <span class="level-value">{{ Math.floor(captain.offspring / 10) }}</span>
+                  <span class="level-value">{{ captain.level || Math.floor(captain.offspring / 10) }}</span>
                 </div>
 
                 <!-- 四维和部队信息网格 -->
@@ -142,7 +142,7 @@
                   <span>{{ captain.attributes.speed }}</span>
                 </div>
               </div>
-              <div class="captain-level">等级 {{ captain.level }}</div>
+              <div class="captain-level">等级 {{ captain.level || Math.floor(captain.offspring / 10) }}</div>
             </div>
             <div v-if="captain.isUsed" class="used-badge">已使用</div>
           </div>
@@ -311,7 +311,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onActivated, onMounted, ref } from 'vue';
 import type { Character } from '../../人物管理/类型/人物类型';
 import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import CustomConfirm from '../../组件/自定义确认框.vue';
@@ -361,10 +361,11 @@ const loadAvailableCharacters = () => {
     // 从模块化存档系统获取调教数据中的人物
     const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
     if (trainingData && trainingData.characters) {
-      // 筛选出可用的角色（已堕落状态或玩家角色，且可战斗）
+      // 筛选出可用的角色（已堕落状态、玩家角色或已编制状态，且可战斗）
       const characters = trainingData.characters.filter(
         (char: Character) =>
-          ((char.status === 'surrendered' || char.status === 'player') && char.canCombat === true) ||
+          ((char.status === 'surrendered' || char.status === 'player' || char.status === 'deployed') &&
+            char.canCombat === true) ||
           char.name === '哥布林之王',
       );
       availableCharacters.value = characters;
@@ -382,7 +383,7 @@ const initializeCaptains = () => {
     id: character.id,
     name: character.name,
     avatar: character.avatar || '👤',
-    level: character.level || 1,
+    level: character.level || Math.floor(character.offspring / 10), // 优先使用实际等级，后备使用计算等级
     offspring: character.offspring || 0,
     attributes: {
       attack: character.attributes.attack,
@@ -754,7 +755,7 @@ const getCaptainBaseHealth = () => {
 const getCaptainTotalHealthForCard = (captain: Captain) => {
   if (!captain) return 0;
   // 使用人物的实际血量属性，如果没有则使用等级 * 10 作为后备
-  const baseHealth = captain.attributes?.health || captain.level * 10;
+  const baseHealth = captain.attributes?.health || (captain.level || Math.floor(captain.offspring / 10)) * 10;
   let bonusHealth = 0;
 
   if (captain.troops) {
@@ -813,6 +814,10 @@ const autoSave = async () => {
   try {
     // 自动保存到存档系统
     await FormationService.saveFormationData(captainSlots.value);
+
+    // 同步当前编制到存档
+    FormationService.saveCurrentFormationToArchive(captainSlots.value);
+
     console.log('部队编制已自动保存');
   } catch (error) {
     console.error('自动保存失败:', error);
@@ -1052,15 +1057,24 @@ const handleImageError = (event: Event) => {
 
 // 同步队长使用状态
 const syncCaptainUsageStatus = () => {
+  console.log('开始同步队长使用状态...');
+
   // 获取所有已编制的队长ID
   const usedCaptainIds = captainSlots.value.filter(captain => captain !== null).map(captain => captain!.id);
+  console.log('已编制的队长ID:', usedCaptainIds);
 
   // 更新可用队长的使用状态
   availableCaptains.value.forEach(captain => {
+    const wasUsed = captain.isUsed;
     captain.isUsed = usedCaptainIds.includes(captain.id);
+
+    // 如果状态发生变化，记录日志
+    if (wasUsed !== captain.isUsed) {
+      console.log(`队长 ${captain.name} 使用状态变化: ${wasUsed} -> ${captain.isUsed}`);
+    }
   });
 
-  console.log('已同步队长使用状态:', {
+  console.log('队长使用状态同步完成:', {
     usedCaptainIds,
     availableCaptains: availableCaptains.value.map(c => ({ id: c.id, name: c.name, isUsed: c.isUsed })),
   });
@@ -1069,6 +1083,8 @@ const syncCaptainUsageStatus = () => {
 // 加载已保存的编制数据
 const loadFormationData = () => {
   try {
+    console.log('开始加载部队编制数据...');
+
     // 从存档系统加载部队编制数据
     const formationData = FormationService.loadFormationData();
     if (formationData && formationData.length > 0) {
@@ -1077,13 +1093,41 @@ const loadFormationData = () => {
 
       // 同步更新可用队长的使用状态
       syncCaptainUsageStatus();
+    } else {
+      console.log('没有找到已保存的部队编制数据');
+      // 即使没有编制数据，也要同步状态（清空所有使用状态）
+      syncCaptainUsageStatus();
     }
   } catch (error) {
     console.error('加载部队编制数据失败:', error);
+    // 出错时也要同步状态
+    syncCaptainUsageStatus();
   }
 };
 
-onMounted(async () => {
+// 刷新数据（当人物等级更新时调用）
+const refreshData = () => {
+  console.log('刷新部队编制界面数据...');
+  loadAvailableCharacters();
+  initializeCaptains();
+
+  // 同步更新已编制队长的等级
+  captainSlots.value.forEach(captain => {
+    if (captain) {
+      const character = availableCharacters.value.find(char => char.id === captain.id);
+      if (character) {
+        captain.level = character.level || Math.floor(character.offspring / 10);
+        console.log(`更新队长 ${captain.name} 等级: ${captain.level}`);
+      }
+    }
+  });
+
+  // 最后同步队长使用状态
+  syncCaptainUsageStatus();
+};
+
+// 初始化数据的公共函数
+const initializeData = async () => {
   // 确保存档系统已初始化
   try {
     if (!modularSaveManager.getCurrentGameData()) {
@@ -1095,15 +1139,34 @@ onMounted(async () => {
     console.error('初始化存档系统失败:', error);
   }
 
+  // 先加载人物数据，再加载编制数据，最后同步等级
   loadAvailableCharacters();
   initializeCaptains();
   loadFormationData();
+
+  // 确保已编制队长的等级是最新的
+  refreshData();
+};
+
+onMounted(async () => {
+  await initializeData();
+});
+
+// 添加 activated 生命周期钩子，处理 keep-alive 组件激活时的数据同步
+onActivated(async () => {
+  console.log('部队编制界面被激活，刷新数据...');
+  await initializeData();
+});
+
+// 暴露刷新方法给父组件
+defineExpose({
+  refreshData,
 });
 </script>
 
 <style scoped lang="scss">
 .army-formation-container {
-  height: 710px;
+  height: calc(100vh - 90px);
   width: 100%;
   max-width: 100%;
   padding: 16px;
@@ -1196,7 +1259,7 @@ onMounted(async () => {
 .captains-section {
   flex: 1;
   margin-bottom: 16px;
-  min-height: 0;
+  min-height: calc(100vh - 600px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -2008,17 +2071,19 @@ onMounted(async () => {
 }
 
 /* 宽屏布局调整 */
-@media (min-width: 1200px) {
+@media (min-width: 1300px) {
   .captain-slot {
-    height: 500px;
+    height: calc(100vh - 280px);
   }
 }
 
 /* 响应式设计 */
-@media (max-width: 1200px) {
+@media (max-width: 1300px) {
   .captains-grid {
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-rows: repeat(2, 1fr);
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .captain-slot {
+    height: calc(100vh - 300px);
   }
 }
 
@@ -2109,159 +2174,6 @@ onMounted(async () => {
     min-width: 80px;
     flex: 1;
     max-width: 120px;
-  }
-}
-
-@media (max-width: 480px) {
-  .formation-header {
-    margin-bottom: 16px;
-
-    .main-title {
-      font-size: 20px;
-    }
-
-    .subtitle {
-      font-size: 12px;
-    }
-  }
-
-  .captains-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
-    flex: 1;
-    min-height: 0;
-  }
-
-  .captain-slot {
-    height: 270px;
-    padding: 0;
-  }
-
-  .captain-header {
-    margin-bottom: 8px;
-
-    .captain-avatar {
-      font-size: 20px;
-    }
-
-    .captain-info h4 {
-      font-size: 14px;
-    }
-
-    .captain-level {
-      font-size: 10px;
-    }
-
-    .captain-actions {
-      gap: 1px;
-    }
-
-    .configure-troops-btn,
-    .remove-captain-btn {
-      width: 14px;
-      height: 14px;
-      font-size: 7px;
-    }
-  }
-
-  .captain-stats {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
-    margin-bottom: 8px;
-
-    .stat-item {
-      font-size: 10px;
-      padding: 3px 4px;
-    }
-  }
-
-  .captain-troops {
-    .troop-count {
-      font-size: 10px;
-    }
-  }
-
-  .captain-name-vertical-left {
-    font-size: 10px;
-  }
-
-  .section-header h3 {
-    font-size: 14px;
-  }
-
-  .preview-stats {
-    gap: 8px;
-
-    .stat-item {
-      padding: 6px;
-      font-size: 11px;
-    }
-  }
-
-  .troop-composition {
-    gap: 4px;
-
-    .composition-item {
-      padding: 4px;
-      font-size: 10px;
-    }
-  }
-
-  .formation-actions {
-    flex-direction: row;
-    gap: 6px;
-    flex-wrap: wrap;
-    justify-content: center;
-    margin-top: auto;
-    padding-top: 12px;
-  }
-
-  .action-btn {
-    padding: 6px 8px;
-    font-size: 10px;
-    min-width: 70px;
-    flex: 1;
-    max-width: 100px;
-
-    .text {
-      font-size: 10px;
-    }
-  }
-
-  .modal-content {
-    margin: 10px;
-    max-height: 90vh;
-  }
-
-  .captain-option {
-    padding: 8px;
-
-    .captain-avatar {
-      font-size: 20px;
-      margin-right: 8px;
-    }
-
-    .captain-details {
-      h4 {
-        font-size: 12px;
-      }
-
-      p {
-        font-size: 10px;
-      }
-
-      .captain-attributes {
-        gap: 8px;
-
-        .attr-item {
-          font-size: 9px;
-        }
-      }
-
-      .captain-level {
-        font-size: 10px;
-      }
-    }
   }
 }
 

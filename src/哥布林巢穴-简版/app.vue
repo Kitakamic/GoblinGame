@@ -792,8 +792,14 @@ const processCharacterTurn = () => {
         const currentRound = modularSaveManager.resources.value.rounds || 1;
         const breedingResult = BreedingService.calculateBreeding(character, currentRound);
 
+        // 保存生育前的状态，用于生育完成后恢复
+        const originalStatus = character.originalStatus || 'imprisoned';
+
         // 更新角色信息
         character.offspring += breedingResult.totalOffspring;
+
+        // 更新角色等级（基于后代数量）
+        character.level = Math.floor(character.offspring / 10);
 
         // 生育消耗生育值（完全基于生育数量和评级）
         const getRatingFertilityMultiplier = (rating: string) => {
@@ -816,13 +822,13 @@ const processCharacterTurn = () => {
         const ratingMultiplier = getRatingFertilityMultiplier(character.rating || 'D');
 
         // 已堕落状态额外降低50%消耗
-        const surrenderedMultiplier = character.status === 'surrendered' ? 0.5 : 1.0;
+        const surrenderedMultiplier = originalStatus === 'surrendered' ? 0.5 : 1.0;
 
         const baseFertilityLoss = breedingResult.totalOffspring * 3 * ratingMultiplier;
         const fertilityLoss = Math.ceil(baseFertilityLoss * surrenderedMultiplier); // 应用已堕落加成
         character.fertility = Math.max(0, character.fertility - fertilityLoss);
 
-        const statusText = character.status === 'surrendered' ? '已堕落(-50%)' : '';
+        const statusText = originalStatus === 'surrendered' ? '已堕落(-50%)' : '';
         console.log(
           `${character.name} 生育${breedingResult.totalOffspring}个后代，评级${character.rating || 'D'}(×${ratingMultiplier})${statusText}，消耗生育值 ${fertilityLoss} 点，当前生育值: ${character.fertility}`,
         );
@@ -832,9 +838,9 @@ const processCharacterTurn = () => {
         character.loyalty = Math.min(100, character.loyalty + corruptionGain);
         console.log(`${character.name} 生育过程中堕落值增加 ${corruptionGain} 点，当前堕落值: ${character.loyalty}`);
 
-        // 生育完成后直接回到关押状态，不检查堕落值（避免生育中堕落）
-        character.status = 'imprisoned';
-        console.log(`${character.name} 生育完成，回到关押状态`);
+        // 生育完成后恢复到生育前的状态
+        character.status = originalStatus;
+        console.log(`${character.name} 生育完成，恢复到${originalStatus === 'surrendered' ? '已堕落' : '关押'}状态`);
 
         character.locationId = undefined; // 释放交配间
 
@@ -1223,13 +1229,13 @@ onUnmounted(() => {
     'Segoe UI Emoji';
   position: relative;
   isolation: isolate;
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
 }
 
 /* 花纹边框 */
 .decorative-border {
-  max-width: 1400px;
+  max-width: 100%;
   margin: 0 auto;
   position: relative;
   padding: 20px;
@@ -1486,7 +1492,7 @@ onUnmounted(() => {
     grid-template-columns: repeat(4, 1fr);
 
     /* 电脑端可以八个并列一行 */
-    @media (min-width: 1024px) {
+    @media (min-width: 769px) {
       &.eight-columns {
         grid-template-columns: repeat(8, 1fr);
       }
@@ -1688,7 +1694,7 @@ onUnmounted(() => {
 
   .action-buttons {
     gap: 8px;
-    margin: 16px 0;
+    margin: 10px 0 !important; /* 减少上下间距从16px到12px */
 
     .action-btn {
       padding: 10px 16px;
@@ -1703,44 +1709,9 @@ onUnmounted(() => {
       }
     }
   }
-}
 
-@media (max-width: 480px) {
-  .stats-container {
-    .resources-grid {
-      /* 小屏幕仍然保持四个并列 */
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-
-      .resource-item {
-        padding: 6px;
-
-        .resource-icon {
-          font-size: 20px;
-        }
-
-        .resource-value {
-          font-size: 14px;
-        }
-      }
-    }
-  }
-
-  .action-buttons {
-    gap: 6px;
-    margin: 12px 0;
-
-    .action-btn {
-      padding: 8px 12px;
-
-      .text {
-        font-size: 11px;
-      }
-
-      .icon {
-        font-size: 12px;
-      }
-    }
+  .info-display {
+    margin-top: 10px !important; /* 减少上间距从20px到12px */
   }
 }
 

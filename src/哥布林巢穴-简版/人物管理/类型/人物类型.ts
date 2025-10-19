@@ -177,6 +177,8 @@ export interface Character {
   // ========== 状态信息 ==========
   /** 当前状态 */
   status: CharacterStatus;
+  /** 原始状态（用于生育完成后恢复） */
+  originalStatus?: CharacterStatus;
   /** 位置信息（据点名称或交配间ID） */
   locationId?: string;
   /** 捕获时间（游戏内日期，格式化字符串或Date对象用于兼容） */

@@ -51,15 +51,15 @@ export class BattleFactory {
       id: character.name, // 使用名称作为ID
       name: character.name,
       type: character.unitType || 'physical',
-      level: character.level || 1,
+      level: Math.floor(character.offspring / 10),
       attributes: {
         attack: character.attributes.attack || 0,
         defense: character.attributes.defense || 0,
         intelligence: character.attributes.intelligence || 0,
         speed: character.attributes.speed || 0,
       },
-      maxHealth: character.attributes.health || (character.level || 1) * 10,
-      currentHealth: character.attributes.health || (character.level || 1) * 10,
+      maxHealth: character.attributes.health || Math.floor(character.offspring / 10) * 10,
+      currentHealth: character.attributes.health || Math.floor(character.offspring / 10) * 10,
       isAlive: true,
       avatar: character.avatar, // 添加avatar字段
       fallbackAvatar: character.avatar && !character.avatar.startsWith('http') ? character.avatar : undefined, // 保存emoji作为回退

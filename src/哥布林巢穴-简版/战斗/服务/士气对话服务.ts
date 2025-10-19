@@ -267,7 +267,13 @@ export class MoraleDialogueService {
       prompt += `\`\`\`yaml\n${yamlContent}\`\`\`\n\n`;
     }
 
-    prompt += `请在你的回复末尾包含以下格式的数据：
+    prompt += `## 战前对话模式规则:
+
+1. 注意：morale_changes.morale 应该是士气变化值（负数表示士气下降，正数表示士气上升），范围建议在-10到+10之间。
+2. 回复时请考虑敌方角色身份性格等信息
+3. 根据据点难度和双方部队对比来调整对话内容和士气影响
+4. 剧情末尾必须包含以下json格式的选项内容（根据剧情发展，设置合适的选项）和士气变化值
+
 [OPTIONS_JSON]
 {
   "options": [
@@ -281,9 +287,7 @@ export class MoraleDialogueService {
 }
 [/OPTIONS_JSON]
 
-1. 注意：morale_changes.morale 应该是士气变化值（负数表示士气下降，正数表示士气上升），范围建议在-10到+10之间。
-2. 回复时请考虑敌方角色身份性格等信息
-3. 根据据点难度和双方实力对比来调整对话内容和士气影响
+
 
 {{user}}：${userInput}
 `;
