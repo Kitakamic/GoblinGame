@@ -285,6 +285,13 @@ export class ExploreService {
               location.rewards.heroes = [character];
               console.log('AI英雄生成完成:', character.name);
 
+              // 标记图片资源为已使用（延迟标记机制）
+              if (location.pictureResource?.id) {
+                const { pictureResourceMappingService } = await import('./图片资源映射服务');
+                pictureResourceMappingService.markPictureAsUsed(location.pictureResource.id);
+                console.log(`✅ [人物生成] 图片资源 ${location.pictureResource.id} 已标记为已使用`);
+              }
+
               // 清除已生成的敌方单位，以便重新生成包含英雄的单位
               location.enemyUnits = undefined;
               location.enemyUnitsGeneratedAt = undefined;
@@ -674,18 +681,72 @@ export class ExploreService {
   // 根据据点类型获取威胁度倍数
   private getThreatMultiplierByType(type: string): number {
     switch (type) {
+      // 通用类型
       case 'village':
-        return 1.0; // 村庄威胁度最低
+        return 1.0; // 村庄：最低
       case 'town':
-        return 1.5; // 城镇威胁度中等
+        return 1.5; // 城镇：中等
       case 'city':
-        return 2.5; // 城市威胁度最高
-      case 'fortress':
-        return 2.0; // 要塞威胁度较高
+        return 2.5; // 城市：很高
       case 'ruins':
-        return 1.2; // 废墟威胁度较低
-      case 'dungeon':
-        return 1.8; // 地牢威胁度较高
+        return 1.2; // 遗迹：较低
+      case 'trade_caravan':
+        return 1.3; // 贸易商队：较低
+      case 'adventurer_party':
+        return 1.6; // 冒险者小队：中等偏高
+      // 古拉尔大陆
+      case 'exile_outpost':
+        return 1.5; // 流放者据点：中等
+      case 'bandit_camp':
+        return 1.4; // 盗匪营地：中等
+      case 'elven_forest':
+        return 1.8; // 精灵森林：较高
+      case 'fox_colony':
+        return 1.6; // 狐族殖民地：中等偏高
+      // 瓦尔基里大陆
+      case 'dark_spire':
+        return 3.0; // 巢都尖塔：最高
+      case 'slave_camp':
+        return 1.2; // 奴隶营地：较低
+      case 'dark_fortress':
+        return 2.3; // 黑暗要塞：高
+      case 'obsidian_mine':
+        return 1.5; // 黑曜石矿场：中等
+      case 'raid_dock':
+        return 2.0; // 劫掠舰码头：较高
+      // 香草群岛
+      case 'fox_water_town':
+        return 1.7; // 狐族水乡：中等偏高
+      case 'shrine':
+        return 2.0; // 神社：较高
+      case 'trading_port':
+        return 1.6; // 贸易港口：中等偏高
+      case 'warship_dock':
+        return 2.2; // 军舰泊地：高
+      case 'spice_plantation':
+        return 1.3; // 香料种植园：较低
+      // 赛菲亚大陆
+      case 'imperial_city':
+        return 2.8; // 帝国城市：很高
+      case 'noble_estate':
+        return 2.1; // 贵族庄园：较高
+      case 'mining_district':
+        return 1.6; // 矿业区域：中等偏高
+      case 'border_fortress':
+        return 2.4; // 边境要塞：高
+      case 'cathedral':
+        return 2.2; // 教堂：高
+      case 'academy':
+        return 1.9; // 学院：较高
+      // 世界树圣域
+      case 'tree_city':
+        return 2.6; // 树城：很高
+      case 'elven_temple':
+        return 2.5; // 精灵圣殿：很高
+      case 'guardian_outpost':
+        return 2.0; // 守卫哨所：较高
+      case 'canopy_palace':
+        return 3.0; // 树冠宫殿：最高
       default:
         return 1.0;
     }

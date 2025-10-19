@@ -7,8 +7,19 @@ import { CharacterParser } from './人物解析服务';
 /**
  * 英雄人物判定服务
  * 根据据点类型和难度判定是否出现英雄人物
+ *
+ * 使用累计制随机机制（按据点类型独立累积）：
+ * - 每次未出现英雄时，该类型累积10%概率
+ * - 出现英雄后，重置该类型的累积概率
+ * - 不同据点类型的累积值独立计算
  */
 export class HeroDeterminationService {
+  /**
+   * 按据点类型存储的累积概率加成（百分比）
+   * 每种据点类型独立累积，互不影响
+   */
+  private static accumulatedBonusByType: Map<Location['type'], number> = new Map();
+
   /**
    * 人物性格风格分类 - 用于随机筛子
    */
@@ -85,7 +96,7 @@ export class HeroDeterminationService {
     };
   }
   /**
-   * 根据据点类型和难度判定是否出现英雄
+   * 根据据点类型和难度判定是否出现英雄（使用按类型独立累计的随机机制）
    * @param locationType 据点类型
    * @param difficulty 难度
    * @returns 是否出现英雄
@@ -93,32 +104,124 @@ export class HeroDeterminationService {
   static shouldHaveHero(locationType: Location['type'], difficulty: number): boolean {
     const random = Math.random();
     const baseProbability = this.getBaseProbability(locationType, difficulty);
-    return random < baseProbability;
+
+    // 获取该类型当前的累积加成（如果不存在则初始化为0）
+    const currentBonus = this.accumulatedBonusByType.get(locationType) || 0;
+
+    // 计算最终概率 = 基础概率 + 该类型的累积加成
+    const finalProbability = Math.min(0.95, baseProbability + currentBonus);
+
+    console.log('🎲 [英雄判定]', {
+      据点类型: locationType,
+      难度: difficulty,
+      基础概率: `${(baseProbability * 100).toFixed(1)}%`,
+      该类型累积: `${(currentBonus * 100).toFixed(0)}%`,
+      最终概率: `${(finalProbability * 100).toFixed(1)}%`,
+      随机数: random.toFixed(3),
+    });
+
+    const hasHero = random < finalProbability;
+
+    if (hasHero) {
+      // 出现英雄，重置该类型的累积
+      console.log(`✅ [英雄判定] ${locationType} 类型出现英雄！重置该类型累积概率`);
+      this.accumulatedBonusByType.set(locationType, 0);
+    } else {
+      // 未出现英雄，增加该类型的10%累积
+      const newBonus = Math.min(0.9, currentBonus + 0.1);
+      this.accumulatedBonusByType.set(locationType, newBonus);
+      console.log(`📈 [英雄判定] ${locationType} 类型未出英雄，该类型累积增加至 ${(newBonus * 100).toFixed(0)}%`);
+    }
+
+    return hasHero;
   }
 
   /**
-   * 获取基础概率
+   * 重置指定类型的累积概率
+   * @param locationType 据点类型（不传则重置所有）
+   */
+  static resetAccumulatedBonus(locationType?: Location['type']): void {
+    if (locationType) {
+      this.accumulatedBonusByType.set(locationType, 0);
+      console.log(`🔄 [英雄判定] ${locationType} 类型累积概率已重置`);
+    } else {
+      this.accumulatedBonusByType.clear();
+      console.log('🔄 [英雄判定] 所有类型累积概率已重置');
+    }
+  }
+
+  /**
+   * 获取指定类型的当前累积概率
    * @param locationType 据点类型
-   * @param difficulty 难度
+   * @returns 当前累积概率
+   */
+  static getAccumulatedBonus(locationType: Location['type']): number {
+    return this.accumulatedBonusByType.get(locationType) || 0;
+  }
+
+  /**
+   * 获取所有类型的累积概率（用于调试）
+   * @returns 所有类型的累积状态
+   */
+  static getAllAccumulatedBonus(): Record<string, number> {
+    const result: Record<string, number> = {};
+    this.accumulatedBonusByType.forEach((bonus, type) => {
+      result[type] = bonus;
+    });
+    return result;
+  }
+
+  /**
+   * 获取基础概率（降低所有概率，不受大陆和难度影响）
+   * @param locationType 据点类型
+   * @param _difficulty 难度（保留参数以兼容现有代码，但不再使用）
    * @returns 基础概率
    */
-  private static getBaseProbability(locationType: Location['type'], difficulty: number): number {
-    // 根据据点类型的基础概率
-    const typeProbabilities: Record<Location['type'], number> = {
-      village: 0.3, // 村庄：30%概率
-      town: 0.5, // 城镇：50%概率
-      fortress: 0.7, // 要塞：70%概率
-      ruins: 0.2, // 废墟：20%概率
-      dungeon: 0.4, // 地牢：40%概率
-      city: 0.8, // 城市：80%概率
+  private static getBaseProbability(locationType: Location['type'], _difficulty: number): number {
+    // 根据据点类型的基础概率（统一降低，不再区分大陆）
+    const typeProbabilities: Partial<Record<Location['type'], number>> = {
+      // 通用类型 - 基础较低
+      village: 0.15, // 村庄：15%
+      town: 0.2, // 城镇：20%
+      city: 0.25, // 城市：25%
+      ruins: 0.1, // 遗迹：10%
+      trade_caravan: 0.12, // 贸易商队：12%
+      adventurer_party: 0.18, // 冒险者小队：18%
+      // 古拉尔大陆 - 流放混居之地
+      exile_outpost: 0.15, // 流放者据点：15%
+      bandit_camp: 0.18, // 盗匪营地：18%
+      elven_forest: 0.2, // 精灵森林：20%
+      fox_colony: 0.17, // 狐族殖民地：17%
+      // 瓦尔基里大陆 - 黑暗精灵
+      dark_spire: 0.3, // 巢都尖塔：30%（最高权力）
+      slave_camp: 0.12, // 奴隶营地：12%
+      dark_fortress: 0.25, // 黑暗要塞：25%
+      obsidian_mine: 0.15, // 黑曜石矿场：15%
+      raid_dock: 0.2, // 劫掠舰码头：20%
+      // 香草群岛 - 狐族
+      fox_water_town: 0.18, // 狐族水乡：18%
+      shrine: 0.22, // 神社：22%
+      trading_port: 0.17, // 贸易港口：17%
+      warship_dock: 0.2, // 军舰泊地：20%
+      spice_plantation: 0.14, // 香料种植园：14%
+      // 赛菲亚大陆 - 人类帝国
+      imperial_city: 0.28, // 帝国城市：28%
+      noble_estate: 0.23, // 贵族庄园：23%
+      mining_district: 0.16, // 矿业区域：16%
+      border_fortress: 0.22, // 边境要塞：22%
+      cathedral: 0.24, // 教堂：24%
+      academy: 0.21, // 学院：21%
+      // 世界树圣域 - 永恒精灵
+      tree_city: 0.26, // 树城：26%
+      elven_temple: 0.27, // 精灵圣殿：27%
+      guardian_outpost: 0.21, // 守卫哨所：21%
+      canopy_palace: 0.3, // 树冠宫殿：30%（最高统治）
     };
 
-    // 根据星级难度计算修正系数：1星=0.5倍，10星=1.5倍
-    const difficultyMultiplier = 0.4 + (difficulty - 1) * 0.1; // 1星=0.4，10星=1.3
+    // 不再使用难度修正，直接返回基础概率
+    const baseProb = typeProbabilities[locationType] || 0.15;
 
-    const baseProb = typeProbabilities[locationType] || 0.3;
-
-    return Math.min(0.9, baseProb * difficultyMultiplier); // 最大90%概率
+    return baseProb;
   }
 
   /**

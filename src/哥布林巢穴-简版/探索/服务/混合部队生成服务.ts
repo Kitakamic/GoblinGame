@@ -197,8 +197,20 @@ export class MixedTroopGenerationService {
       baseCount = 6;
     }
 
-    // 根据据点类型调整
-    if (type === 'fortress' || type === 'dungeon' || type === 'city') {
+    // 根据据点类型调整（高级据点增加兵种类型）
+    const highLevelTypes = [
+      'city',
+      'dark_spire',
+      'dark_fortress',
+      'imperial_city',
+      'border_fortress',
+      'tree_city',
+      'elven_temple',
+      'canopy_palace',
+      'warship_dock',
+      'cathedral',
+    ];
+    if (highLevelTypes.includes(type)) {
       baseCount = Math.min(baseCount + 1, maxTypes);
     }
 

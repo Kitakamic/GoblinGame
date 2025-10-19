@@ -229,12 +229,42 @@ export class ConquestRecordManager {
    */
   private static getLocationTypeDescription(type: string): string {
     const typeMap: Record<string, string> = {
+      // 通用类型
       village: '村庄',
       town: '城镇',
       city: '城市',
-      fortress: '军事要塞',
-      ruins: '古代废墟',
-      dungeon: '地下迷宫',
+      ruins: '遗迹',
+      trade_caravan: '贸易商队',
+      adventurer_party: '冒险者小队',
+      // 古拉尔大陆
+      exile_outpost: '流放者据点',
+      bandit_camp: '盗匪营地',
+      elven_forest: '精灵森林',
+      fox_colony: '狐族殖民地',
+      // 瓦尔基里大陆
+      dark_spire: '巢都尖塔',
+      slave_camp: '奴隶营地',
+      dark_fortress: '黑暗要塞',
+      obsidian_mine: '黑曜石矿场',
+      raid_dock: '劫掠舰码头',
+      // 香草群岛
+      fox_water_town: '狐族水乡',
+      shrine: '神社',
+      trading_port: '贸易港口',
+      warship_dock: '军舰泊地',
+      spice_plantation: '香料种植园',
+      // 赛菲亚大陆
+      imperial_city: '帝国城市',
+      noble_estate: '贵族庄园',
+      mining_district: '矿业区域',
+      border_fortress: '边境要塞',
+      cathedral: '教堂',
+      academy: '学院',
+      // 世界树圣域
+      tree_city: '树城',
+      elven_temple: '精灵圣殿',
+      guardian_outpost: '守卫哨所',
+      canopy_palace: '树冠宫殿',
     };
     return typeMap[type] || '未知类型';
   }

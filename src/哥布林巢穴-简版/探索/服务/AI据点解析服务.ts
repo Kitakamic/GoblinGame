@@ -10,12 +10,42 @@ export class LocationParser {
    * 中文类型到英文类型的映射
    */
   private static readonly TYPE_MAPPING: Record<string, Location['type']> = {
-    城镇: 'town',
+    // 通用类型
     村庄: 'village',
+    城镇: 'town',
     城市: 'city',
-    要塞: 'fortress',
-    废墟: 'ruins',
-    地牢: 'dungeon',
+    遗迹: 'ruins',
+    贸易商队: 'trade_caravan',
+    冒险者小队: 'adventurer_party',
+    // 古拉尔大陆
+    流放者据点: 'exile_outpost',
+    盗匪营地: 'bandit_camp',
+    精灵森林: 'elven_forest',
+    狐族殖民地: 'fox_colony',
+    // 瓦尔基里大陆
+    巢都尖塔: 'dark_spire',
+    奴隶营地: 'slave_camp',
+    黑暗要塞: 'dark_fortress',
+    黑曜石矿场: 'obsidian_mine',
+    劫掠舰码头: 'raid_dock',
+    // 香草群岛
+    狐族水乡: 'fox_water_town',
+    神社: 'shrine',
+    贸易港口: 'trading_port',
+    军舰泊地: 'warship_dock',
+    香料种植园: 'spice_plantation',
+    // 赛菲亚大陆
+    帝国城市: 'imperial_city',
+    贵族庄园: 'noble_estate',
+    矿业区域: 'mining_district',
+    边境要塞: 'border_fortress',
+    教堂: 'cathedral',
+    学院: 'academy',
+    // 世界树圣域
+    树城: 'tree_city',
+    精灵圣殿: 'elven_temple',
+    守卫哨所: 'guardian_outpost',
+    树冠宫殿: 'canopy_palace',
   };
 
   /**
@@ -273,12 +303,42 @@ export class LocationParser {
    */
   private static getDefaultIcon(type: Location['type']): string {
     const iconMap: Record<Location['type'], string> = {
-      town: '🏙️',
+      // 通用类型
       village: '🏘️',
+      town: '🏙️',
       city: '🏛️',
-      fortress: '🏰',
       ruins: '🏚️',
-      dungeon: '🕳️',
+      trade_caravan: '🚛',
+      adventurer_party: '⚔️',
+      // 古拉尔大陆
+      exile_outpost: '🏚️',
+      bandit_camp: '⛺',
+      elven_forest: '🌲',
+      fox_colony: '🦊',
+      // 瓦尔基里大陆
+      dark_spire: '🗼',
+      slave_camp: '⛓️',
+      dark_fortress: '🏰',
+      obsidian_mine: '⚒️',
+      raid_dock: '⚓',
+      // 香草群岛
+      fox_water_town: '🏘️',
+      shrine: '⛩️',
+      trading_port: '🚢',
+      warship_dock: '⚓',
+      spice_plantation: '🌿',
+      // 赛菲亚大陆
+      imperial_city: '👑',
+      noble_estate: '🏰',
+      mining_district: '⛏️',
+      border_fortress: '🛡️',
+      cathedral: '⛪',
+      academy: '📚',
+      // 世界树圣域
+      tree_city: '🌳',
+      elven_temple: '🏛️',
+      guardian_outpost: '🗡️',
+      canopy_palace: '🏰',
     };
     return iconMap[type] || '📍';
   }

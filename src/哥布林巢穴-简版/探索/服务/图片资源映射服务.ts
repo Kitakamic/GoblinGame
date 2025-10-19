@@ -18,15 +18,11 @@ export interface PictureResource {
 }
 
 /**
- * 据点类型到职业的映射关系
+ * 据点类型到职业的映射关系（已废弃，保留用于兼容）
+ * @deprecated 使用 Record<string, string[]> 替代
  */
 export interface LocationTypeToClassMapping {
-  town: string[];
-  village: string[];
-  city: string[];
-  fortress: string[];
-  ruins: string[];
-  dungeon: string[];
+  [key: string]: string[];
 }
 
 /**
@@ -94,42 +90,49 @@ export class PictureResourceMappingService {
     ],
   };
 
-  // 据点类型到职业的映射关系（基于角色绘制生成器的种族特色职业体系）
-  private readonly LOCATION_TYPE_TO_CLASS_MAPPING: LocationTypeToClassMapping = {
-    town: ['商人', '教师', '学者', '医师', '吟游诗人', '法师', '战士', '盗贼'], // 城镇：商业、教育、医疗、娱乐、魔法、军事、地下活动
-    village: ['医师', '教师', '商人', '女仆', '精灵侍女', '德鲁伊', '游侠', '祭司', '元素使'], // 村庄：基础服务，包含精灵特色职业
-    city: [
-      '女王',
-      '王后',
-      '公主',
-      '学者',
-      '商人',
-      '教师',
-      '医师',
-      '领主',
-      '法师',
-      '骑士',
-      '牧师',
-      '战士',
-      '歌妓',
-      '船长',
-    ], // 城市：政治、文化、商业中心，包含各种族特色职业
-    fortress: ['骑士', '战士', '法师', '牧师', '姬武士', '狂战士', '暗影刺客', '血法师', '巫灵姐妹', '奴主'], // 要塞：军事、宗教、黑暗势力，包含各种族军事职业
-    ruins: ['盗贼', '法师', '学者', '游侠', '德鲁伊', '暗影刺客', '血法师', '元素使', '祭司', '女奴'], // 废墟：探险、研究、魔法遗迹，包含各种族探险职业
-    dungeon: [
-      '法师',
-      '牧师',
-      '战士',
-      '盗贼',
-      '血法师',
-      '巫灵姐妹',
-      '元素使',
-      '暗影刺客',
-      '狂战士',
-      '奴主',
-      '女奴',
-      '德鲁伊',
-    ], // 地牢：魔法、战斗、探险、黑暗势力，包含各种族危险职业
+  // 据点类型到职业的映射关系（基于新的据点类型系统和种族特色职业体系）
+  private readonly LOCATION_TYPE_TO_CLASS_MAPPING: Record<string, string[]> = {
+    // ==================== 通用据点类型 ====================
+    village: ['医师', '教师', '商人', '女仆', '吟游诗人'], // 村庄：基础服务人员
+    town: ['商人', '教师', '学者', '医师', '吟游诗人', '法师', '战士', '盗贼'], // 城镇：商业、教育、基础设施
+    city: ['女王', '王后', '公主', '学者', '领主', '法师', '骑士', '牧师', '战士'], // 城市：政治、文化、商业中心
+    ruins: ['盗贼', '法师', '学者', '游侠', '德鲁伊', '暗影刺客', '血法师', '元素使', '祭司'], // 遗迹：探险、研究、魔法遗迹
+    trade_caravan: ['商人', '战士', '盗贼', '医师'], // 贸易商队：商人和护卫
+    adventurer_party: ['战士', '法师', '盗贼', '游侠', '骑士', '牧师'], // 冒险者小队：战斗职业组合
+
+    // ==================== 古拉尔大陆（流放混居之地）====================
+    exile_outpost: ['战士', '盗贼', '骑士', '法师', '商人'], // 流放者据点：流亡贵族和罪犯
+    bandit_camp: ['盗贼', '战士', '女仆'], // 盗匪营地：劫掠者和奴隶
+    elven_forest: ['德鲁伊', '游侠', '祭司', '元素使', '精灵侍女'], // 精灵森林：永恒精灵殖民地
+    fox_colony: ['巫女', '姬武士', '领主', '商人', '医师', '吟游诗人'], // 狐族殖民地：狐族移民
+
+    // ==================== 瓦尔基里大陆（黑暗精灵）====================
+    dark_spire: ['奴主', '血法师', '巫灵姐妹', '暗影刺客', '女奴'], // 巢都尖塔：最高权力中心
+    slave_camp: ['女奴', '奴主', '战士'], // 奴隶营地：奴隶和监工
+    dark_fortress: ['奴主', '狂战士', '暗影刺客', '血法师', '巫灵姐妹'], // 黑暗要塞：军事要塞
+    obsidian_mine: ['女奴', '战士', '奴主'], // 黑曜石矿场：采矿奴隶和监工
+    raid_dock: ['暗影刺客', '狂战士', '奴主', '战士'], // 劫掠舰码头：海盗和劫掠者
+
+    // ==================== 香草群岛（狐族）====================
+    fox_water_town: ['商人', '巫女', '姬武士', '医师', '吟游诗人', '歌妓'], // 狐族水乡：水上居民区
+    shrine: ['巫女', '祭司', '姬武士'], // 神社：九尾神信仰中心
+    trading_port: ['商人', '船长', '海贼', '战士'], // 贸易港口：商业港口
+    warship_dock: ['船长', '姬武士', '战士', '海贼'], // 军舰泊地：军事港口
+    spice_plantation: ['商人', '女仆', '战士'], // 香料种植园：种植园和工人
+
+    // ==================== 赛菲亚大陆（人类帝国）====================
+    imperial_city: ['女王', '王后', '公主', '骑士', '牧师', '学者', '法师', '商人'], // 帝国城市：政治中心
+    noble_estate: ['公主', '王后', '骑士', '法师', '牧师', '女仆', '商人'], // 贵族庄园：贵族领地
+    mining_district: ['战士', '商人', '法师', '女仆'], // 矿业区域：矿工和监工
+    border_fortress: ['骑士', '战士', '法师', '牧师'], // 边境要塞：军事要塞
+    cathedral: ['牧师', '骑士', '学者', '法师'], // 教堂：宗教中心
+    academy: ['学者', '法师', '教师', '医师'], // 学院：学术机构
+
+    // ==================== 世界树圣域（永恒精灵）====================
+    tree_city: ['德鲁伊', '游侠', '祭司', '元素使', '精灵侍女', '学者'], // 树城：精灵城市
+    elven_temple: ['祭司', '德鲁伊', '元素使', '游侠'], // 精灵圣殿：宗教圣地
+    guardian_outpost: ['游侠', '德鲁伊', '元素使', '战士'], // 守卫哨所：边境守卫
+    canopy_palace: ['女王', '祭司', '德鲁伊', '元素使', '游侠', '精灵侍女'], // 树冠宫殿：最高权力中心
   };
 
   private constructor() {
@@ -228,7 +231,7 @@ export class PictureResourceMappingService {
     console.log(`📍 [图片资源匹配] 据点信息: 类型=${locationType}, 种族=${race}`);
 
     // 获取该据点类型对应的职业列表
-    const allowedClasses = this.LOCATION_TYPE_TO_CLASS_MAPPING[locationType as keyof LocationTypeToClassMapping] || [];
+    const allowedClasses = this.LOCATION_TYPE_TO_CLASS_MAPPING[locationType] || [];
     console.log(`🎯 [图片资源匹配] 据点类型 "${locationType}" 对应的职业列表:`, allowedClasses);
 
     // 筛选匹配种族和职业的图片资源
@@ -265,7 +268,7 @@ export class PictureResourceMappingService {
    */
   private getValidClassesForRaceAndLocation(race: string, locationType: string): string[] {
     // 获取据点类型允许的职业
-    const locationClasses = this.LOCATION_TYPE_TO_CLASS_MAPPING[locationType as keyof LocationTypeToClassMapping] || [];
+    const locationClasses = this.LOCATION_TYPE_TO_CLASS_MAPPING[locationType] || [];
 
     // 获取种族允许的职业
     const raceClasses = this.RACE_TO_CLASS_MAPPING[race] || [];
@@ -288,12 +291,14 @@ export class PictureResourceMappingService {
    * @param locationType 据点类型
    * @param race 种族
    * @param generateName 是否生成人物名称，默认为true
+   * @param markAsUsed 是否立即标记为已使用，默认为false（延迟标记，避免浪费）
    * @returns 随机选择的图片资源，如果没有匹配的则返回null
    */
   public getRandomMatchingPictureResource(
     locationType: string,
     race: string,
     generateName: boolean = true,
+    markAsUsed: boolean = false,
   ): PictureResource | null {
     console.log(`🎲 [随机选择] 开始随机选择图片资源（先选职业，再选图片）...`);
 
@@ -342,8 +347,13 @@ export class PictureResourceMappingService {
       const randomPictureIndex = Math.floor(Math.random() * unusedMatchingResources.length);
       const selectedResource = unusedMatchingResources[randomPictureIndex];
 
-      // 标记为已使用
-      this.usedPictureIds.add(selectedResource.id);
+      // 根据参数决定是否立即标记为已使用
+      if (markAsUsed) {
+        this.usedPictureIds.add(selectedResource.id);
+        console.log(`🔒 [图片选择] 图片ID ${selectedResource.id} 已标记为已使用`);
+      } else {
+        console.log(`⏸️ [图片选择] 图片ID ${selectedResource.id} 暂未标记为已使用（延迟标记）`);
+      }
 
       // 生成人物名称（如果需要）
       if (generateName) {
@@ -397,7 +407,13 @@ export class PictureResourceMappingService {
         const randomIndex = Math.floor(Math.random() * unusedOtherResources.length);
         const selectedResource = unusedOtherResources[randomIndex];
 
-        this.usedPictureIds.add(selectedResource.id);
+        // 根据参数决定是否立即标记为已使用
+        if (markAsUsed) {
+          this.usedPictureIds.add(selectedResource.id);
+          console.log(`🔒 [降级策略] 图片ID ${selectedResource.id} 已标记为已使用`);
+        } else {
+          console.log(`⏸️ [降级策略] 图片ID ${selectedResource.id} 暂未标记为已使用（延迟标记）`);
+        }
 
         // 生成人物名称（如果需要）
         if (generateName) {
@@ -445,7 +461,13 @@ export class PictureResourceMappingService {
       const randomIndex = Math.floor(Math.random() * unusedSameRaceResources.length);
       const selectedResource = unusedSameRaceResources[randomIndex];
 
-      this.usedPictureIds.add(selectedResource.id);
+      // 根据参数决定是否立即标记为已使用
+      if (markAsUsed) {
+        this.usedPictureIds.add(selectedResource.id);
+        console.log(`🔒 [同种族降级] 图片ID ${selectedResource.id} 已标记为已使用`);
+      } else {
+        console.log(`⏸️ [同种族降级] 图片ID ${selectedResource.id} 暂未标记为已使用（延迟标记）`);
+      }
 
       // 生成人物名称（如果需要）
       if (generateName) {
@@ -488,7 +510,13 @@ export class PictureResourceMappingService {
       const randomIndex = Math.floor(Math.random() * freshMatchingResources.length);
       const selectedResource = freshMatchingResources[randomIndex];
 
-      this.usedPictureIds.add(selectedResource.id);
+      // 根据参数决定是否立即标记为已使用
+      if (markAsUsed) {
+        this.usedPictureIds.add(selectedResource.id);
+        console.log(`🔒 [重置后选择] 图片ID ${selectedResource.id} 已标记为已使用`);
+      } else {
+        console.log(`⏸️ [重置后选择] 图片ID ${selectedResource.id} 暂未标记为已使用（延迟标记）`);
+      }
 
       // 生成人物名称（如果需要）
       if (generateName) {
@@ -519,6 +547,19 @@ export class PictureResourceMappingService {
 
     console.log(`❌ [图片选择] 没有匹配的图片资源，返回null`);
     return null;
+  }
+
+  /**
+   * 标记图片资源为已使用（延迟标记时使用）
+   * @param pictureId 图片ID
+   */
+  public markPictureAsUsed(pictureId: string): void {
+    if (this.usedPictureIds.has(pictureId)) {
+      console.log(`⚠️ [图片标记] 图片ID ${pictureId} 已经被标记为已使用`);
+      return;
+    }
+    this.usedPictureIds.add(pictureId);
+    console.log(`✅ [图片标记] 图片ID ${pictureId} 已标记为已使用`);
   }
 
   /**

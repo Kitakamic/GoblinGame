@@ -248,13 +248,9 @@
             <div class="option-group">
               <label>侦察方向：</label>
               <select v-model="selectedLocationType">
-                <option value="">随机探索</option>
-                <option value="village">村庄区域</option>
-                <option value="town">城镇周边</option>
-                <option value="city">城市中心</option>
-                <option value="fortress">军事要塞</option>
-                <option value="ruins">古代废墟</option>
-                <option value="dungeon">地下迷宫</option>
+                <option v-for="locType in availableLocationTypes" :key="locType.value" :value="locType.value">
+                  {{ locType.label }}
+                </option>
               </select>
             </div>
 
@@ -439,6 +435,61 @@ const unlockedRegions = computed(() => {
 
 const currentRegion = computed(() => {
   return currentContinentRegions.value.find(r => r.name === selectedRegion.value);
+});
+
+// 根据当前大陆生成可用的据点类型选项
+const availableLocationTypes = computed(() => {
+  // 通用据点类型（所有大陆都可使用）
+  const commonTypes = [
+    { value: '', label: '随机探索' },
+    { value: 'village', label: '村庄' },
+    { value: 'town', label: '城镇' },
+    { value: 'city', label: '城市' },
+    { value: 'ruins', label: '遗迹' },
+    { value: 'trade_caravan', label: '贸易商队' },
+    { value: 'adventurer_party', label: '冒险者小队' },
+  ];
+
+  // 根据当前大陆添加专属据点类型
+  const continentSpecificTypes: Record<string, { value: string; label: string }[]> = {
+    古拉尔大陆: [
+      { value: 'exile_outpost', label: '流放者据点' },
+      { value: 'bandit_camp', label: '盗匪营地' },
+      { value: 'elven_forest', label: '精灵森林' },
+      { value: 'fox_colony', label: '狐族殖民地' },
+    ],
+    瓦尔基里大陆: [
+      { value: 'dark_spire', label: '巢都尖塔' },
+      { value: 'slave_camp', label: '奴隶营地' },
+      { value: 'dark_fortress', label: '黑暗要塞' },
+      { value: 'obsidian_mine', label: '黑曜石矿场' },
+      { value: 'raid_dock', label: '劫掠舰码头' },
+    ],
+    香草群岛: [
+      { value: 'fox_water_town', label: '狐族水乡' },
+      { value: 'shrine', label: '神社' },
+      { value: 'trading_port', label: '贸易港口' },
+      { value: 'warship_dock', label: '军舰泊地' },
+      { value: 'spice_plantation', label: '香料种植园' },
+    ],
+    赛菲亚大陆: [
+      { value: 'imperial_city', label: '帝国城市' },
+      { value: 'noble_estate', label: '贵族庄园' },
+      { value: 'mining_district', label: '矿业区域' },
+      { value: 'border_fortress', label: '边境要塞' },
+      { value: 'cathedral', label: '教堂' },
+      { value: 'academy', label: '学院' },
+    ],
+    世界树圣域: [
+      { value: 'tree_city', label: '树城' },
+      { value: 'elven_temple', label: '精灵圣殿' },
+      { value: 'guardian_outpost', label: '守卫哨所' },
+      { value: 'canopy_palace', label: '树冠宫殿' },
+    ],
+  };
+
+  const specificTypes = continentSpecificTypes[selectedContinent.value] || [];
+  return [...commonTypes, ...specificTypes];
 });
 
 // 所有目标据点（合并侦察和进攻）

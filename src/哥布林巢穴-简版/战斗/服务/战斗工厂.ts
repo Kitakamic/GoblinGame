@@ -472,31 +472,51 @@ export class BattleFactory {
   /**
    * 根据据点类型创建敌方人物部队
    */
-  public static createEnemyCharacterArmyByLocation(
-    locationType: 'village' | 'town' | 'fortress' | 'ruins' | 'dungeon' | 'city',
-  ): BattleUnit[] {
+  public static createEnemyCharacterArmyByLocation(locationType: string): BattleUnit[] {
     let composition: any = {};
 
-    switch (locationType) {
-      case 'village':
-        composition = { human: 2 };
-        break;
-      case 'town':
-        composition = { human: 3 };
-        break;
-      case 'city':
-        composition = { human: 4 };
-        break;
-      case 'fortress':
-        composition = { human: 3 };
-        break;
-      case 'ruins':
-        composition = { undead: 2 };
-        break;
-      case 'dungeon':
-        composition = { undead: 2 }; // 暂时只有亡灵，可以后续扩展
-        break;
-    }
+    // 根据据点类型确定部队规模（简化版，实际应该从据点数据获取）
+    const armySizes: Record<string, number> = {
+      // 通用类型
+      village: 2,
+      town: 3,
+      city: 4,
+      ruins: 2,
+      trade_caravan: 2,
+      adventurer_party: 3,
+      // 古拉尔大陆
+      exile_outpost: 3,
+      bandit_camp: 2,
+      elven_forest: 3,
+      fox_colony: 3,
+      // 瓦尔基里大陆
+      dark_spire: 5,
+      slave_camp: 2,
+      dark_fortress: 4,
+      obsidian_mine: 3,
+      raid_dock: 4,
+      // 香草群岛
+      fox_water_town: 3,
+      shrine: 3,
+      trading_port: 3,
+      warship_dock: 4,
+      spice_plantation: 2,
+      // 赛菲亚大陆
+      imperial_city: 5,
+      noble_estate: 4,
+      mining_district: 3,
+      border_fortress: 4,
+      cathedral: 4,
+      academy: 3,
+      // 世界树圣域
+      tree_city: 4,
+      elven_temple: 4,
+      guardian_outpost: 3,
+      canopy_palace: 5,
+    };
+
+    const armySize = armySizes[locationType] || 2;
+    composition = { human: armySize };
 
     return this.createEnemyCharacterArmy(composition);
   }
@@ -618,40 +638,50 @@ export class BattleFactory {
   /**
    * 创建据点攻击战斗
    */
-  public static createLocationAttackBattle(
-    goblinArmy: BattleUnit[],
-    locationType: 'village' | 'town' | 'fortress' | 'ruins' | 'dungeon' | 'city',
-  ): NewBattleSystem {
-    let enemyCount = 2;
-    let enemyLevel = 1;
-
+  public static createLocationAttackBattle(goblinArmy: BattleUnit[], locationType: string): NewBattleSystem {
     // 根据据点类型调整敌方强度
-    switch (locationType) {
-      case 'village':
-        enemyCount = 2;
-        enemyLevel = 1;
-        break;
-      case 'town':
-        enemyCount = 3;
-        enemyLevel = 2;
-        break;
-      case 'city':
-        enemyCount = 5;
-        enemyLevel = 3;
-        break;
-      case 'fortress':
-        enemyCount = 4;
-        enemyLevel = 3;
-        break;
-      case 'ruins':
-        enemyCount = 2;
-        enemyLevel = 2;
-        break;
-      case 'dungeon':
-        enemyCount = 3;
-        enemyLevel = 2;
-        break;
-    }
+    const locationSettings: Record<string, { count: number; level: number }> = {
+      // 通用类型
+      village: { count: 2, level: 1 },
+      town: { count: 3, level: 2 },
+      city: { count: 5, level: 3 },
+      ruins: { count: 2, level: 2 },
+      trade_caravan: { count: 2, level: 1 },
+      adventurer_party: { count: 3, level: 2 },
+      // 古拉尔大陆
+      exile_outpost: { count: 3, level: 2 },
+      bandit_camp: { count: 2, level: 1 },
+      elven_forest: { count: 4, level: 3 },
+      fox_colony: { count: 3, level: 2 },
+      // 瓦尔基里大陆
+      dark_spire: { count: 6, level: 4 },
+      slave_camp: { count: 2, level: 1 },
+      dark_fortress: { count: 5, level: 3 },
+      obsidian_mine: { count: 3, level: 2 },
+      raid_dock: { count: 4, level: 3 },
+      // 香草群岛
+      fox_water_town: { count: 3, level: 2 },
+      shrine: { count: 4, level: 3 },
+      trading_port: { count: 3, level: 2 },
+      warship_dock: { count: 5, level: 3 },
+      spice_plantation: { count: 2, level: 1 },
+      // 赛菲亚大陆
+      imperial_city: { count: 6, level: 4 },
+      noble_estate: { count: 4, level: 3 },
+      mining_district: { count: 3, level: 2 },
+      border_fortress: { count: 5, level: 3 },
+      cathedral: { count: 4, level: 3 },
+      academy: { count: 4, level: 3 },
+      // 世界树圣域
+      tree_city: { count: 5, level: 3 },
+      elven_temple: { count: 5, level: 4 },
+      guardian_outpost: { count: 4, level: 3 },
+      canopy_palace: { count: 6, level: 4 },
+    };
+
+    const settings = locationSettings[locationType] || { count: 2, level: 1 };
+    const enemyCount = settings.count;
+    const enemyLevel = settings.level;
 
     const enemies: BattleUnit[] = [];
     for (let i = 0; i < enemyCount; i++) {

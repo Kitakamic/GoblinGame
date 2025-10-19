@@ -27,6 +27,7 @@ export class CharacterAttributeCalculator {
     age: number,
     appearance: CharacterAppearance,
     background: BackgroundType = '平民',
+    difficulty?: number,
   ): CharacterRating {
     let score = 0;
 
@@ -57,8 +58,16 @@ export class CharacterAttributeCalculator {
     score += randomScore;
     console.log(`🎲 [评级计算] 随机评分: ${randomScore}分`);
 
+    // 6. 难度修正 (0-10分) - 高难度据点更容易出高评级人物
+    let difficultyScore = 0;
+    if (difficulty && difficulty > 1) {
+      difficultyScore = Math.min(10, (difficulty - 1) * 1.2); // 1星=0, 10星=10.8≈10分
+      score += Math.floor(difficultyScore);
+      console.log(`⚔️ [评级计算] 难度评分: ${difficulty}星 = ${Math.floor(difficultyScore)}分`);
+    }
+
     console.log(
-      `📊 [评级计算] 总分: ${score}分 (种族:${raceScore} + 年龄:${ageScore} + 外貌:${appearanceScore} + 出身:${backgroundScore} + 随机:${randomScore})`,
+      `📊 [评级计算] 总分: ${score}分 (种族:${raceScore} + 年龄:${ageScore} + 外貌:${appearanceScore} + 出身:${backgroundScore} + 随机:${randomScore}${difficultyScore > 0 ? ` + 难度:${Math.floor(difficultyScore)}` : ''})`,
     );
 
     // 根据总分计算评级
@@ -81,12 +90,12 @@ export class CharacterAttributeCalculator {
     rating: CharacterRating,
     locationType?: string,
   ): CharacterAttributes {
-    // 基础属性
-    let attack = 10;
-    let defense = 10;
-    let intelligence = 10;
-    let speed = 10;
-    let health = 40;
+    // 基础属性（大幅提升基础值）
+    let attack = 20;
+    let defense = 20;
+    let intelligence = 20;
+    let speed = 20;
+    let health = 100;
 
     // 种族加成
     const raceBonus = this.getRaceAttributeBonus(race);
@@ -365,10 +374,10 @@ export class CharacterAttributeCalculator {
    */
   private static getRaceAttributeBonus(race: string): CharacterAttributes {
     const raceMap: Record<string, CharacterAttributes> = {
-      人类: { attack: 0, defense: 0, intelligence: 0, speed: 0, health: 0 },
-      狐族: { attack: 2, defense: 1, intelligence: 2, speed: 3, health: 8 },
-      永恒精灵: { attack: 1, defense: 0, intelligence: 3, speed: 2, health: 5 },
-      黑暗精灵: { attack: 2, defense: 1, intelligence: 2, speed: 2, health: 4 },
+      人类: { attack: 0, defense: 0, intelligence: 0, speed: 0, health: 0 }, // 人类：平衡型
+      狐族: { attack: 5, defense: 3, intelligence: 8, speed: 10, health: 20 }, // 狐族：高智力高速度
+      永恒精灵: { attack: 3, defense: 2, intelligence: 12, speed: 8, health: 15 }, // 永恒精灵：高智力
+      黑暗精灵: { attack: 8, defense: 5, intelligence: 8, speed: 6, health: 12 }, // 黑暗精灵：高攻击
     };
     return raceMap[race] || { attack: 0, defense: 0, intelligence: 0, speed: 0, health: 0 };
   }
@@ -377,12 +386,12 @@ export class CharacterAttributeCalculator {
    * 获取年龄属性加成
    */
   private static getAgeAttributeBonus(age: number): CharacterAttributes {
-    if (age < 18) return { attack: -1, defense: -1, intelligence: 0, speed: 1, health: -3 };
-    if (age < 25) return { attack: 1, defense: 0, intelligence: 0, speed: 1, health: 3 };
-    if (age < 30) return { attack: 2, defense: 1, intelligence: 1, speed: 0, health: 2 };
-    if (age < 40) return { attack: 0, defense: 1, intelligence: 2, speed: 0, health: 1 };
-    if (age < 50) return { attack: 0, defense: 0, intelligence: 1, speed: -1, health: 0 };
-    return { attack: -1, defense: 0, intelligence: 0, speed: -1, health: -2 };
+    if (age < 18) return { attack: -3, defense: -3, intelligence: 0, speed: 2, health: -10 }; // 未成年：较弱
+    if (age < 25) return { attack: 3, defense: 1, intelligence: 1, speed: 3, health: 8 }; // 青年：活力型
+    if (age < 30) return { attack: 5, defense: 3, intelligence: 2, speed: 2, health: 10 }; // 壮年：巅峰期
+    if (age < 40) return { attack: 2, defense: 4, intelligence: 5, speed: 1, health: 8 }; // 中年：经验型
+    if (age < 50) return { attack: 1, defense: 2, intelligence: 3, speed: -1, health: 5 }; // 中老年：智慧型
+    return { attack: -2, defense: 1, intelligence: 2, speed: -2, health: -5 }; // 老年：衰退期
   }
 
   /**
@@ -390,10 +399,10 @@ export class CharacterAttributeCalculator {
    */
   private static getRatingAttributeBonus(rating: CharacterRating): CharacterAttributes {
     const ratingMap: Record<CharacterRating, CharacterAttributes> = {
-      S: { attack: 0.5, defense: 0.5, intelligence: 0.5, speed: 0.5, health: 0.4 }, // 50%攻击防御智力速度，40%血量
-      A: { attack: 0.35, defense: 0.35, intelligence: 0.35, speed: 0.35, health: 0.25 }, // 35%攻击防御智力速度，25%血量
-      B: { attack: 0.2, defense: 0.2, intelligence: 0.2, speed: 0.2, health: 0.15 }, // 20%攻击防御智力速度，15%血量
-      C: { attack: 0.1, defense: 0.1, intelligence: 0.1, speed: 0.1, health: 0.08 }, // 10%攻击防御智力速度，8%血量
+      S: { attack: 1.0, defense: 1.0, intelligence: 1.0, speed: 1.0, health: 0.8 }, // 100%攻击防御智力速度，80%血量
+      A: { attack: 0.6, defense: 0.6, intelligence: 0.6, speed: 0.6, health: 0.5 }, // 60%攻击防御智力速度，50%血量
+      B: { attack: 0.3, defense: 0.3, intelligence: 0.3, speed: 0.3, health: 0.25 }, // 30%攻击防御智力速度，25%血量
+      C: { attack: 0.1, defense: 0.1, intelligence: 0.1, speed: 0.1, health: 0.1 }, // 10%攻击防御智力速度，10%血量
       D: { attack: 0, defense: 0, intelligence: 0, speed: 0, health: 0 }, // 无加成
     };
     return ratingMap[rating] || { attack: 0, defense: 0, intelligence: 0, speed: 0, health: 0 };
@@ -404,16 +413,42 @@ export class CharacterAttributeCalculator {
    */
   private static getLocationAttributeBonus(locationType: string): CharacterAttributes {
     const locationMap: Record<string, CharacterAttributes> = {
-      // 村庄：偏向智力和速度，防御较低
-      village: { attack: 0, defense: -1, intelligence: 2, speed: 2, health: 0 },
-      // 城镇：平衡发展，各项属性相对平均
-      town: { attack: 1, defense: 1, intelligence: 1, speed: 1, health: 2 },
-      // 要塞：偏向攻击和防御，速度较低
-      fortress: { attack: 2, defense: 2, intelligence: 0, speed: -1, health: 3 },
-      // 废墟：偏向智力和速度，血量较低
-      ruins: { attack: 0, defense: 0, intelligence: 2, speed: 2, health: -2 },
-      // 地牢：偏向攻击和血量，智力较低
-      dungeon: { attack: 2, defense: 0, intelligence: -1, speed: 0, health: 3 },
+      // 通用类型
+      village: { attack: 2, defense: 1, intelligence: 3, speed: 3, health: 5 }, // 村庄：智力速度型
+      town: { attack: 3, defense: 3, intelligence: 3, speed: 3, health: 8 }, // 城镇：平衡型
+      city: { attack: 5, defense: 5, intelligence: 5, speed: 4, health: 12 }, // 城市：全面强化
+      ruins: { attack: 2, defense: 2, intelligence: 4, speed: 4, health: 3 }, // 遗迹：智力速度型
+      trade_caravan: { attack: 3, defense: 2, intelligence: 3, speed: 4, health: 6 }, // 贸易商队：速度型
+      adventurer_party: { attack: 4, defense: 3, intelligence: 3, speed: 4, health: 8 }, // 冒险者：战斗型
+      // 古拉尔大陆
+      exile_outpost: { attack: 3, defense: 3, intelligence: 3, speed: 3, health: 8 }, // 流放者：平衡型
+      bandit_camp: { attack: 4, defense: 2, intelligence: 2, speed: 4, health: 6 }, // 盗匪：攻速型
+      elven_forest: { attack: 3, defense: 3, intelligence: 6, speed: 4, health: 6 }, // 精灵森林：魔法型
+      fox_colony: { attack: 3, defense: 3, intelligence: 4, speed: 4, health: 6 }, // 狐族：灵巧型
+      // 瓦尔基里大陆
+      dark_spire: { attack: 8, defense: 6, intelligence: 8, speed: 6, health: 15 }, // 巢都尖塔：最强
+      slave_camp: { attack: 1, defense: 0, intelligence: 1, speed: 2, health: 3 }, // 奴隶营：弱小
+      dark_fortress: { attack: 6, defense: 5, intelligence: 3, speed: 3, health: 10 }, // 黑暗要塞：战斗型
+      obsidian_mine: { attack: 3, defense: 3, intelligence: 2, speed: 2, health: 8 }, // 矿场：耐久型
+      raid_dock: { attack: 5, defense: 3, intelligence: 3, speed: 4, health: 8 }, // 劫掠舰：战斗型
+      // 香草群岛
+      fox_water_town: { attack: 3, defense: 3, intelligence: 4, speed: 4, health: 6 }, // 狐族水乡：灵巧型
+      shrine: { attack: 3, defense: 3, intelligence: 6, speed: 3, health: 8 }, // 神社：魔法型
+      trading_port: { attack: 3, defense: 3, intelligence: 3, speed: 4, health: 8 }, // 贸易港：平衡型
+      warship_dock: { attack: 5, defense: 5, intelligence: 3, speed: 3, health: 10 }, // 军舰泊地：战斗型
+      spice_plantation: { attack: 2, defense: 2, intelligence: 3, speed: 3, health: 4 }, // 种植园：弱小
+      // 赛菲亚大陆
+      imperial_city: { attack: 6, defense: 5, intelligence: 5, speed: 4, health: 12 }, // 帝国城市：强大
+      noble_estate: { attack: 5, defense: 5, intelligence: 5, speed: 4, health: 10 }, // 贵族庄园：全面型
+      mining_district: { attack: 3, defense: 3, intelligence: 3, speed: 2, health: 8 }, // 矿业区：耐久型
+      border_fortress: { attack: 6, defense: 6, intelligence: 2, speed: 2, health: 10 }, // 边境要塞：防御型
+      cathedral: { attack: 3, defense: 4, intelligence: 6, speed: 3, health: 8 }, // 教堂：魔法防御型
+      academy: { attack: 2, defense: 3, intelligence: 8, speed: 3, health: 6 }, // 学院：智力型
+      // 世界树圣域
+      tree_city: { attack: 5, defense: 5, intelligence: 6, speed: 5, health: 10 }, // 树城：全面强化
+      elven_temple: { attack: 3, defense: 4, intelligence: 8, speed: 4, health: 8 }, // 精灵圣殿：魔法型
+      guardian_outpost: { attack: 4, defense: 4, intelligence: 4, speed: 4, health: 8 }, // 守卫哨所：平衡型
+      canopy_palace: { attack: 8, defense: 8, intelligence: 10, speed: 8, health: 15 }, // 树冠宫殿：最强
     };
     return locationMap[locationType] || { attack: 0, defense: 0, intelligence: 0, speed: 0, health: 0 };
   }
@@ -571,28 +606,45 @@ export class CharacterAttributeCalculator {
     let baseLevel = 3; // 基础等级
 
     // 根据据点类型调整等级
-    switch (locationType) {
-      case 'village':
-        baseLevel = 2;
-        break;
-      case 'town':
-        baseLevel = 3;
-        break;
-      case 'city':
-        baseLevel = 5;
-        break;
-      case 'fortress':
-        baseLevel = 4;
-        break;
-      case 'dungeon':
-        baseLevel = 6;
-        break;
-      case 'ruins':
-        baseLevel = 4;
-        break;
-      default:
-        baseLevel = 3;
-    }
+    const levelMap: Record<string, number> = {
+      // 通用类型
+      village: 2,
+      town: 3,
+      city: 5,
+      ruins: 4,
+      trade_caravan: 3,
+      adventurer_party: 4,
+      // 古拉尔大陆
+      exile_outpost: 3,
+      bandit_camp: 2,
+      elven_forest: 4,
+      fox_colony: 3,
+      // 瓦尔基里大陆
+      dark_spire: 7,
+      slave_camp: 2,
+      dark_fortress: 5,
+      obsidian_mine: 3,
+      raid_dock: 4,
+      // 香草群岛
+      fox_water_town: 3,
+      shrine: 4,
+      trading_port: 3,
+      warship_dock: 5,
+      spice_plantation: 2,
+      // 赛菲亚大陆
+      imperial_city: 6,
+      noble_estate: 5,
+      mining_district: 3,
+      border_fortress: 5,
+      cathedral: 5,
+      academy: 4,
+      // 世界树圣域
+      tree_city: 5,
+      elven_temple: 6,
+      guardian_outpost: 4,
+      canopy_palace: 7,
+    };
+    baseLevel = locationType ? levelMap[locationType] || 3 : 3;
 
     // 根据评级调整等级
     switch (rating) {
@@ -630,6 +682,7 @@ export class CharacterAttributeCalculator {
     parsedData: ParsedCharacterData,
     locationId?: string,
     locationType?: string,
+    difficulty?: number,
   ): Promise<Character | null> {
     try {
       console.log('🔧 [属性计算] 开始构建人物对象...');
@@ -658,6 +711,7 @@ export class CharacterAttributeCalculator {
         parsedData.age,
         parsedData.appearance,
         parsedData.background,
+        difficulty,
       );
       console.log('🎯 [属性计算] 评级计算完成:', rating);
 
