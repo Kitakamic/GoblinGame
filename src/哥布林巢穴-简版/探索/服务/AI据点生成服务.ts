@@ -54,6 +54,123 @@ export class AILocationGenerationService {
   }
 
   /**
+   * 据点类型到允许种族的映射关系
+   */
+  private static readonly LOCATION_TYPE_TO_ALLOWED_RACES: Record<string, string[]> = {
+    // ==================== 通用据点类型（所有种族） ====================
+    village: ['人类', '永恒精灵', '黑暗精灵', '狐族'], // 村庄：所有种族都可能建立
+    town: ['人类', '永恒精灵', '黑暗精灵', '狐族'], // 城镇：所有种族都可能建立
+    city: ['人类', '永恒精灵', '黑暗精灵', '狐族'], // 城市：所有种族都可能建立
+    ruins: ['人类', '永恒精灵', '黑暗精灵', '狐族'], // 遗迹：可能被任何种族占据
+    trade_caravan: ['人类', '永恒精灵', '黑暗精灵', '狐族'], // 贸易商队：所有种族都可能参与
+    adventurer_party: ['人类', '永恒精灵', '黑暗精灵', '狐族'], // 冒险者小队：所有种族都可能参与
+
+    // ==================== 古拉尔大陆（流放混居之地）====================
+    exile_outpost: ['人类'], // 流放者据点：人类流亡者
+    bandit_camp: ['人类'], // 盗匪营地：人类盗匪
+    elven_forest: ['永恒精灵'], // 精灵森林：永恒精灵殖民地
+    fox_colony: ['狐族'], // 狐族殖民地：狐族移民
+
+    // ==================== 瓦尔基里大陆（黑暗精灵）====================
+    dark_spire: ['黑暗精灵'], // 巢都尖塔：黑暗精灵最高权力中心
+    slave_camp: ['黑暗精灵'], // 奴隶营地：黑暗精灵奴隶主
+    dark_fortress: ['黑暗精灵'], // 黑暗要塞：黑暗精灵军事要塞
+    obsidian_mine: ['黑暗精灵'], // 黑曜石矿场：黑暗精灵矿场
+    raid_dock: ['黑暗精灵'], // 劫掠舰码头：黑暗精灵海盗
+
+    // ==================== 香草群岛（狐族）====================
+    fox_water_town: ['狐族'], // 狐族水乡：狐族水上居民区
+    shrine: ['狐族'], // 神社：狐族九尾神信仰中心
+    trading_port: ['狐族'], // 贸易港口：狐族商业港口
+    warship_dock: ['狐族'], // 军舰泊地：狐族军事港口
+    spice_plantation: ['狐族'], // 香料种植园：狐族种植园
+
+    // ==================== 赛菲亚大陆（人类帝国）====================
+    imperial_city: ['人类'], // 帝国城市：人类政治中心
+    noble_estate: ['人类'], // 贵族庄园：人类贵族领地
+    mining_district: ['人类'], // 矿业区域：人类矿工
+    border_fortress: ['人类'], // 边境要塞：人类军事要塞
+    cathedral: ['人类'], // 教堂：人类宗教中心
+    academy: ['人类'], // 学院：人类学术机构
+
+    // ==================== 世界树圣域（永恒精灵）====================
+    tree_city: ['永恒精灵'], // 树城：永恒精灵城市
+    elven_temple: ['永恒精灵'], // 精灵圣殿：永恒精灵宗教圣地
+    guardian_outpost: ['永恒精灵'], // 守卫哨所：永恒精灵边境守卫
+    canopy_palace: ['永恒精灵'], // 树冠宫殿：永恒精灵最高权力中心
+  };
+
+  /**
+   * 获取据点类型允许的种族列表
+   * @param locationType 据点类型
+   * @returns 允许的种族列表字符串
+   */
+  private static getAllowedRacesForLocationType(locationType?: LocationType): string {
+    if (!locationType) {
+      // 如果没有指定类型，返回所有可能的种族
+      return '人类/永恒精灵/黑暗精灵/狐族，只允许选择一个种族';
+    }
+
+    const allowedRaces = this.LOCATION_TYPE_TO_ALLOWED_RACES[locationType];
+    if (!allowedRaces || allowedRaces.length === 0) {
+      return '人类/永恒精灵/黑暗精灵/狐族，只允许选择一个种族';
+    }
+
+    if (allowedRaces.length === 1) {
+      return allowedRaces[0];
+    }
+
+    return `${allowedRaces.join('/')}, 只允许选择一个种族`;
+  }
+
+  /**
+   * 获取据点类型的详细介绍
+   * @param locationType 据点类型
+   * @returns 据点类型的详细介绍
+   */
+  private static getLocationTypeIntroduction(locationType: LocationType): string {
+    const introductions: Record<LocationType, string> = {
+      // 通用类型
+      village: '小型村落聚居地',
+      town: '中等规模的商业中心',
+      city: '大型政治文化中心',
+      ruins: '古代遗迹或废弃建筑',
+      trade_caravan: '移动的贸易商队',
+      adventurer_party: '由冒险者组成的小队',
+      // 古拉尔大陆
+      exile_outpost: '流放者建立的据点',
+      bandit_camp: '盗匪的临时营地',
+      elven_forest: '永恒精灵的森林殖民地',
+      fox_colony: '狐族移民建立的定居点',
+      // 瓦尔基里大陆
+      dark_spire: '黑暗精灵的最高权力中心',
+      slave_camp: '黑暗精灵的奴隶营地',
+      dark_fortress: '黑暗精灵的军事要塞',
+      obsidian_mine: '黑暗精灵的黑曜石矿场',
+      raid_dock: '黑暗精灵的劫掠舰码头',
+      // 香草群岛
+      fox_water_town: '狐族的水上居民区',
+      shrine: '狐族的九尾神信仰中心',
+      trading_port: '狐族的商业港口',
+      warship_dock: '狐族的军事港口',
+      spice_plantation: '狐族的香料种植园',
+      // 赛菲亚大陆
+      imperial_city: '人类帝国的政治中心',
+      noble_estate: '人类贵族的私人领地',
+      mining_district: '人类帝国的矿业区域',
+      border_fortress: '人类帝国的边境要塞',
+      cathedral: '人类帝国的宗教中心',
+      academy: '人类帝国的学术机构',
+      // 世界树圣域
+      tree_city: '永恒精灵的树城',
+      elven_temple: '永恒精灵的宗教圣地',
+      guardian_outpost: '永恒精灵的边境守卫哨所',
+      canopy_palace: '永恒精灵的最高权力中心',
+    };
+    return introductions[locationType] || '未知的据点类型';
+  }
+
+  /**
    * 生成据点类型的提示词字符串
    * @param continentName 大陆名称
    * @param specifiedType 用户指定的据点类型（如果有）
@@ -94,6 +211,8 @@ export class AILocationGenerationService {
 2. 难度要合理分布，奖励要与难度匹配
 3. ***specialUnit不允许是人物，只允许是部队***
 4. ***此模式只输出侦察json数据，无需输出剧情正文***
+5. ***必须严格遵守据点类型和种族***
+
 
 \`\`\`json
 {
@@ -105,7 +224,7 @@ export class AILocationGenerationService {
   "distance": {距离公里数},
   "continent": "{大陆名称}",
   "region": "{区域名称}",
-  "race": "{据点种族，人类/永恒精灵/黑暗精灵/狐族/混居，只允许选择一个种族，但是允许和大陆区域种族不一致，只要符合据点现实即可}",
+  "race": "{ALLOWED_RACES}",
   "baseGuards": {此值为据点守军总人数，根据据点难度和类型合理设定，也要符合现实，比如*一个村落不可能有几百人的部队，同时一个要塞不可能只有几十人守军*。参考标准：小村庄50-200人，大村庄/小镇200-500人，城镇500-1500人，要塞1000-3000人，大城市2000-8000人，重要城市5000-15000人，首都/重要据点10000-50000人},
   "rewards": {
     "gold": {金币数量},
@@ -190,6 +309,18 @@ export class AILocationGenerationService {
         finalPrompt = finalPrompt.replace('{LOCATION_TYPES}', locationTypesPrompt);
       }
 
+      // 替换允许种族占位符
+      const allowedRaces = this.getAllowedRacesForLocationType(conditions?.type);
+      finalPrompt = finalPrompt.replace('{ALLOWED_RACES}', `**此据点允许种族：${allowedRaces}**`);
+      console.log(`🎯 [据点生成] 据点类型 "${conditions?.type || '未指定'}" 允许的种族:`, allowedRaces);
+
+      // 如果指定了据点类型，添加类型介绍和种族要求
+      if (conditions?.type) {
+        const typeDescription = this.getLocationTypeDescription(conditions.type);
+        const typeIntroduction = this.getLocationTypeIntroduction(conditions.type);
+        finalPrompt += `\n\n# 当前已指定内容：\ntype：${typeDescription}（${typeIntroduction}）\nrace：${allowedRaces}`;
+      }
+
       // 根据大陆和区域信息设置难度范围
       if (continentName && regionName) {
         const continent = continentExploreService.continents.value.find(c => c.name === continentName);
@@ -218,11 +349,16 @@ export class AILocationGenerationService {
         // 单个据点处理
         const result = LocationParser.parseLocations(aiResponse);
 
-        if (!result || Array.isArray(result)) {
+        if (!result) {
           return { success: false, error: '无法解析据点信息', aiResponse: aiResponse };
         }
 
-        const location = result;
+        // 如果返回的是数组，取第一个元素
+        const location = Array.isArray(result) ? result[0] : result;
+
+        if (!location) {
+          return { success: false, error: '据点数据为空', aiResponse: aiResponse };
+        }
 
         // 验证据点数据
         const validation = LocationParser.validateLocation(location);

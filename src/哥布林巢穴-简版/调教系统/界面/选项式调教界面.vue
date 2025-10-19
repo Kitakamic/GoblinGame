@@ -4,7 +4,7 @@
       <!-- 头部信息 -->
       <div class="training-header">
         <div class="character-info">
-          <div class="character-portrait">
+          <div class="character-portrait" title="点击查看人物详细信息" @click="showCharacterDetail = true">
             <img
               v-if="character.avatar"
               :src="character.avatar"
@@ -26,21 +26,21 @@
             <div class="stat-item">
               <div class="stat-header">
                 <span class="stat-label">堕落值</span>
-                <span class="stat-value">{{ character.loyalty }}%</span>
+                <span class="stat-value">{{ displayCharacter.loyalty }}%</span>
               </div>
               <div class="stat-bar">
-                <div class="stat-fill loyalty-fill" :style="{ width: `${character.loyalty}%` }"></div>
+                <div class="stat-fill loyalty-fill" :style="{ width: `${displayCharacter.loyalty}%` }"></div>
               </div>
             </div>
             <div class="stat-item">
               <div class="stat-header">
                 <span class="stat-label">体力</span>
-                <span class="stat-value">{{ character.stamina }}/{{ character.maxStamina || 200 }}</span>
+                <span class="stat-value">{{ displayCharacter.stamina }}/{{ displayCharacter.maxStamina || 200 }}</span>
               </div>
               <div class="stat-bar">
                 <div
                   class="stat-fill stamina-fill"
-                  :style="{ width: `${(character.stamina / (character.maxStamina || 200)) * 100}%` }"
+                  :style="{ width: `${(displayCharacter.stamina / (displayCharacter.maxStamina || 200)) * 100}%` }"
                 ></div>
               </div>
             </div>
@@ -221,13 +221,22 @@
 
     <!-- 自定义弹窗提示 -->
     <ToastContainer ref="toastRef" />
+
+    <!-- 人物卡界面 -->
+    <CharacterDetailModal
+      :show="showCharacterDetail"
+      :character="character"
+      @close="showCharacterDetail = false"
+      @edit-avatar="handleEditAvatar"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { WorldbookService } from '../../世界书管理/世界书服务';
 import { AvatarSwitchService } from '../../人物管理/服务/头像切换服务';
+import CharacterDetailModal from '../../人物管理/界面/人物卡界面.vue';
 import type { Character } from '../../人物管理/类型/人物类型';
 import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import { TimeParseService } from '../../服务/时间解析服务';
@@ -314,6 +323,30 @@ const toastRef = ref<InstanceType<typeof ToastContainer>>();
 const showCloseConfirm = ref(false);
 const showDeleteConfirm = ref(false);
 
+// 人物卡显示状态
+const showCharacterDetail = ref(false);
+
+// 处理编辑头像事件
+const handleEditAvatar = (_character: Character) => {
+  showCharacterDetail.value = false;
+  toastRef.value?.info('头像编辑请从调教界面打开人物卡进行编辑', {
+    title: '提示',
+    duration: 2000,
+  });
+};
+
+// 计算实时的属性值（包括暂存的变化）
+const displayCharacter = computed(() => {
+  if (pendingAttributeChanges.value) {
+    return {
+      ...props.character,
+      loyalty: pendingAttributeChanges.value.loyalty,
+      stamina: pendingAttributeChanges.value.stamina,
+    };
+  }
+  return props.character;
+});
+
 // 重试状态
 const showRetryButton = ref(false);
 const retryMessage = ref('');
@@ -322,6 +355,13 @@ const retryMessage = ref('');
 const currentDialoguePair = ref<{
   userInput: string;
   aiResponse: string;
+} | null>(null);
+
+// 暂存属性变化，不立即应用到人物
+const pendingAttributeChanges = ref<{
+  loyalty: number;
+  stamina: number;
+  character: Character;
 } | null>(null);
 
 // 选项结构
@@ -395,7 +435,7 @@ const submitCustomOption = async () => {
   if (!text || isSending.value) return;
 
   // 检查体力限制
-  if (AttributeChangeParseService.isStaminaTooLow(props.character.stamina)) {
+  if (AttributeChangeParseService.isStaminaTooLow(displayCharacter.value.stamina)) {
     console.log('⚠️ 体力过低，无法继续调教');
     toastRef.value?.warning(`${props.character.name} 体力过低，无法继续调教！`);
     closeCustomInputPanel();
@@ -603,7 +643,7 @@ const chooseOption = async (opt: TrainingOption) => {
   }
 
   // 检查体力限制
-  if (AttributeChangeParseService.isStaminaTooLow(props.character.stamina)) {
+  if (AttributeChangeParseService.isStaminaTooLow(displayCharacter.value.stamina)) {
     console.log('⚠️ 体力过低，无法继续调教');
     toastRef.value?.warning(`${props.character.name} 体力过低，无法继续调教！`);
     return;
@@ -613,8 +653,9 @@ const chooseOption = async (opt: TrainingOption) => {
 
   addUserMessageWithGameTime(choiceText);
 
-  // 先保存之前暂存的对话对
+  // 先保存之前暂存的对话对和属性变化
   await savePendingDialogue();
+  await applyPendingAttributeChanges();
 
   // 暂存用户选择，等待AI回复后一起保存
   lastUserInput.value = choiceText;
@@ -751,25 +792,14 @@ const generateAndHandleAIReply = async () => {
         toastRef.value?.warning(`${finalCharacter.name} 体力过低，无法继续调教！`);
       }
 
-      // 更新世界书信息
-      console.log('更新世界书信息...');
-      await WorldbookService.updateCharacterEntry(finalCharacter);
+      // 暂存属性变化，等待下一轮对话开始前应用
+      pendingAttributeChanges.value = {
+        loyalty: newAttributes.loyalty,
+        stamina: newAttributes.stamina,
+        character: finalCharacter,
+      };
 
-      // 保存人物数据到存档
-      const currentTrainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
-      const updatedCharacters = (currentTrainingData?.characters || []).map((char: any) =>
-        char.id === props.character.id ? finalCharacter : char,
-      );
-
-      modularSaveManager.updateModuleData({
-        moduleName: 'training',
-        data: {
-          ...currentTrainingData,
-          characters: updatedCharacters,
-        },
-      });
-
-      console.log('人物属性已更新:', {
+      console.log('📝 暂存属性变化，等待下一轮对话开始前应用:', {
         loyalty: newAttributes.loyalty,
         stamina: newAttributes.stamina,
       });
@@ -834,12 +864,48 @@ const savePendingDialogue = async () => {
   }
 };
 
+// 应用暂存的属性变化
+const applyPendingAttributeChanges = async () => {
+  if (pendingAttributeChanges.value) {
+    console.log('🔄 应用暂存的属性变化:', pendingAttributeChanges.value);
+
+    const { character: finalCharacter } = pendingAttributeChanges.value;
+
+    // 更新世界书信息
+    console.log('📚 更新世界书信息...');
+    await WorldbookService.updateCharacterEntry(finalCharacter);
+
+    // 保存人物数据到存档
+    const currentTrainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
+    const updatedCharacters = (currentTrainingData?.characters || []).map((char: any) =>
+      char.id === props.character.id ? finalCharacter : char,
+    );
+
+    modularSaveManager.updateModuleData({
+      moduleName: 'training',
+      data: {
+        ...currentTrainingData,
+        characters: updatedCharacters,
+      },
+    });
+
+    console.log('✅ 属性变化已应用到存档和世界书:', {
+      loyalty: finalCharacter.loyalty,
+      stamina: finalCharacter.stamina,
+    });
+
+    // 清除暂存的属性变化
+    pendingAttributeChanges.value = null;
+  }
+};
+
 // 重试AI生成
 const retryAIGeneration = async () => {
   console.log('🔄 用户点击重试按钮，重新生成AI回复');
 
-  // 清除暂存的AI回复
+  // 清除暂存的AI回复和属性变化
   currentDialoguePair.value = null;
+  pendingAttributeChanges.value = null;
 
   // 删除当前页面的AI回复显示
   if (pages.value.length > 0 && currentPageIndex.value < pages.value.length) {
@@ -960,8 +1026,9 @@ const closeTraining = async () => {
 const confirmCloseTraining = async () => {
   showCloseConfirm.value = false;
 
-  // 先保存暂存的对话对
+  // 先保存暂存的对话对和属性变化
   await savePendingDialogue();
+  await applyPendingAttributeChanges();
 
   // 消息已通过世界书服务自动保存
 
@@ -1245,6 +1312,16 @@ const handleImageError = (event: Event) => {
     inset 0 2px 4px rgba(255, 200, 150, 0.15);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
+  cursor: pointer;
+
+  &:hover {
+    transform: scale(1.05);
+    border-color: rgba(255, 215, 0, 0.8);
+    box-shadow:
+      0 8px 25px rgba(0, 0, 0, 0.5),
+      0 0 0 3px rgba(255, 215, 0, 0.3),
+      inset 0 2px 6px rgba(255, 200, 150, 0.25);
+  }
 
   &::before {
     content: '';

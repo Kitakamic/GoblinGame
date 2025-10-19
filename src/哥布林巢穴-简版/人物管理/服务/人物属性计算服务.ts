@@ -37,7 +37,7 @@ export class CharacterAttributeCalculator {
     console.log(`🏷️ [评级计算] 种族评分: ${race} = ${raceScore}分`);
 
     // 2. 年龄评分 (0-20分)
-    const ageScore = this.getAgeScore(age);
+    const ageScore = this.getAgeScore(age, race);
     score += ageScore;
     console.log(`🎂 [评级计算] 年龄评分: ${age}岁 = ${ageScore}分`);
 
@@ -105,8 +105,8 @@ export class CharacterAttributeCalculator {
     speed += raceBonus.speed;
     health += raceBonus.health;
 
-    // 年龄影响
-    const ageBonus = this.getAgeAttributeBonus(age);
+    // 年龄影响（适配长寿种族）
+    const ageBonus = this.getAgeAttributeBonus(age, race);
     attack += ageBonus.attack;
     defense += ageBonus.defense;
     intelligence += ageBonus.intelligence;
@@ -155,8 +155,8 @@ export class CharacterAttributeCalculator {
     const raceBonus = this.getRaceStaminaBonus(race);
     stamina += raceBonus;
 
-    // 年龄影响
-    const ageBonus = this.getAgeStaminaBonus(age);
+    // 年龄影响（适配长寿种族）
+    const ageBonus = this.getAgeStaminaBonus(age, race);
     stamina += ageBonus;
 
     // 评级加成
@@ -194,8 +194,8 @@ export class CharacterAttributeCalculator {
     const raceBonus = this.getRaceFertilityBonus(race);
     fertility += raceBonus;
 
-    // 年龄影响（最佳生育年龄）
-    const ageBonus = this.getAgeFertilityBonus(age);
+    // 年龄影响（最佳生育年龄，适配长寿种族）
+    const ageBonus = this.getAgeFertilityBonus(age, race);
     fertility += ageBonus;
 
     // 评级加成
@@ -236,9 +236,16 @@ export class CharacterAttributeCalculator {
   /**
    * 获取年龄评分
    * @param age 年龄
+   * @param race 种族（用于长寿种族适配）
    * @returns 年龄评分
    */
-  private static getAgeScore(age: number): number {
+  private static getAgeScore(age: number, race?: string): number {
+    // 长寿种族（精灵）的年龄评分标准
+    if (race === '永恒精灵' || race === '黑暗精灵') {
+      return this.getElfAgeScore(age);
+    }
+
+    // 普通种族的年龄评分标准
     if (age < 16) return 5; // 未成年
     if (age < 20) return 15; // 青春年华
     if (age < 25) return 20; // 最佳年龄
@@ -247,6 +254,23 @@ export class CharacterAttributeCalculator {
     if (age < 40) return 12; // 中年期
     if (age < 50) return 8; // 中年期
     return 5; // 老年期
+  }
+
+  /**
+   * 获取精灵种族的年龄评分（长寿种族适配）
+   * @param age 年龄
+   * @returns 年龄评分
+   */
+  private static getElfAgeScore(age: number): number {
+    if (age < 50) return 5; // 幼年期（相当于人类的未成年）
+    if (age < 100) return 15; // 青年期（相当于人类的青春年华）
+    if (age < 150) return 20; // 最佳年龄期（相当于人类的20-25岁）
+    if (age < 200) return 18; // 成熟期（相当于人类的25-30岁）
+    if (age < 300) return 15; // 成熟期（相当于人类的30-35岁）
+    if (age < 400) return 12; // 中年期（相当于人类的35-40岁）
+    if (age < 500) return 8; // 中年期（相当于人类的40-50岁）
+    if (age < 600) return 5; // 老年期（相当于人类的50岁以上）
+    return 3; // 超老年期（600岁以上）
   }
 
   /**
@@ -384,14 +408,38 @@ export class CharacterAttributeCalculator {
 
   /**
    * 获取年龄属性加成
+   * @param age 年龄
+   * @param race 种族（用于长寿种族适配）
    */
-  private static getAgeAttributeBonus(age: number): CharacterAttributes {
+  private static getAgeAttributeBonus(age: number, race?: string): CharacterAttributes {
+    // 长寿种族（精灵）的年龄属性加成
+    if (race === '永恒精灵' || race === '黑暗精灵') {
+      return this.getElfAgeAttributeBonus(age);
+    }
+
+    // 普通种族的年龄属性加成
     if (age < 18) return { attack: -3, defense: -3, intelligence: 0, speed: 2, health: -10 }; // 未成年：较弱
     if (age < 25) return { attack: 3, defense: 1, intelligence: 1, speed: 3, health: 8 }; // 青年：活力型
     if (age < 30) return { attack: 5, defense: 3, intelligence: 2, speed: 2, health: 10 }; // 壮年：巅峰期
     if (age < 40) return { attack: 2, defense: 4, intelligence: 5, speed: 1, health: 8 }; // 中年：经验型
     if (age < 50) return { attack: 1, defense: 2, intelligence: 3, speed: -1, health: 5 }; // 中老年：智慧型
     return { attack: -2, defense: 1, intelligence: 2, speed: -2, health: -5 }; // 老年：衰退期
+  }
+
+  /**
+   * 获取精灵种族的年龄属性加成（长寿种族适配）
+   * @param age 年龄
+   */
+  private static getElfAgeAttributeBonus(age: number): CharacterAttributes {
+    if (age < 50) return { attack: -3, defense: -3, intelligence: 0, speed: 2, health: -10 }; // 幼年期：较弱
+    if (age < 100) return { attack: 3, defense: 1, intelligence: 1, speed: 3, health: 8 }; // 青年期：活力型
+    if (age < 150) return { attack: 5, defense: 3, intelligence: 2, speed: 2, health: 10 }; // 最佳年龄期：巅峰期
+    if (age < 200) return { attack: 4, defense: 4, intelligence: 4, speed: 2, health: 10 }; // 成熟期：平衡型
+    if (age < 300) return { attack: 3, defense: 5, intelligence: 6, speed: 1, health: 8 }; // 成熟期：经验型
+    if (age < 400) return { attack: 2, defense: 4, intelligence: 8, speed: 1, health: 8 }; // 中年期：智慧型
+    if (age < 500) return { attack: 1, defense: 3, intelligence: 6, speed: 0, health: 5 }; // 中年期：智慧型
+    if (age < 600) return { attack: 0, defense: 2, intelligence: 4, speed: -1, health: 3 }; // 老年期：衰退期
+    return { attack: -1, defense: 1, intelligence: 3, speed: -2, health: 0 }; // 超老年期：衰退期
   }
 
   /**
@@ -470,14 +518,38 @@ export class CharacterAttributeCalculator {
 
   /**
    * 获取年龄体力加成
+   * @param age 年龄
+   * @param race 种族（用于长寿种族适配）
    */
-  private static getAgeStaminaBonus(age: number): number {
+  private static getAgeStaminaBonus(age: number, race?: string): number {
+    // 长寿种族（精灵）的年龄体力加成
+    if (race === '永恒精灵' || race === '黑暗精灵') {
+      return this.getElfAgeStaminaBonus(age);
+    }
+
+    // 普通种族的年龄体力加成
     if (age < 18) return -10;
     if (age < 25) return 10;
     if (age < 30) return 5;
     if (age < 40) return 0;
     if (age < 50) return -5;
     return -15;
+  }
+
+  /**
+   * 获取精灵种族的年龄体力加成（长寿种族适配）
+   * @param age 年龄
+   */
+  private static getElfAgeStaminaBonus(age: number): number {
+    if (age < 50) return -10; // 幼年期
+    if (age < 100) return 10; // 青年期（相当于人类的18-25岁）
+    if (age < 150) return 15; // 最佳年龄期（相当于人类的25-30岁）
+    if (age < 200) return 10; // 成熟期（相当于人类的30-40岁）
+    if (age < 300) return 5; // 成熟期（相当于人类的40-50岁）
+    if (age < 400) return 0; // 中年期
+    if (age < 500) return -5; // 中年期
+    if (age < 600) return -10; // 老年期
+    return -15; // 超老年期
   }
 
   /**
@@ -521,8 +593,16 @@ export class CharacterAttributeCalculator {
 
   /**
    * 获取年龄生育力加成
+   * @param age 年龄
+   * @param race 种族（用于长寿种族适配）
    */
-  private static getAgeFertilityBonus(age: number): number {
+  private static getAgeFertilityBonus(age: number, race?: string): number {
+    // 长寿种族（精灵）的年龄生育力加成
+    if (race === '永恒精灵' || race === '黑暗精灵') {
+      return this.getElfAgeFertilityBonus(age);
+    }
+
+    // 普通种族的年龄生育力加成
     if (age < 18) return -20;
     if (age < 25) return 15;
     if (age < 30) return 20;
@@ -530,6 +610,22 @@ export class CharacterAttributeCalculator {
     if (age < 40) return 0;
     if (age < 45) return -10;
     return -25;
+  }
+
+  /**
+   * 获取精灵种族的年龄生育力加成（长寿种族适配）
+   * @param age 年龄
+   */
+  private static getElfAgeFertilityBonus(age: number): number {
+    if (age < 50) return -20; // 幼年期
+    if (age < 100) return 15; // 青年期（相当于人类的18-25岁）
+    if (age < 150) return 25; // 最佳生育期（相当于人类的25-30岁）
+    if (age < 200) return 20; // 成熟期（相当于人类的30-35岁）
+    if (age < 300) return 15; // 成熟期（相当于人类的35-40岁）
+    if (age < 400) return 10; // 中年期（相当于人类的40-45岁）
+    if (age < 500) return 0; // 中年期
+    if (age < 600) return -10; // 老年期
+    return -20; // 超老年期
   }
 
   /**

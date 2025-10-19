@@ -97,26 +97,9 @@
             class="wheel-btn fertility"
             :class="{
               'btn-3': true,
-              disabled:
-                selectedCharacter?.status === 'breeding' ||
-                selectedCharacter?.status === 'training' ||
-                selectedCharacter?.status === 'deployed' ||
-                (selectedCharacter?.stamina || 0) < 20,
             }"
-            :disabled="
-              selectedCharacter?.status === 'breeding' ||
-              selectedCharacter?.status === 'training' ||
-              selectedCharacter?.status === 'deployed' ||
-              (selectedCharacter?.stamina || 0) < 20
-            "
-            :title="
-              selectedCharacter?.status === 'deployed'
-                ? '已编制的人物无法交配'
-                : (selectedCharacter?.stamina || 0) < 20
-                  ? '体力过低，无法交配'
-                  : '交配'
-            "
-            @click="selectedCharacter && startFertility(selectedCharacter)"
+            title="交配"
+            @click="selectedCharacter && handleFertilityClick(selectedCharacter)"
           >
             <span class="btn-icon">🤱</span>
           </button>
@@ -124,26 +107,9 @@
             class="wheel-btn manual"
             :class="{
               'btn-4': true,
-              disabled:
-                selectedCharacter?.status === 'training' ||
-                selectedCharacter?.status === 'breeding' ||
-                selectedCharacter?.status === 'deployed' ||
-                (selectedCharacter?.stamina || 0) < 20,
             }"
-            :disabled="
-              selectedCharacter?.status === 'training' ||
-              selectedCharacter?.status === 'breeding' ||
-              selectedCharacter?.status === 'deployed' ||
-              (selectedCharacter?.stamina || 0) < 20
-            "
-            :title="
-              selectedCharacter?.status === 'deployed'
-                ? '已编制的人物无法调教'
-                : (selectedCharacter?.stamina || 0) < 20
-                  ? '体力过低，无法调教'
-                  : '融合调教（手动+自动）'
-            "
-            @click="selectedCharacter && startManualTraining(selectedCharacter)"
+            title="融合调教（手动+自动）"
+            @click="selectedCharacter && handleManualTrainingClick(selectedCharacter)"
           >
             <span class="btn-icon">⚡</span>
           </button>
@@ -240,11 +206,23 @@
 
     <!-- 弹窗提示组件 -->
     <ToastNotification ref="toastRef" />
+
+    <!-- 自定义确认框组件 -->
+    <CustomConfirmDialog
+      :show="showCustomConfirm"
+      :title="confirmConfig.title"
+      :message="confirmConfig.message"
+      :details="confirmConfig.details"
+      :type="confirmConfig.type"
+      @confirm="handleConfirmDialogConfirm"
+      @cancel="handleConfirmDialogCancel"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onActivated, onMounted, ref } from 'vue';
+import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { WorldbookService } from '../世界书管理/世界书服务';
 import { AvatarSwitchService } from '../人物管理/服务/头像切换服务';
 import CharacterCardInterface from '../人物管理/界面/人物卡界面.vue';
@@ -254,6 +232,7 @@ import { modularSaveManager } from '../存档管理/模块化存档服务';
 import { ConfirmService } from '../服务/确认框服务';
 import { actionPointsService } from '../服务/行动力服务';
 import ToastNotification from '../组件/弹窗提示.vue';
+import CustomConfirmDialog from '../组件/自定义确认框.vue';
 import OptionTrainingInterface from '../调教系统/界面/选项式调教界面.vue';
 
 // 资源管理 - 直接使用 modularSaveManager
@@ -305,6 +284,12 @@ const isDataFullyLoaded = (): boolean => {
     // 这通常发生在其他界面修改了数据，或者回合结束后数据被更新
     // 注意：现在capturedAt可能是字符串格式，我们主要通过属性差异来判断
 
+    // 检查状态变化（重要：状态变化需要重新加载）
+    if (char.status !== savedChar.status) {
+      console.log(`检测到状态变化: ${char.name} ${char.status} -> ${savedChar.status}`);
+      return true;
+    }
+
     // 如果关键属性有明显差异，则需要重新加载
     return (
       Math.abs(char.stamina - savedChar.stamina) > 1 ||
@@ -331,6 +316,17 @@ const showManualTraining = ref(false);
 const showOutfitModal = ref(false);
 const avatarUrl = ref('');
 const editingCharacter = ref<Character | null>(null);
+
+// 自定义确认框状态
+const showCustomConfirm = ref(false);
+const confirmConfig = ref({
+  title: '',
+  message: '',
+  details: '',
+  type: 'warning' as 'info' | 'warning' | 'danger' | 'success',
+  onConfirm: () => {},
+  onCancel: () => {},
+});
 
 // 人物列表
 const filteredCharacters = ref<Character[]>([]);
@@ -389,9 +385,9 @@ const loadTrainingData = async (forceReload = true) => {
     // 在进入视图层之前先对合并后的数据去重
     allCharacters = uniqueById(allCharacters);
 
-    // 生成此次加载的签名（基于 id 集合）
+    // 生成此次加载的签名（基于 id 和状态，确保状态变化时能重新加载）
     const signature = allCharacters
-      .map(c => c.id)
+      .map(c => `${c.id}:${c.status}:${c.formationPosition || 'none'}`)
       .filter(Boolean)
       .sort()
       .join('|');
@@ -1482,6 +1478,138 @@ const toggleFavorite = (character: Character) => {
   saveTrainingData();
 };
 
+// 显示自定义确认框
+const showCustomConfirmDialog = (config: {
+  title: string;
+  message: string;
+  details?: string;
+  type?: 'info' | 'warning' | 'danger' | 'success';
+  onConfirm?: () => void;
+  onCancel?: () => void;
+}) => {
+  confirmConfig.value = {
+    title: config.title,
+    message: config.message,
+    details: config.details || '',
+    type: config.type || 'warning',
+    onConfirm: config.onConfirm || (() => {}),
+    onCancel: config.onCancel || (() => {}),
+  };
+  showCustomConfirm.value = true;
+};
+
+// 处理确认框确认
+const handleConfirmDialogConfirm = () => {
+  confirmConfig.value.onConfirm();
+  showCustomConfirm.value = false;
+};
+
+// 处理确认框取消
+const handleConfirmDialogCancel = () => {
+  confirmConfig.value.onCancel();
+  showCustomConfirm.value = false;
+};
+
+// 处理交配按钮点击
+const handleFertilityClick = (character: Character) => {
+  // 检查是否已编制
+  if (character.status === 'deployed') {
+    showCustomConfirmDialog({
+      title: '无法交配',
+      message: `${character.name} 已编制，无法进行交配！`,
+      details: '已编制的人物需要先解除编制才能进行交配。',
+      type: 'warning',
+    });
+    return;
+  }
+
+  // 检查是否已在交配中
+  if (character.status === 'breeding') {
+    showCustomConfirmDialog({
+      title: '正在交配中',
+      message: `${character.name} 正在交配中，无法重复交配！`,
+      details: '请等待当前交配完成后再进行下一次交配。',
+      type: 'info',
+    });
+    return;
+  }
+
+  // 检查是否正在调教中
+  if (character.status === 'training') {
+    showCustomConfirmDialog({
+      title: '正在调教中',
+      message: `${character.name} 正在调教中，无法进行交配！`,
+      details: '请等待调教完成后再进行交配。',
+      type: 'info',
+    });
+    return;
+  }
+
+  // 检查体力是否过低
+  if (character.stamina < 20) {
+    showCustomConfirmDialog({
+      title: '体力不足',
+      message: `${character.name} 体力过低，无法进行交配！`,
+      details: `当前体力：${character.stamina}/${character.maxStamina}\n需要至少20点体力才能进行交配。\n\n未交配和调教状态的人物，每回合会自然回复。`,
+      type: 'warning',
+    });
+    return;
+  }
+
+  // 如果所有条件都满足，开始交配
+  startFertility(character);
+};
+
+// 处理手动调教按钮点击
+const handleManualTrainingClick = (character: Character) => {
+  // 检查是否已编制
+  if (character.status === 'deployed') {
+    showCustomConfirmDialog({
+      title: '无法调教',
+      message: `${character.name} 已编制，无法进行调教！`,
+      details: '已编制的人物需要先解除编制才能进行调教。',
+      type: 'warning',
+    });
+    return;
+  }
+
+  // 检查是否正在调教中
+  if (character.status === 'training') {
+    showCustomConfirmDialog({
+      title: '正在调教中',
+      message: `${character.name} 正在调教中，本回合无法再次开启调教对话！`,
+      details: '请等待当前调教完成后再进行下一次调教。',
+      type: 'info',
+    });
+    return;
+  }
+
+  // 检查是否正在交配中
+  if (character.status === 'breeding') {
+    showCustomConfirmDialog({
+      title: '正在交配中',
+      message: `${character.name} 正在交配中，无法进行调教！`,
+      details: '请等待交配完成后再进行调教。',
+      type: 'info',
+    });
+    return;
+  }
+
+  // 检查体力是否过低
+  if (character.stamina < 20) {
+    showCustomConfirmDialog({
+      title: '体力不足',
+      message: `${character.name} 体力过低，无法开始调教！`,
+      details: `当前体力：${character.stamina}/${character.maxStamina}\n需要至少20点体力才能进行调教。\n\n未调教和生育状态的人物，每回合会自然回复。`,
+      type: 'warning',
+    });
+    return;
+  }
+
+  // 如果所有条件都满足，开始手动调教
+  startManualTraining(character);
+};
+
 // 应用排序
 const applyFilters = () => {
   const filtered = [...characters.value];
@@ -1512,14 +1640,34 @@ onMounted(async () => {
   updateTrainingCharactersCount();
 });
 
+// 获取当前路由
+const route = useRoute();
+
 // 组件激活时刷新数据（防止重复加载）
 onActivated(async () => {
+  console.log('🔄 调教界面 onActivated 被触发');
   // 为避免切换首页返回导致的重复，统一强制全量重载并替换
   await loadTrainingData(true);
   applyFilters();
   // 每次激活调教界面时更新调教人物数量
   updateTrainingCharactersCount();
+  console.log('✅ 调教界面数据刷新完成');
 });
+
+// 监听路由变化，作为 onActivated 的备用方案
+watch(
+  () => route.path,
+  async (newPath, oldPath) => {
+    if (newPath === '/调教' && oldPath === '/部队编制') {
+      console.log('🔄 检测到从编制界面切换到调教界面，强制刷新数据');
+      await loadTrainingData(true);
+      applyFilters();
+      updateTrainingCharactersCount();
+      console.log('✅ 路由切换触发的数据刷新完成');
+    }
+  },
+  { immediate: false },
+);
 </script>
 
 <style scoped lang="scss">

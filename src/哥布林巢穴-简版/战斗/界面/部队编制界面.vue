@@ -88,6 +88,9 @@
 
       <!-- 操作按钮 -->
       <div class="formation-actions">
+        <button class="action-btn auto-config-btn" title="一键编制所有队长" @click="autoAssignTroops">
+          <span class="text">一键编制</span>
+        </button>
         <button class="action-btn config-btn" title="管理部队配置" @click="openConfigManager">
           <span class="text">配置管理</span>
         </button>
@@ -393,6 +396,7 @@ const initializeCaptains = () => {
       health: character.attributes.health,
     },
     description: `${character.title} - 堕落值: ${character.loyalty || 0}`,
+    unitType: character.unitType || 'physical', // 使用人物的单位类型，默认为物理型
     isUsed: false,
   }));
 };
@@ -532,6 +536,10 @@ const removeCaptain = (index: number) => {
 
           modularSaveManager.updateModuleData({ moduleName: 'training', data: trainingData });
           console.log(`人物 ${character.name} 状态已恢复为已堕落`);
+
+          // 立即强制保存到酒馆存档，确保其他界面能读取到最新状态
+          modularSaveManager.saveCurrentGameData(0);
+          console.log(`已强制保存人物 ${character.name} 的状态变化到酒馆存档`);
         }
       }
     } catch (error) {
@@ -818,7 +826,10 @@ const autoSave = async () => {
     // 同步当前编制到存档
     FormationService.saveCurrentFormationToArchive(captainSlots.value);
 
-    console.log('部队编制已自动保存');
+    // 立即强制保存到酒馆存档，确保其他界面能读取到最新状态
+    modularSaveManager.saveCurrentGameData(0);
+
+    console.log('部队编制已自动保存，并强制同步到酒馆存档');
   } catch (error) {
     console.error('自动保存失败:', error);
   }
@@ -850,6 +861,10 @@ const resetFormation = () => {
         }
       });
       modularSaveManager.updateModuleData({ moduleName: 'training', data: trainingData });
+
+      // 立即强制保存到酒馆存档，确保其他界面能读取到最新状态
+      modularSaveManager.saveCurrentGameData(0);
+      console.log('已强制保存重置后的人物状态到酒馆存档');
     }
   } catch (error) {
     console.error('重置人物状态失败:', error);
@@ -1157,6 +1172,221 @@ onActivated(async () => {
   console.log('部队编制界面被激活，刷新数据...');
   await initializeData();
 });
+
+// 一键编制功能
+const autoAssignTroops = () => {
+  showCustomConfirm({
+    title: '一键编制',
+    message: '确定要为所有队长自动编制部队吗？',
+    details: '将按照物理优先圣骑士→战士，魔法优先萨满→圣骑士→战士的顺序进行编制。',
+    type: 'info',
+    confirmText: '开始编制',
+    cancelText: '取消',
+    onConfirm: () => {
+      performAutoAssignment();
+    },
+  });
+};
+
+const performAutoAssignment = () => {
+  try {
+    console.log('开始一键编制...');
+
+    // 获取所有已编制的队长
+    const assignedCaptains = captainSlots.value.filter(captain => captain !== null) as Captain[];
+
+    if (assignedCaptains.length === 0) {
+      showCustomConfirm({
+        title: '编制失败',
+        message: '没有找到已编制的队长！',
+        type: 'warning',
+        showCancel: false,
+      });
+      return;
+    }
+
+    // 按顺序处理每个队长
+    for (let i = 0; i < assignedCaptains.length; i++) {
+      const captain = assignedCaptains[i];
+      const captainIndex = captainSlots.value.findIndex(slot => slot?.id === captain.id);
+
+      if (captainIndex === -1) continue;
+
+      console.log(`开始为队长 ${captain.name} 编制部队...`);
+
+      // 清空当前队长的部队配置
+      captain.troops = {
+        普通哥布林: 0,
+        哥布林战士: 0,
+        哥布林萨满: 0,
+        哥布林圣骑士: 0,
+      };
+
+      // 获取队长等级
+      const captainLevel = captain.level || Math.floor(captain.offspring / 10);
+      let remainingLevels = captainLevel;
+
+      console.log(`队长 ${captain.name} 等级: ${captainLevel}, 剩余等级: ${remainingLevels}`);
+
+      // 判断队长类型（根据身份关键词和种族判断）
+      const isMagicalCaptain = captain.unitType === 'magical';
+
+      console.log(`队长 ${captain.name} 类型: ${isMagicalCaptain ? '魔法型' : '物理型'}`);
+
+      if (isMagicalCaptain) {
+        // 魔法型队长：优先萨满→圣骑士→战士
+        remainingLevels = assignTroopsForMagicalCaptain(captain, remainingLevels);
+      } else {
+        // 物理型队长：优先圣骑士→战士
+        remainingLevels = assignTroopsForPhysicalCaptain(captain, remainingLevels);
+      }
+
+      // 用普通哥布林填充剩余等级
+      if (remainingLevels > 0) {
+        const normalGoblinCount = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['普通哥布林']);
+        const availableNormalGoblins = getAvailableGoblinCount('普通哥布林');
+        const actualNormalGoblinCount = Math.min(normalGoblinCount, availableNormalGoblins);
+
+        if (actualNormalGoblinCount > 0) {
+          captain.troops['普通哥布林'] = actualNormalGoblinCount;
+          console.log(`队长 ${captain.name} 分配普通哥布林: ${actualNormalGoblinCount}`);
+        }
+      }
+
+      // 更新队长槽位
+      captainSlots.value[captainIndex] = { ...captain };
+
+      console.log(`队长 ${captain.name} 编制完成:`, captain.troops);
+    }
+
+    // 自动保存
+    autoSave();
+
+    showCustomConfirm({
+      title: '编制完成',
+      message: '所有队长的部队编制已完成！',
+      type: 'success',
+      showCancel: false,
+    });
+  } catch (error) {
+    console.error('一键编制失败:', error);
+    showCustomConfirm({
+      title: '编制失败',
+      message: '一键编制过程中出现错误，请重试！',
+      type: 'danger',
+      showCancel: false,
+    });
+  }
+};
+
+// 为魔法型队长分配部队
+const assignTroopsForMagicalCaptain = (captain: Captain, remainingLevels: number): number => {
+  console.log(`为魔法型队长 ${captain.name} 分配部队，剩余等级: ${remainingLevels}`);
+
+  // 确保 troops 对象存在
+  if (!captain.troops) {
+    captain.troops = {
+      普通哥布林: 0,
+      哥布林战士: 0,
+      哥布林萨满: 0,
+      哥布林圣骑士: 0,
+    };
+  }
+
+  // 1. 优先分配哥布林萨满
+  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林萨满']) {
+    const availableShamans = getAvailableGoblinCount('哥布林萨满');
+    const maxShamans = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林萨满']);
+    const shamanCount = Math.min(maxShamans, availableShamans);
+
+    if (shamanCount > 0) {
+      captain.troops['哥布林萨满'] = shamanCount;
+      remainingLevels -= shamanCount * TROOP_LEVEL_COSTS['哥布林萨满'];
+      console.log(`分配哥布林萨满: ${shamanCount}, 剩余等级: ${remainingLevels}`);
+    }
+  }
+
+  // 2. 其次分配哥布林圣骑士
+  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林圣骑士']) {
+    const availablePaladins = getAvailableGoblinCount('哥布林圣骑士');
+    const maxPaladins = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林圣骑士']);
+    const paladinCount = Math.min(maxPaladins, availablePaladins);
+
+    if (paladinCount > 0) {
+      captain.troops['哥布林圣骑士'] = paladinCount;
+      remainingLevels -= paladinCount * TROOP_LEVEL_COSTS['哥布林圣骑士'];
+      console.log(`分配哥布林圣骑士: ${paladinCount}, 剩余等级: ${remainingLevels}`);
+    }
+  }
+
+  // 3. 最后分配哥布林战士
+  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林战士']) {
+    const availableWarriors = getAvailableGoblinCount('哥布林战士');
+    const maxWarriors = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林战士']);
+    const warriorCount = Math.min(maxWarriors, availableWarriors);
+
+    if (warriorCount > 0) {
+      captain.troops['哥布林战士'] = warriorCount;
+      remainingLevels -= warriorCount * TROOP_LEVEL_COSTS['哥布林战士'];
+      console.log(`分配哥布林战士: ${warriorCount}, 剩余等级: ${remainingLevels}`);
+    }
+  }
+
+  return remainingLevels;
+};
+
+// 为物理型队长分配部队
+const assignTroopsForPhysicalCaptain = (captain: Captain, remainingLevels: number): number => {
+  console.log(`为物理型队长 ${captain.name} 分配部队，剩余等级: ${remainingLevels}`);
+
+  // 确保 troops 对象存在
+  if (!captain.troops) {
+    captain.troops = {
+      普通哥布林: 0,
+      哥布林战士: 0,
+      哥布林萨满: 0,
+      哥布林圣骑士: 0,
+    };
+  }
+
+  // 1. 优先分配哥布林圣骑士
+  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林圣骑士']) {
+    const availablePaladins = getAvailableGoblinCount('哥布林圣骑士');
+    const maxPaladins = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林圣骑士']);
+    const paladinCount = Math.min(maxPaladins, availablePaladins);
+
+    if (paladinCount > 0) {
+      captain.troops['哥布林圣骑士'] = paladinCount;
+      remainingLevels -= paladinCount * TROOP_LEVEL_COSTS['哥布林圣骑士'];
+      console.log(`分配哥布林圣骑士: ${paladinCount}, 剩余等级: ${remainingLevels}`);
+    }
+  }
+
+  // 2. 其次分配哥布林战士
+  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林战士']) {
+    const availableWarriors = getAvailableGoblinCount('哥布林战士');
+    const maxWarriors = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林战士']);
+    const warriorCount = Math.min(maxWarriors, availableWarriors);
+
+    if (warriorCount > 0) {
+      captain.troops['哥布林战士'] = warriorCount;
+      remainingLevels -= warriorCount * TROOP_LEVEL_COSTS['哥布林战士'];
+      console.log(`分配哥布林战士: ${warriorCount}, 剩余等级: ${remainingLevels}`);
+    }
+  }
+
+  return remainingLevels;
+};
+
+// 获取可用的哥布林数量（考虑其他队长已使用的数量）
+const getAvailableGoblinCount = (goblinType: string): number => {
+  const totalCount = getCurrentGoblinCount(goblinType);
+  const usedCount = getUsedGoblinCount(goblinType);
+  const availableCount = Math.max(0, totalCount - usedCount);
+
+  console.log(`${goblinType} 可用数量: 总计${totalCount} - 已用${usedCount} = 可用${availableCount}`);
+  return availableCount;
+};
 
 // 暴露刷新方法给父组件
 defineExpose({
@@ -1860,6 +2090,14 @@ defineExpose({
     font-size: 16px;
   }
 
+  &.auto-config-btn {
+    &:hover:not(:disabled) {
+      background: linear-gradient(180deg, rgba(34, 197, 94, 0.2), rgba(22, 163, 74, 0.3));
+      border-color: rgba(34, 197, 94, 0.5);
+      color: #22c55e;
+    }
+  }
+
   &.config-btn {
     &:hover:not(:disabled) {
       background: linear-gradient(180deg, rgba(168, 85, 247, 0.2), rgba(147, 51, 234, 0.3));
@@ -2100,7 +2338,7 @@ defineExpose({
   }
 
   .captain-slot {
-    height: 270px;
+    height: 260px;
     padding: 0;
   }
 

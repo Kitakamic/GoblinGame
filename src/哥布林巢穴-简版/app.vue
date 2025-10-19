@@ -1106,8 +1106,38 @@ const endRound = async () => {
       console.error('更新资源世界书失败:', error);
     }
 
-    // 人物世界书状态更新已移除，现在由调教界面自动处理
-    console.log('人物世界书状态已通过调教界面自动同步');
+    // 更新人物世界书状态（因为人物可能生育了，需要同步更新）
+    console.log('开始更新人物世界书状态...');
+    try {
+      const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
+      if (trainingData && trainingData.characters) {
+        const characters = trainingData.characters;
+        let updatedCount = 0;
+
+        // 批量更新所有人物信息到世界书
+        for (const character of characters) {
+          // 跳过player角色
+          if (character.status === 'player') {
+            continue;
+          }
+
+          try {
+            await WorldbookService.updateCharacterEntry(character);
+            updatedCount++;
+          } catch (error) {
+            console.error(`更新人物 ${character.name} 的世界书失败:`, error);
+            // 继续处理其他人物，不中断整个流程
+          }
+        }
+
+        console.log(`人物世界书更新完成，共更新 ${updatedCount} 个人物`);
+      } else {
+        console.log('没有人物数据需要更新到世界书');
+      }
+    } catch (error) {
+      console.error('更新人物世界书状态失败:', error);
+      // 不影响回合结束的其他流程
+    }
 
     // 检查随机事件（回合开始事件）
     console.log('检查回合开始随机事件...');

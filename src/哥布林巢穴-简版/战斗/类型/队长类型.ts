@@ -23,6 +23,8 @@ export interface Captain {
   };
   /** 描述 */
   description: string;
+  /** 单位类型（用于战斗系统） */
+  unitType?: 'physical' | 'magical';
   /** 是否已使用 */
   isUsed: boolean;
   /** 部队编制信息 */
