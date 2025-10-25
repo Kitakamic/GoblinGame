@@ -1,6 +1,18 @@
 {
   "compilerOptions": {
+<<<<<<< HEAD
     "types": ["jquery", "jqueryui", "lodash", "toastr", "type-fest", "yaml", "zod"],
+=======
+    "types": [
+      "jquery",
+      "jqueryui",
+      "lodash",
+      "toastr",
+      "type-fest",
+      "yaml",
+      "zod",
+    ],
+>>>>>>> fdcb3fcc413e2f1fe11e10b448df6b0e292f5b04
     "target": "ESNext",
     "module": "ESNext",
     "outDir": "dist",
@@ -22,6 +34,18 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
+<<<<<<< HEAD
   "include": ["@types", "src", "*.d.ts"],
   "exclude": ["**/dist/**", "**/node_modules/**"]
+=======
+  "include": [
+    "@types",
+    "src",
+    "*.d.ts",
+  ],
+  "exclude": [
+    "**/dist/**",
+    "**/node_modules/**",
+  ]
+>>>>>>> fdcb3fcc413e2f1fe11e10b448df6b0e292f5b04
 }
