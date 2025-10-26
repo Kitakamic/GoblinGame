@@ -56,6 +56,9 @@
         <!-- <button class="header-btn delete-btn" title="删除当前页消息" @click="deleteCurrentPageMessage()">
           <span class="btn-icon">🗑️</span>
         </button> -->
+        <button class="header-btn style-btn" title="文字样式设置" @click="showStyleSettings = true">
+          <span class="btn-icon">🎨</span>
+        </button>
         <button v-if="showRetryButton" class="header-btn retry-btn" title="重新生成AI回复" @click="retryAIGeneration()">
           <span class="btn-icon">🔄</span>
         </button>
@@ -229,12 +232,17 @@
       @close="showCharacterDetail = false"
       @edit-avatar="handleEditAvatar"
     />
+
+    <!-- 文字样式设置 -->
+    <TextStyleSettings :show="showStyleSettings" @close="showStyleSettings = false" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { generateWithChainOfThought } from '../../世界书管理/AI生成助手';
 import { WorldbookService } from '../../世界书管理/世界书服务';
+import { ChainOfThoughtMode } from '../../世界书管理/思维链管理器';
 import { AvatarSwitchService } from '../../人物管理/服务/头像切换服务';
 import CharacterDetailModal from '../../人物管理/界面/人物卡界面.vue';
 import type { Character } from '../../人物管理/类型/人物类型';
@@ -243,6 +251,7 @@ import { TimeParseService } from '../../服务/时间解析服务';
 import { MessageService } from '../../消息模块/消息服务';
 import { useMessageChat } from '../../消息模块/消息聊天';
 import ToastContainer from '../../组件/弹窗提示.vue';
+import TextStyleSettings from '../../组件/文字样式设置.vue';
 import CustomConfirm from '../../组件/自定义确认框.vue';
 import { AttributeChangeParseService } from '../服务/属性变化解析服务';
 import { OptionParseService } from '../服务/选项解析服务';
@@ -325,6 +334,7 @@ const showDeleteConfirm = ref(false);
 
 // 人物卡显示状态
 const showCharacterDetail = ref(false);
+const showStyleSettings = ref(false);
 
 // 处理编辑头像事件
 const handleEditAvatar = (_character: Character) => {
@@ -351,6 +361,9 @@ const displayCharacter = computed(() => {
 const showRetryButton = ref(false);
 const retryMessage = ref('');
 
+// 当前流式传输的页面索引（用于重试时删除）
+const currentStreamingPageIndex = ref(-1);
+
 // 暂存当前对话对，不立即保存到世界书
 const currentDialoguePair = ref<{
   userInput: string;
@@ -363,6 +376,9 @@ const pendingAttributeChanges = ref<{
   stamina: number;
   character: Character;
 } | null>(null);
+
+// 保存原始人物属性，用于重新生成时恢复到原始状态
+const originalCharacter = ref<Character | null>(null);
 
 // 选项结构
 const options = ref<TrainingOption[]>([]);
@@ -486,6 +502,10 @@ onMounted(async () => {
     status: props.character.status,
     id: props.character.id,
   });
+
+  // 初始化原始人物属性
+  originalCharacter.value = { ...props.character };
+  console.log('💾 已保存原始人物属性:', originalCharacter.value);
 
   console.log('📦 开始加载历史调教消息...');
   await loadCharacterTrainingMessages();
@@ -724,14 +744,75 @@ const chooseInitialOption = async (opt: TrainingOption) => {
 const generateAndHandleAIReply = async () => {
   let aiResponse = '';
   let isAISuccess = false;
+  let response = ''; // 声明 response 变量
 
   try {
     isSending.value = true;
 
-    // 直接使用AI生成，不创建聊天消息
-    const response = await window.TavernHelper.generate({
-      user_input: buildUserPrompt(),
-    });
+    // 在生成新的AI回复之前，保存当前的人物状态作为基准
+    // 这样重试时可以恢复到正确的状态
+    if (pendingAttributeChanges.value) {
+      originalCharacter.value = { ...pendingAttributeChanges.value.character };
+      console.log('💾 保存当前人物状态作为重试基准:', originalCharacter.value);
+    } else if (!originalCharacter.value) {
+      originalCharacter.value = { ...props.character };
+      console.log('💾 保存原始人物状态:', originalCharacter.value);
+    }
+
+    // 流式传输相关变量
+    currentStreamingPageIndex.value = -1;
+
+    // 监听流式传输事件
+    const handleStreamToken = (fullText: string) => {
+      // 应用酒馆正则处理
+      const formatted = formatAsTavernRegexedString(fullText, 'ai_output', 'display');
+
+      // 如果有临时页面，更新它；否则创建新页面
+      if (currentStreamingPageIndex.value >= 0) {
+        pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formatted);
+      } else {
+        currentStreamingPageIndex.value = pages.value.length;
+        pages.value.push({ html: safeFormatMessage(formatted) });
+        currentPageIndex.value = currentStreamingPageIndex.value;
+      }
+
+      // 滚动到底部
+      MessageService.scrollToBottom(dialogueContent.value);
+
+      // console.log('📝 流式传输更新:', formatted.substring(0, 50) + '...');
+    };
+
+    // 注册流式传输事件监听
+    eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+    try {
+      // 读取全局流式传输设置
+      const globalVars = getVariables({ type: 'global' });
+      const enableStreamOutput =
+        typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : true; // 默认开启
+
+      // 使用带思维链的AI生成（人物调教模式）
+      response = await generateWithChainOfThought(ChainOfThoughtMode.CHARACTER_TRAINING, {
+        user_input: buildUserPrompt(),
+        should_stream: enableStreamOutput,
+      });
+
+      // 移除事件监听
+      eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+      // 注意：保留 currentStreamingPageIndex，在生成完成后检查是否需更新页面
+    } catch (error) {
+      // 移除事件监听
+      eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+      // 生成失败时重置流式页面索引
+      if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
+        pages.value.splice(currentStreamingPageIndex.value, 1);
+      }
+      currentStreamingPageIndex.value = -1;
+
+      throw error;
+    }
 
     // 检查AI回复是否为空或无效
     if (!response || response.trim().length === 0) {
@@ -860,8 +941,21 @@ const generateAndHandleAIReply = async () => {
     console.log('🎨 最终显示内容:', formattedResponse);
 
     addAIMessageWithGameTime(formattedResponse, props.character.name);
-    // 追加新书页并自动切换到下一页
-    pushAIPage(formattedResponse);
+
+    // 如果流式传输已经创建了页面，就更新它；否则创建新页面
+    if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
+      // 更新流式传输创建的页面
+      pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formattedResponse);
+      currentPageIndex.value = currentStreamingPageIndex.value;
+      console.log('✅ 更新流式传输创建的页面:', currentStreamingPageIndex.value);
+    } else {
+      // 追加新书页并自动切换到下一页
+      console.log('📄 创建新页面（非流式传输）');
+      pushAIPage(formattedResponse);
+    }
+
+    // 重置流式页面索引（在更新/创建完成后）
+    currentStreamingPageIndex.value = -1;
 
     // AI回复成功后，暂存用户输入和AI回复，等待用户下一步操作时再保存到世界书
     if (isAISuccess && lastUserInput.value) {
@@ -938,9 +1032,29 @@ const retryAIGeneration = async () => {
   currentDialoguePair.value = null;
   pendingAttributeChanges.value = null;
 
-  // 删除当前页面的AI回复显示
-  if (pages.value.length > 0 && currentPageIndex.value < pages.value.length) {
-    console.log('🗑️ 删除当前页面的AI回复显示');
+  // 恢复到上一次生成前的状态（originalCharacter 在每次生成开始时会更新）
+  if (originalCharacter.value) {
+    console.log('🔄 恢复到上一次生成前的状态:', originalCharacter.value);
+    // 通知父组件恢复到上一次生成前的状态（不触发自动调教）
+    emit('update-character', originalCharacter.value, false);
+    // 等待一帧，确保父组件已更新 props.character
+    await nextTick();
+  }
+
+  // 删除流式传输创建的页面
+  if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
+    console.log('🗑️ 删除流式传输创建的页面:', currentStreamingPageIndex.value);
+    pages.value.splice(currentStreamingPageIndex.value, 1);
+
+    // 调整当前页面索引
+    if (currentPageIndex.value >= pages.value.length) {
+      currentPageIndex.value = Math.max(0, pages.value.length - 1);
+    }
+  }
+
+  // 如果没有流式传输页面，尝试删除当前页面（向后兼容）
+  else if (pages.value.length > 0 && currentPageIndex.value < pages.value.length) {
+    console.log('🗑️ 删除当前页面的AI回复显示（向后兼容）');
     pages.value.splice(currentPageIndex.value, 1);
     // 调整页面索引
     if (currentPageIndex.value >= pages.value.length) {
@@ -948,7 +1062,10 @@ const retryAIGeneration = async () => {
     }
   }
 
-  // 重新生成
+  // 重置流式页面索引
+  currentStreamingPageIndex.value = -1;
+
+  // 重新生成（会使用 originalCharacter 作为基准）
   await generateAndHandleAIReply();
 };
 
@@ -1141,16 +1258,14 @@ const cancelCloseTraining = () => {
 const editingMessageIndex = ref(-1);
 const editingContent = ref('');
 
-const editMessage = (index: number) => {
-  editingMessageIndex.value = index;
-  editingContent.value = messages.value[index].content;
-};
-
 const saveEdit = () => {
-  if (editingMessageIndex.value >= 0) {
-    messages.value[editingMessageIndex.value].content = editingContent.value;
-    // 更新对应的书页内容
-    updatePageContent(editingMessageIndex.value);
+  if (editingMessageIndex.value >= 0 && editingMessageIndex.value < pages.value.length) {
+    // 将纯文本转换回 HTML 格式
+    const htmlContent = convertTextToHtml(editingContent.value);
+
+    // 直接更新页面内容
+    pages.value[editingMessageIndex.value].html = htmlContent;
+
     // 消息已通过世界书服务自动保存
     editingMessageIndex.value = -1;
     editingContent.value = '';
@@ -1162,64 +1277,72 @@ const cancelEdit = () => {
   editingContent.value = '';
 };
 
-const updatePageContent = (messageIndex: number) => {
-  const message = messages.value[messageIndex];
-  if (message.role === 'assistant' || message.role === 'system') {
-    // 找到对应的书页并更新
-    const pageIndex = Math.floor(messageIndex / 2); // 假设每两条消息一页
-    if (pageIndex < pages.value.length) {
-      const html = safeFormatMessage(filterXmlTags(message.content));
-      pages.value[pageIndex].html = html;
-    }
-  }
+// 从 HTML 中提取纯文本（用于编辑时显示）
+const extractTextFromHtml = (html: string): string => {
+  // 先将 <br> 标签转换为临时标记，避免被 textContent 移除
+  const processedHtml = html
+    .replace(/<br\s*\/?>/gi, '__BR__') // 将 <br> 转换为临时标记
+    .replace(/<\/p>/gi, '__BR__') // 将 </p> 也转换为换行
+    .replace(/<\/div>/gi, '__BR__'); // 将 </div> 也转换为换行
+
+  // 创建一个临时 div 来解析 HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = processedHtml;
+
+  // 获取纯文本
+  let text = tempDiv.textContent || tempDiv.innerText || '';
+
+  // 将临时标记转换为换行符
+  text = text.replace(/__BR__/g, '\n');
+
+  // 移除多余的连续换行（保留空行，但限制最大连续换行数）
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  return text.trim();
 };
 
-const rebuildPages = () => {
-  pages.value = [];
-  messages.value.forEach(msg => {
-    if (msg.role === 'assistant' || msg.role === 'system') {
-      pushAIPage(msg.content);
-    }
-  });
-};
+// 将纯文本转换为 HTML（保存时使用）
+const convertTextToHtml = (text: string): string => {
+  // 转义特殊字符
+  let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-// 获取当前页消息的索引
-const getCurrentPageMessageIndex = () => {
-  const aiMessages = messages.value.filter(msg => msg.role === 'assistant' || msg.role === 'system');
-  if (currentPageIndex.value >= 0 && currentPageIndex.value < aiMessages.length) {
-    const targetMessage = aiMessages[currentPageIndex.value];
-    return messages.value.findIndex(msg => msg === targetMessage);
-  }
-  return -1;
+  // 将换行符转换为 <br>
+  html = html.replace(/\n/g, '<br>');
+
+  // 使用 MessageService 格式化（支持引号、粗体等）
+  return MessageService.formatMessage(html, { enableMarkdown: false, enableCodeHighlight: false, enableQuote: true });
 };
 
 // 编辑当前页消息
 const editCurrentPageMessage = () => {
-  const messageIndex = getCurrentPageMessageIndex();
-  if (messageIndex >= 0 && messageIndex < messages.value.length) {
-    editMessage(messageIndex);
+  if (currentPageIndex.value >= 0 && currentPageIndex.value < pages.value.length) {
+    // 获取当前页面的内容
+    const currentPage = pages.value[currentPageIndex.value];
+    editingMessageIndex.value = currentPageIndex.value;
+
+    // 从 HTML 中提取纯文本，显示给用户编辑
+    editingContent.value = extractTextFromHtml(currentPage.html);
   }
 };
 
 // 删除当前页消息
 // const deleteCurrentPageMessage = () => {
-//   const messageIndex = getCurrentPageMessageIndex();
-//   if (messageIndex >= 0 && messageIndex < messages.value.length) {
+//   if (currentPageIndex.value >= 0 && currentPageIndex.value < pages.value.length) {
 //     showDeleteConfirm.value = true;
 //   }
 // };
 
 // 确认删除消息
 const confirmDeleteMessage = () => {
-  const messageIndex = getCurrentPageMessageIndex();
-  if (messageIndex >= 0 && messageIndex < messages.value.length) {
-    messages.value.splice(messageIndex, 1);
-    // 重新构建书页
-    rebuildPages();
-    // 调整当前页索引
+  if (currentPageIndex.value >= 0 && currentPageIndex.value < pages.value.length) {
+    // 直接删除当前页面
+    pages.value.splice(currentPageIndex.value, 1);
+
+    // 调整当前页面索引
     if (currentPageIndex.value >= pages.value.length) {
       currentPageIndex.value = Math.max(0, pages.value.length - 1);
     }
+
     // 消息已通过世界书服务自动保存
   }
   showDeleteConfirm.value = false;
@@ -1259,6 +1382,8 @@ const handleImageError = (event: Event) => {
 </script>
 
 <style lang="scss">
+@use '../../样式/对话样式变量.scss' as *;
+
 /* 复用手动调教界面的整体样式，并补充选项样式 */
 .manual-training-container {
   position: fixed;
@@ -1606,6 +1731,34 @@ const handleImageError = (event: Event) => {
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 200, 150, 0.1);
+
+  /* 自定义滚动条样式 */
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 5px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, rgba(205, 133, 63, 0.6), rgba(139, 90, 43, 0.5));
+    border-radius: 5px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+
+    &:hover {
+      background: linear-gradient(135deg, rgba(205, 133, 63, 0.8), rgba(139, 90, 43, 0.7));
+    }
+
+    &:active {
+      background: linear-gradient(135deg, rgba(255, 180, 100, 0.9), rgba(205, 133, 63, 0.8));
+    }
+  }
+
+  /* Firefox 滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(205, 133, 63, 0.6) rgba(0, 0, 0, 0.3);
 }
 .page {
   /* 交由外层 book-viewport 滚动，避免嵌套滚动 */
@@ -1657,72 +1810,16 @@ const handleImageError = (event: Event) => {
   }
 }
 .page-content.typo-book {
-  color: #f7efd9;
-  font-family: 'Georgia', 'Times New Roman', serif;
-  font-size: 18px;
-  line-height: 1.85;
-  letter-spacing: 0.3px;
-  text-rendering: optimizeLegibility;
-
-  /* 宽屏优化 */
-  @media (min-width: 1400px) {
-    font-size: 19px;
-    line-height: 1.9;
-    letter-spacing: 0.35px;
-  }
-
-  @media (min-width: 1600px) {
-    font-size: 20px;
-    line-height: 1.95;
-    letter-spacing: 0.4px;
-  }
-
-  @media (min-width: 1920px) {
-    font-size: 21px;
-    line-height: 2;
-    letter-spacing: 0.45px;
-  }
-
-  @media (min-width: 2560px) {
-    font-size: 22px;
-    line-height: 2.05;
-    letter-spacing: 0.5px;
-  }
-
-  @media (max-width: 768px) {
-    font-size: 16px;
-    line-height: 1.75;
-    letter-spacing: 0.2px;
-  }
+  @include typo-book;
 }
-.page-content.typo-book p {
-  text-indent: 2em;
-  margin: 0 0 12px 0;
-  position: relative;
-  padding-bottom: 8px;
-  border-bottom: 1px dashed rgba(205, 133, 63, 0.15);
-}
-.page-content.typo-book em,
-.page-content.typo-book .italic-text {
-  text-decoration: underline dotted rgba(255, 215, 161, 0.5);
-  text-underline-offset: 2px;
-}
-.page-content.typo-book .strong-text {
-  text-decoration: underline solid rgba(255, 215, 161, 0.35);
-  text-underline-offset: 3px;
-}
-.page-content.typo-book .quote {
-  border-left-color: rgba(255, 215, 161, 0.45);
-  background: rgba(255, 215, 161, 0.08);
-}
+
 .choice-line {
   margin-top: 8px;
-  color: #ffd7a1;
   font-weight: 600;
-}
-.choice-prefix {
-  color: #ffbd7a;
-  margin-right: 6px;
+
+  .choice-prefix {
+    margin-right: 6px;
+  }
 }
 
 .manual-training-container .dialogue-message {
@@ -2008,6 +2105,34 @@ const handleImageError = (event: Event) => {
   display: flex;
   flex-direction: column;
   flex: 1;
+
+  /* 自定义滚动条样式 */
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 5px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, rgba(205, 133, 63, 0.6), rgba(139, 90, 43, 0.5));
+    border-radius: 5px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+
+    &:hover {
+      background: linear-gradient(135deg, rgba(205, 133, 63, 0.8), rgba(139, 90, 43, 0.7));
+    }
+
+    &:active {
+      background: linear-gradient(135deg, rgba(255, 180, 100, 0.9), rgba(205, 133, 63, 0.8));
+    }
+  }
+
+  /* Firefox 滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(205, 133, 63, 0.6) rgba(0, 0, 0, 0.3);
 }
 
 .custom-input-textarea {
@@ -2467,6 +2592,34 @@ const handleImageError = (event: Event) => {
   padding: 20px;
   flex: 1;
   overflow-y: auto;
+
+  /* 自定义滚动条样式 */
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 5px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, rgba(205, 133, 63, 0.6), rgba(139, 90, 43, 0.5));
+    border-radius: 5px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+
+    &:hover {
+      background: linear-gradient(135deg, rgba(205, 133, 63, 0.8), rgba(139, 90, 43, 0.7));
+    }
+
+    &:active {
+      background: linear-gradient(135deg, rgba(255, 180, 100, 0.9), rgba(205, 133, 63, 0.8));
+    }
+  }
+
+  /* Firefox 滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(205, 133, 63, 0.6) rgba(0, 0, 0, 0.3);
 }
 
 .edit-dialog-body .edit-textarea {

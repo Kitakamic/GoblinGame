@@ -3,11 +3,15 @@ import type { Continent } from '../探索/类型/大陆探索类型';
 import type { HistoryRecord } from './世界书类型定义';
 import { CharacterWorldbookManager } from './人物信息管理器';
 import { GameEventLorebookManager } from './冒头事件管理器';
+import { ChainOfThoughtManager, ChainOfThoughtMode } from './思维链管理器';
 import { PreBattleDialogueManager } from './战前对话管理器';
 import { BattleSummaryManager } from './战斗总结管理器';
 import { ConquestRecordManager } from './据点征服管理器';
 import { TrainingRecordManager } from './调教记录管理器';
 import { ResourcesWorldbookManager } from './资源同步管理器';
+
+// 导出思维链模式枚举供外部使用
+export { ChainOfThoughtMode } from './思维链管理器';
 
 /**
  * 世界书服务类 - 门面模式统一入口
@@ -20,6 +24,7 @@ import { ResourcesWorldbookManager } from './资源同步管理器';
  * - ResourcesWorldbookManager: 资源世界书管理
  * - ConquestRecordManager: 据点征服记录管理
  * - GameEventLorebookManager: 游戏冒头事件记录管理
+ * - ChainOfThoughtManager: 思维链管理
  */
 export class WorldbookService {
   private static currentWorldbookName: string = '哥布林巢穴-人物档案';
@@ -207,5 +212,40 @@ export class WorldbookService {
   ): Promise<void> {
     const worldbookName = this.getCurrentWorldbookName();
     return GameEventLorebookManager.createEventStoryRecord(worldbookName, eventId, eventName, eventContent, gameTime);
+  }
+
+  // ==================== 思维链管理 ====================
+
+  /**
+   * 设置思维链模式（共用同一个世界书条目，调用时更新内容）
+   * @param mode 思维链模式
+   */
+  static async setChainOfThoughtMode(mode: ChainOfThoughtMode): Promise<void> {
+    const worldbookName = this.getCurrentWorldbookName();
+    return ChainOfThoughtManager.addChainToWorldbook(worldbookName, mode);
+  }
+
+  /**
+   * 初始化思维链条目（首次使用时创建）
+   */
+  static async initializeChainOfThought(): Promise<void> {
+    const worldbookName = this.getCurrentWorldbookName();
+    return ChainOfThoughtManager.initializeChainToWorldbook(worldbookName);
+  }
+
+  /**
+   * 移除思维链条目
+   */
+  static async removeChainOfThought(): Promise<void> {
+    const worldbookName = this.getCurrentWorldbookName();
+    return ChainOfThoughtManager.removeChainFromWorldbook(worldbookName);
+  }
+
+  /**
+   * 检查思维链条目是否存在
+   */
+  static async chainOfThoughtExists(): Promise<boolean> {
+    const worldbookName = this.getCurrentWorldbookName();
+    return ChainOfThoughtManager.chainExistsInWorldbook(worldbookName);
   }
 }

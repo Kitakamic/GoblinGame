@@ -61,6 +61,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
+import { generateWithChainOfThought } from '../../世界书管理/AI生成助手';
+import { ChainOfThoughtMode } from '../../世界书管理/思维链管理器';
+import { toast } from '../../服务/弹窗提示服务';
 import { MessageService } from '../../消息模块/消息服务';
 import { BattleSummaryService } from '../服务/战斗总结服务';
 
@@ -113,19 +116,48 @@ const generateSummaryWithoutSaving = async (): Promise<string> => {
   // 构建战斗总结提示词
   const prompt = BattleSummaryService.buildBattleSummaryPrompt(props.summaryConfig.battleData);
 
-  // 调用AI生成总结
-  const response = await window.TavernHelper.generate({
-    user_input: prompt,
-  });
+  // 监听流式传输事件
+  const handleStreamToken = (fullText: string) => {
+    // 应用酒馆正则处理
+    const formatted = formatAsTavernRegexedString(fullText, 'ai_output', 'display');
 
-  // 应用酒馆正则处理AI回复
-  console.log('🧹 原始AI回复:', response);
-  const regexResponse = formatAsTavernRegexedString(response, 'ai_output', 'display');
-  console.log('🎨 应用酒馆正则后的回复:', regexResponse);
+    // 实时更新显示内容
+    summaryContent.value = formatted;
 
-  // 解析AI回复
-  const summary = BattleSummaryService.parseBattleSummary(regexResponse);
-  return summary;
+    console.log('📝 流式传输更新:', formatted.substring(0, 50) + '...');
+  };
+
+  // 注册流式传输事件监听
+  eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+  try {
+    // 读取全局流式传输设置
+    const globalVars = getVariables({ type: 'global' });
+    const enableStreamOutput =
+      typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : true; // 默认开启
+
+    // 使用带思维链的AI生成（战斗总结模式）
+    const response = await generateWithChainOfThought(ChainOfThoughtMode.BATTLE_SUMMARY, {
+      user_input: prompt,
+      should_stream: enableStreamOutput, // 根据设置启用流式传输
+    });
+
+    // 移除事件监听
+    eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+    // 应用酒馆正则处理AI回复
+    console.log('🧹 原始AI回复:', response);
+    const regexResponse = formatAsTavernRegexedString(response, 'ai_output', 'display');
+    console.log('🎨 应用酒馆正则后的回复:', regexResponse);
+
+    // 解析AI回复
+    const summary = BattleSummaryService.parseBattleSummary(regexResponse);
+    return summary;
+  } catch (error) {
+    // 移除事件监听
+    eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+    throw error;
+  }
 };
 
 // 生成战斗总结
@@ -155,7 +187,7 @@ const generateSummary = async () => {
     emit('summary-generated', summary);
   } catch (error) {
     console.error('生成战斗总结失败:', error);
-    toastr.error('生成战斗总结失败', 'AI生成失败');
+    toast.error('生成战斗总结失败', { title: 'AI生成失败' });
   } finally {
     isGenerating.value = false;
   }
@@ -191,10 +223,11 @@ const regenerateSummary = async () => {
   // 清除暂存的总结
   pendingSummary.value = null;
 
-  // 清空当前内容
+  // 清空当前内容（这会自动清理流式传输创建的内容）
   summaryContent.value = '';
 
   // 重新生成（不会立即保存，等待关闭时保存）
+  // 注意：流式传输会实时更新 summaryContent.value，所以不需要额外处理
   await generateSummary();
 };
 
@@ -235,6 +268,8 @@ onMounted(() => {
 </script>
 
 <style lang="scss">
+@use '../../样式/对话样式变量.scss' as *;
+
 /* 战斗总结界面样式 - 基于通用对话界面设计 */
 .battle-summary-container {
   position: fixed;
@@ -411,42 +446,7 @@ onMounted(() => {
 }
 
 .summary-text.typo-book {
-  color: #f7efd9;
-  font-family: 'Georgia', 'Times New Roman', serif;
-  font-size: 18px;
-  line-height: 1.85;
-  letter-spacing: 0.3px;
-  text-rendering: optimizeLegibility;
-
-  @media (max-width: 768px) {
-    font-size: 16px;
-    line-height: 1.75;
-    letter-spacing: 0.2px;
-  }
-
-  p {
-    text-indent: 2em;
-    margin: 0 0 12px 0;
-    position: relative;
-    padding-bottom: 8px;
-    border-bottom: 1px dashed rgba(205, 133, 63, 0.15);
-  }
-
-  em,
-  .italic-text {
-    text-decoration: underline dotted rgba(255, 215, 161, 0.5);
-    text-underline-offset: 2px;
-  }
-
-  .strong-text {
-    text-decoration: underline solid rgba(255, 215, 161, 0.35);
-    text-underline-offset: 3px;
-  }
-
-  .quote {
-    border-left-color: rgba(255, 215, 161, 0.45);
-    background: rgba(255, 215, 161, 0.08);
-  }
+  @include typo-book;
 }
 
 /* 生成中状态 */

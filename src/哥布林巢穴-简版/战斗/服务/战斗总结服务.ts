@@ -3,6 +3,8 @@
  * 用于生成战斗总结的AI服务
  */
 
+import { generateWithChainOfThought } from '../../世界书管理/AI生成助手';
+import { ChainOfThoughtMode } from '../../世界书管理/思维链管理器';
 import { TimeParseService } from '../../服务/时间解析服务';
 
 export interface BattleSummaryData {
@@ -50,8 +52,8 @@ export class BattleSummaryService {
       // 构建战斗总结提示词
       const prompt = this.buildBattleSummaryPrompt(battleData);
 
-      // 调用AI生成总结
-      const response = await window.TavernHelper.generate({
+      // 使用带思维链的AI生成（自动切换到战斗总结思维链）
+      const response = await generateWithChainOfThought(ChainOfThoughtMode.BATTLE_SUMMARY, {
         user_input: prompt,
       });
 

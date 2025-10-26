@@ -12,6 +12,11 @@ export interface DialogueConfig {
   onDialogueEnd?: () => void;
   onDialogueClose?: () => void;
   saveKey?: string; // 用于数据持久化的键
+  onRetry?: () => Promise<void> | void; // 重试前的回调，用于恢复状态
+  onAIReply?: (aiResponse: string, characterName: string) => Promise<void>; // AI回复后的回调
+  onUserMessage?: (userMessage: string) => Promise<void>; // 用户消息的回调
+  characterName?: string; // AI角色名称
+  showCustomInput?: boolean; // 是否显示自定义输入功能
 }
 
 // 对话选项接口

@@ -6,8 +6,8 @@
         <div class="content-wrapper">
           <header class="header">
             <div class="header-left">
-              <button class="help-btn" title="查看教程" @click="openTutorial">
-                <span class="icon">?</span>
+              <button class="help-btn" title="游戏设置" @click="openSettings">
+                <span class="icon">⚙️</span>
               </button>
             </div>
             <h1 class="main-title">哥布林巢穴</h1>
@@ -115,6 +115,15 @@
               <span class="icon">💾</span>
               <span class="text">存档管理</span>
             </button>
+            <button
+              class="action-btn story-summary-btn"
+              :class="{ 'needs-summary': needsSummary }"
+              :title="needsSummary ? '⚠️ 建议总结剧情（部分条目超过3万tokens）' : '剧情总结'"
+              @click="openStorySummaryModal"
+            >
+              <span class="icon">📚</span>
+              <span class="text">剧情总结</span>
+            </button>
             <button class="action-btn round-btn" title="结束回合" @click="() => endRound()">
               <span class="icon">⏭️</span>
               <span class="text">结束回合</span>
@@ -220,6 +229,9 @@
     <!-- 历史记录弹窗 -->
     <HistoryModal ref="historyModalRef" :show="showHistoryModal" @close="closeHistoryModal" />
 
+    <!-- 剧情总结界面 -->
+    <StorySummaryModal :show="showStorySummaryModal" @close="closeStorySummaryModal" />
+
     <!-- 自定义确认框 -->
     <CustomConfirm
       :show="confirmState.show"
@@ -245,6 +257,17 @@
       @event-completed="handleRandomEventCompleted"
     />
 
+    <!-- 游戏设置面板 -->
+    <GameSettingsPanel
+      :show="showSettings"
+      @close="closeSettings"
+      @open-text-style="openTextStyleSettings"
+      @open-tutorial="handleSettingsTutorial"
+    />
+
+    <!-- 文字样式设置 -->
+    <TextStyleSettings :show="showTextStyleSettings" @close="closeTextStyleSettings" />
+
     <!-- 教程确认框 -->
     <CustomConfirm
       :show="showTutorialConfirm"
@@ -268,14 +291,18 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import RandomEventManager from '../随机事件/界面/随机事件管理器.vue';
 import { WorldbookService } from './世界书管理/世界书服务';
+import StorySummaryModal from './世界书管理/剧情总结界面.vue';
 import HistoryModal from './历史记录/历史记录界面.vue';
 import SaveLoadModal from './存档管理/存档界面.vue';
 import { modularSaveManager } from './存档管理/模块化存档服务';
 import { continentExploreService } from './探索/服务/大陆探索服务';
+import { SummaryCheckService } from './服务/总结检查服务';
 import { TimeParseService } from './服务/时间解析服务';
 import { PlayerLevelService } from './服务/玩家等级服务';
 import { BreedingService } from './服务/生育服务';
 import { ConfirmService, confirmState } from './服务/确认框服务';
+import TextStyleSettings from './组件/文字样式设置.vue';
+import GameSettingsPanel from './组件/游戏设置面板.vue';
 import CustomConfirm from './组件/自定义确认框.vue';
 
 const route = useRoute();
@@ -393,6 +420,33 @@ function toggleFullscreen() {
   }
 }
 
+// 设置面板状态
+const showSettings = ref(false);
+const showTextStyleSettings = ref(false);
+
+// 设置相关函数
+function openSettings() {
+  showSettings.value = true;
+}
+
+function closeSettings() {
+  showSettings.value = false;
+}
+
+function openTextStyleSettings() {
+  showTextStyleSettings.value = true;
+  closeSettings(); // 关闭主设置面板
+}
+
+function closeTextStyleSettings() {
+  showTextStyleSettings.value = false;
+}
+
+function handleSettingsTutorial() {
+  closeSettings(); // 关闭设置面板
+  openTutorial(); // 打开教程确认框
+}
+
 // 教程确认框状态
 const showTutorialConfirm = ref(false);
 
@@ -422,6 +476,10 @@ const gameState = ref<any>(null);
 // 存档管理
 const showSaveLoadModal = ref(false);
 const isSaveSystemInitialized = ref(false);
+
+// 剧情总结
+const showStorySummaryModal = ref(false);
+const needsSummary = ref(false); // 是否需要总结
 
 // 信息显示相关
 const latestRoundInfo = ref<any>(null);
@@ -738,6 +796,16 @@ const openHistoryModal = () => {
 // 关闭历史记录弹窗
 const closeHistoryModal = () => {
   showHistoryModal.value = false;
+};
+
+// 打开剧情总结界面
+const openStorySummaryModal = () => {
+  showStorySummaryModal.value = true;
+};
+
+// 关闭剧情总结界面
+const closeStorySummaryModal = () => {
+  showStorySummaryModal.value = false;
 };
 
 // 初始化建筑数据到全局建筑系统
@@ -1190,6 +1258,21 @@ const endRound = async () => {
     console.log('检查回合开始随机事件...');
     if (randomEventManagerRef.value) {
       randomEventManagerRef.value.checkRoundStartEvents();
+    }
+
+    // 检查是否需要总结
+    console.log('检查是否需要总结...');
+    try {
+      const checkResult = await SummaryCheckService.checkIfSummaryNeeded();
+      needsSummary.value = checkResult.needsSummary;
+
+      if (checkResult.needsSummary) {
+        const message = SummaryCheckService.getSummaryMessage(checkResult);
+        console.log('⚠️ 检测到需要总结:', message);
+        // 触发按钮高亮效果会在后续响应式更新中自动生效
+      }
+    } catch (error) {
+      console.error('检查总结需要性失败:', error);
     }
 
     console.log('回合结束处理完成');
@@ -1760,6 +1843,45 @@ onUnmounted(() => {
         color: #dc2626;
       }
     }
+
+    &.story-summary-btn.needs-summary {
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.3), rgba(217, 119, 6, 0.4));
+      border: 2px solid rgba(245, 158, 11, 0.6);
+      box-shadow:
+        0 0 20px rgba(245, 158, 11, 0.4),
+        inset 0 1px 0 rgba(255, 237, 213, 0.3);
+      animation: summaryPulse 2s ease-in-out infinite;
+
+      .icon,
+      .text {
+        color: #fbbf24;
+        font-weight: 700;
+      }
+
+      &:hover {
+        background: linear-gradient(180deg, rgba(245, 158, 11, 0.4), rgba(217, 119, 6, 0.5));
+        border-color: rgba(245, 158, 11, 0.8);
+        box-shadow:
+          0 0 30px rgba(245, 158, 11, 0.6),
+          inset 0 1px 0 rgba(255, 237, 213, 0.4);
+        transform: translateY(-2px) scale(1.02);
+      }
+    }
+  }
+}
+
+// 总结按钮脉冲动画
+@keyframes summaryPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 20px rgba(245, 158, 11, 0.4),
+      inset 0 1px 0 rgba(255, 237, 213, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 30px rgba(245, 158, 11, 0.7),
+      inset 0 1px 0 rgba(255, 237, 213, 0.5);
   }
 }
 

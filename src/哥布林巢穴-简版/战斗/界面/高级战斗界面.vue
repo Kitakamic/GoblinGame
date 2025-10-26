@@ -369,6 +369,20 @@
     @close="cancelEndDialogue"
   />
 
+  <!-- 撤退确认框 -->
+  <CustomConfirmBox
+    :show="showRetreatConfirm"
+    title="撤退确认"
+    message="确定要撤退吗？"
+    :details="`你已经进行了战前对话，当前敌方士气已降至 ${enemyMorale.toFixed(1)}%。撤退时可以选择保存对话记录到世界书，或者清除这些信息（请注意：下次进入战斗敌方将恢复到初始状态，只记录剧情）。`"
+    confirm-text="保存并撤退"
+    cancel-text="清除并撤退"
+    type="warning"
+    @confirm="confirmRetreatWithSave"
+    @cancel="confirmRetreatWithoutSave"
+    @close="cancelRetreat"
+  />
+
   <!-- 弹窗提示组件 -->
   <ToastNotification ref="toastRef" />
 
@@ -462,6 +476,7 @@ const enemyMorale = ref(100); // 敌方士气，初始100%
 const dialogueConfig = ref<any>(null);
 const dialogueCompleted = ref(false); // 对话是否已完成
 const showDialogueConfirm = ref(false); // 显示对话确认框
+const showRetreatConfirm = ref(false); // 显示撤退确认框
 
 // 战斗总结相关
 const showBattleSummaryInterface = ref(false);
@@ -1288,6 +1303,21 @@ const syncGoblinLossesToResources = () => {
 const retreat = () => {
   console.log('撤退');
 
+  // 检查是否进行了战前对话，且敌方士气已降低
+  if (dialogueCompleted.value && enemyMorale.value < 100) {
+    console.log('检测到战前对话已完成，显示撤退确认框');
+    showRetreatConfirm.value = true;
+    return;
+  }
+
+  // 没有进行战前对话或士气未降低，直接撤退
+  performRetreat();
+};
+
+// 执行撤退操作
+const performRetreat = async () => {
+  console.log('执行撤退');
+
   // 注意：撤退不返还行动力，因为行动力已经消耗了
 
   // 更新资源世界书（包含哥布林损失）
@@ -1326,6 +1356,108 @@ const retreat = () => {
 
   // 关闭战斗界面
   closeInterface();
+};
+
+// 确认撤退（保存对话记录）
+const confirmRetreatWithSave = async () => {
+  console.log('保存对话记录并撤退');
+  showRetreatConfirm.value = false;
+
+  try {
+    // 获取当前据点的敌方人物信息
+    const getCurrentEnemyCharacters = () => {
+      const target = props.battleData?.target;
+      if (target?.rewards?.heroes && Array.isArray(target.rewards.heroes)) {
+        return target.rewards.heroes.filter((hero: Character) => hero.status === 'enemy' && hero.canCombat === true);
+      }
+      return [];
+    };
+
+    const enemyCharacters = getCurrentEnemyCharacters();
+
+    // 获取游戏时间
+    const rounds = modularSaveManager.resources.value.rounds || 0;
+    const gameTime = TimeParseService.getTimeInfo(rounds).formattedDate;
+    const baseTimestamp = Date.now();
+
+    // 为每个敌方人物添加撤退记录
+    for (const character of enemyCharacters) {
+      const retreatMessage = {
+        gameTime: gameTime,
+        sender: 'user',
+        content: '已撤退，本次战前对话结束',
+        timestamp: baseTimestamp,
+      };
+
+      // 直接调用世界书服务保存撤退记录
+      // 注意：使用 character.name 作为 characterId，与对话时的逻辑保持一致
+      await WorldbookService.addMultipleDialogueRecords(character.name, character.name, [retreatMessage], 'enemy');
+
+      console.log(`✅ 已为 ${character.name} 添加撤退记录`);
+    }
+
+    toastRef.value?.success('撤退记录已保存到世界书', {
+      title: '撤退',
+      duration: 2000,
+    });
+  } catch (error) {
+    console.error('保存撤退记录失败:', error);
+    toastRef.value?.warning('保存撤退记录时出现错误', {
+      title: '警告',
+      duration: 3000,
+    });
+  }
+
+  // 对话记录已经在对话过程中保存到世界书，现在添加了撤退记录，执行撤退
+  await performRetreat();
+};
+
+// 确认撤退（清除对话记录）
+const confirmRetreatWithoutSave = async () => {
+  console.log('清除对话记录并撤退');
+  showRetreatConfirm.value = false;
+
+  try {
+    // 获取当前据点的敌方人物信息
+    const getCurrentEnemyCharacters = () => {
+      const target = props.battleData?.target;
+      if (target?.rewards?.heroes && Array.isArray(target.rewards.heroes)) {
+        return target.rewards.heroes.filter((hero: Character) => hero.status === 'enemy' && hero.canCombat === true);
+      }
+      return [];
+    };
+
+    const enemyCharacters = getCurrentEnemyCharacters();
+
+    // 删除所有敌方人物的剧情记录
+    for (const character of enemyCharacters) {
+      try {
+        await WorldbookService.deleteCharacterStoryHistoryEntry(character.id);
+        console.log(`✅ 已删除 ${character.name} 的剧情记录`);
+      } catch (error) {
+        console.error(`删除 ${character.name} 的剧情记录失败:`, error);
+      }
+    }
+
+    toastRef.value?.success('已清除所有战前对话记录', {
+      title: '撤退',
+      duration: 2000,
+    });
+  } catch (error) {
+    console.error('清除对话记录失败:', error);
+    toastRef.value?.warning('清除对话记录时出现错误', {
+      title: '警告',
+      duration: 3000,
+    });
+  }
+
+  // 执行撤退
+  await performRetreat();
+};
+
+// 取消撤退
+const cancelRetreat = () => {
+  showRetreatConfirm.value = false;
 };
 
 // 再来一次
@@ -1768,6 +1900,9 @@ const startPreBattleDialogue = () => {
     })),
   };
 
+  // 保存原始士气值，用于重试时恢复
+  const originalMorale = ref<number>(enemyMorale.value);
+
   // 使用士气对话服务创建配置
   dialogueConfig.value = MoraleDialogueService.createDialogueConfig(dialogueContext, {
     onMoraleChange: (_oldMorale: number, newMorale: number, _reason: string) => {
@@ -1786,6 +1921,29 @@ const startPreBattleDialogue = () => {
       return enemyMorale.value;
     },
   });
+
+  // 重写 onAIGenerate 回调，在每次生成前保存当前的士气值
+  const originalOnAIGenerate = dialogueConfig.value.onAIGenerate;
+  if (dialogueConfig.value.onAIGenerate) {
+    dialogueConfig.value.onAIGenerate = async (userInput: string) => {
+      // 在生成前保存当前的士气值，用于重试时恢复
+      originalMorale.value = enemyMorale.value;
+      console.log('💾 保存当前士气值作为重试基准:', originalMorale.value);
+      return await originalOnAIGenerate(userInput);
+    };
+  }
+
+  // 添加重试回调，用于恢复到上一次生成前的士气值
+  dialogueConfig.value.onRetry = async () => {
+    // 恢复士气值到上一次生成前的状态
+    enemyMorale.value = originalMorale.value;
+    console.log('🔄 恢复到上一次生成前的士气值:', enemyMorale.value);
+
+    // 更新对话配置中的副标题
+    if (dialogueConfig.value) {
+      MoraleDialogueService.updateDialogueSubtitle(dialogueConfig.value, enemyMorale.value);
+    }
+  };
 
   showDialogueInterface.value = true;
 };

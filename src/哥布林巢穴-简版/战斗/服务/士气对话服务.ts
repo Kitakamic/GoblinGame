@@ -1,4 +1,6 @@
 // 士气对话服务 - 处理战前对话的生成和管理
+import { generateWithChainOfThought } from '../../世界书管理/AI生成助手';
+import { ChainOfThoughtMode } from '../../世界书管理/思维链管理器';
 import { MoraleParseService } from './士气解析服务';
 
 export interface MoraleDialogueConfig {
@@ -136,8 +138,8 @@ export class MoraleDialogueService {
     // 构建AI提示词
     const prompt = this.buildAIPrompt(userInput, context, actualCurrentMorale);
 
-    // 调用酒馆助手生成回复
-    const response = await window.TavernHelper.generate({
+    // 使用带思维链的AI生成（自动切换到战前对话思维链）
+    const response = await generateWithChainOfThought(ChainOfThoughtMode.PRE_BATTLE_DIALOGUE, {
       user_input: prompt,
     });
 

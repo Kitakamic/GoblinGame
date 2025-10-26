@@ -165,7 +165,26 @@ export class TrainingRecordManager {
       entry => entry.extra?.entry_type === 'character_story_history' && entry.extra?.character_id === characterId,
     );
 
-    const historyEntry = this.createCharacterStoryHistoryEntry(characterId, characterName, content);
+    // 如果现有条目有summary（支持多种格式），保留它
+    let finalContent = content;
+    if (historyEntryIndex !== -1) {
+      const existingEntry = worldbook[historyEntryIndex];
+      // 提取所有summary标签（支持<summary>和<summary_N>格式）
+      const allSummaries: string[] = [];
+      const summaryMatches = existingEntry.content?.matchAll(/<summary(?:_\d+)?>([\s\S]*?)<\/summary(?:_\d+)?>/g);
+      if (summaryMatches) {
+        for (const match of summaryMatches) {
+          allSummaries.push(match[0]);
+        }
+      }
+
+      if (allSummaries.length > 0) {
+        const summariesContent = allSummaries.join('\n\n');
+        finalContent = summariesContent + '\n\n' + content;
+      }
+    }
+
+    const historyEntry = this.createCharacterStoryHistoryEntry(characterId, characterName, finalContent);
 
     if (historyEntryIndex !== -1) {
       // 更新现有条目（UID 已经是固定的，直接替换）
@@ -231,7 +250,20 @@ export class TrainingRecordManager {
     console.log('📄 内容长度:', content?.length || 0);
 
     const trainingHistory: HistoryRecord[] = [];
-    const trainingMatch = content.match(/<training_history>([\s\S]*?)<\/training_history>/);
+
+    // 移除所有 summary 标签及其内容（支持<summary>和<summary_N>格式）
+    let parsedContent = content;
+    if (content.includes('<summary>') || /<summary_\d+>/.test(content)) {
+      parsedContent = content.replace(/<summary(?:_\d+)?>[\s\S]*?<\/summary(?:_\d+)?>\n*/g, '');
+    }
+
+    // 如果移除summary后内容为空，说明已经被总结压缩了
+    if (!parsedContent.trim()) {
+      console.log('⚠️ 条目已被总结压缩，返回空记录（后续追加会重建基础结构）');
+      return trainingHistory;
+    }
+
+    const trainingMatch = parsedContent.match(/<training_history>([\s\S]*?)<\/training_history>/);
 
     if (!trainingMatch) {
       console.log('⚠️ 未找到 <training_history> 标签');

@@ -25,8 +25,21 @@ export class ConquestRecordManager {
 
       // 获取现有记录
       let existingRecords: Record<string, Record<string, string[]>> = {};
+      let summaryContent = '';
       if (conquestEntryIndex !== -1) {
-        existingRecords = this.parseExistingConquestRecords(worldbook[conquestEntryIndex].content);
+        const existingContent = worldbook[conquestEntryIndex].content;
+
+        // 提取所有summary部分（支持<summary>和<summary_N>格式）
+        const summaryMatches = existingContent.matchAll(/<summary(?:_\d+)?>([\s\S]*?)<\/summary(?:_\d+)?>/g);
+        const summaries: string[] = [];
+        for (const match of summaryMatches) {
+          summaries.push(match[0]);
+        }
+        if (summaries.length > 0) {
+          summaryContent = summaries.join('\n\n') + '\n\n';
+        }
+
+        existingRecords = this.parseExistingConquestRecords(existingContent);
       }
 
       // 构建新内容（合并现有记录和新记录）
@@ -39,10 +52,11 @@ export class ConquestRecordManager {
       );
 
       if (conquestEntryIndex !== -1) {
-        // 更新现有条目
+        // 更新现有条目，保留summary
+        const finalContent = summaryContent + conquestContent;
         worldbook[conquestEntryIndex] = {
           ...worldbook[conquestEntryIndex],
-          content: conquestContent,
+          content: finalContent,
           extra: {
             ...worldbook[conquestEntryIndex].extra,
             updated_at: new Date().toISOString(),
@@ -73,8 +87,20 @@ export class ConquestRecordManager {
     const groupedRecords: Record<string, Record<string, string[]>> = {};
 
     try {
+      // 移除所有 summary 标签及其内容（支持<summary>和<summary_N>格式），只解析原始格式
+      let parsedContent = content;
+      if (content.includes('<summary>') || /<summary_\d+>/.test(content)) {
+        parsedContent = content.replace(/<summary(?:_\d+)?>[\s\S]*?<\/summary(?:_\d+)?>\n*/g, '');
+      }
+
+      // 如果移除summary后内容为空，说明已经被总结压缩了
+      if (!parsedContent.trim()) {
+        console.log('⚠️ 条目已被总结压缩，返回空记录（后续追加会重建基础结构）');
+        return {};
+      }
+
       // 按行分割内容
-      const lines = content.split('\n');
+      const lines = parsedContent.split('\n');
       let currentContinent = '';
       let currentRegion = '';
 

@@ -12,6 +12,8 @@ export interface MessageSendOptions {
   userInput: string;
   onSuccess?: (response: string) => void;
   onError?: (error: Error) => void;
+  enableStream?: boolean; // 是否启用流式传输
+  onStreamUpdate?: (text: string) => void; // 流式传输更新回调
 }
 
 // 消息格式化选项

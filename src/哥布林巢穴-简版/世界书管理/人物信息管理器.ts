@@ -1,4 +1,5 @@
 import type { Character } from '../人物管理/类型/人物类型';
+import { toast } from '../服务/弹窗提示服务';
 import { TimeParseService } from '../服务/时间解析服务';
 import { WorldbookHelper } from './世界书助手';
 import type { UnlockStatus, WorldbookEntry } from './世界书类型定义';
@@ -29,7 +30,7 @@ export class CharacterWorldbookManager {
       console.log(`已将人物 ${character.name} 添加到世界书: ${worldbookName}`);
       return worldbookName;
     } catch (error) {
-      toastr.error(`创建人物世界书失败: ${error}`);
+      toast.error(`创建人物世界书失败: ${error}`);
       throw error;
     }
   }
@@ -73,12 +74,12 @@ export class CharacterWorldbookManager {
         };
 
         await WorldbookHelper.replace(worldbookName, worldbook);
-        toastr.success(`已更新人物 ${character.name} 的世界书条目`);
+        toast.success(`已更新人物 ${character.name} 的世界书条目`);
       } else {
-        toastr.warning(`未找到人物 ${character.name} 的世界书条目`);
+        toast.warning(`未找到人物 ${character.name} 的世界书条目`);
       }
     } catch (error) {
-      toastr.error(`更新人物世界书条目失败: ${error}`);
+      toast.error(`更新人物世界书条目失败: ${error}`);
       throw error;
     }
   }
@@ -91,9 +92,9 @@ export class CharacterWorldbookManager {
       const worldbook = await WorldbookHelper.get(worldbookName);
       const filteredWorldbook = worldbook.filter(entry => entry.extra?.character_id !== characterId);
       await WorldbookHelper.replace(worldbookName, filteredWorldbook);
-      toastr.success('已删除人物世界书条目');
+      toast.success('已删除人物世界书条目');
     } catch (error) {
-      toastr.error(`删除人物世界书条目失败: ${error}`);
+      toast.error(`删除人物世界书条目失败: ${error}`);
       throw error;
     }
   }

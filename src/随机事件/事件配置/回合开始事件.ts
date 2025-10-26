@@ -1,3 +1,5 @@
+import { generateWithChainOfThought } from '../../哥布林巢穴-简版/世界书管理/AI生成助手';
+import { ChainOfThoughtMode } from '../../哥布林巢穴-简版/世界书管理/思维链管理器';
 import { EventRarity, EventType, RandomEvent } from '../类型定义/事件类型';
 
 // 回合开始随机事件配置
@@ -35,10 +37,23 @@ export const roundStartEvents: RandomEvent[] = [
 4. 保持神秘和紧张的氛围
 5. 字数控制在400字左右
 6. 以**特拉希尔世界传闻录**为开头
+
+重要人物参考（如相关）：
+- 海岚·奥古斯塔·赛菲亚 - 赛菲亚女帝
+- 维多利亚·冯·铁盾 - 卡斯提亚堡领主
+- 奥罗拉·德·星辉 - 维拉诺瓦城城主
+- 维奥莱塔·德·翡翠 - 翡翠王国女王
+- 塞拉菲娜·冯·劳伦丝 - 白玫瑰骑士团长
+- 塞勒涅·月光 - 月光女王
+- 露娜瑞尔·星歌 - 卡拉森林守护者
+- 萨拉德拉·暗影 - 暗影贤者
+- 莫尔德拉·血影 - 血港总督
+- 樱·红叶 - 九尾神巫女
+- 枫·香草 - 红叶商盟会长
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -96,11 +111,16 @@ export const roundStartEvents: RandomEvent[] = [
         请作为中立的叙述者，描述哥布林巢穴首次抵达赛菲亚大陆的历史性时刻。
 
 指导原则：
-1. 参考世界书中的赛菲亚帝国设定，包括女帝海岚·赛菲亚、奥雷利安皇都、封建贵族体系等
+1. 参考世界书中的赛菲亚帝国设定
 2. 描述这是哥布林巢穴首次踏足帝国土地的历史性时刻
 3. 体现帝国的强大和威严，以及他们对这个新威胁的初步反应
 4. 语言要庄重史诗，符合历史性时刻的氛围
 5. 字数控制在600字左右
+
+重要人物：
+- 海岚·奥古斯塔·赛菲亚 - 赛菲亚女帝
+- 维多利亚·冯·铁盾 - 卡斯提亚堡领主
+- 奥罗拉·德·星辉 - 维拉诺瓦城城主
 
 可能的内容方向：
 - 哥布林巢穴抵达的具体场景
@@ -111,7 +131,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -160,11 +180,15 @@ export const roundStartEvents: RandomEvent[] = [
         请作为中立的叙述者，描述哥布林巢穴首次抵达世界树圣域的历史性时刻。
 
 指导原则：
-1. 参考世界书中的永恒精灵设定，包括树灵议会、月光女王艾瑟莉娅、世界树结界等
+1. 参考世界书中的永恒精灵设定
 2. 描述这是哥布林巢穴首次踏足精灵圣域的历史性时刻
 3. 体现精灵的古老智慧和神秘感，以及他们对这个新威胁的初步反应
 4. 语言要神秘庄重，符合精灵圣域的氛围
 5. 字数控制在600字左右
+
+重要人物：
+- 塞勒涅·月光 - 月光女王
+- 露娜瑞尔·星歌 - 卡拉森林守护者
 
 可能的内容方向：
 - 哥布林巢穴抵达的具体场景
@@ -175,7 +199,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -224,22 +248,26 @@ export const roundStartEvents: RandomEvent[] = [
         请作为中立的叙述者，描述哥布林巢穴首次抵达瓦尔基里大陆的历史性时刻。
 
 指导原则：
-1. 参考世界书中的暗影密会设定，包括暗影贤者埃雷博斯、黑暗巢都、奴隶制经济等
+1. 参考世界书中的暗影密会设定
 2. 描述这是哥布林巢穴首次踏足黑暗精灵领土的历史性时刻
 3. 体现黑暗精灵的冷酷和邪恶，以及他们对这个新威胁的初步反应
 4. 语言要冷酷神秘，符合黑暗精灵的邪恶气质
 5. 字数控制在600字左右
 
+重要人物：
+- 萨拉德拉·暗影 - 暗影贤者
+- 莫尔德拉·血影 - 血港总督
+
 可能的内容方向：
 - 哥布林巢穴抵达的具体场景
 - 黑暗巢都的感知和反应
-- 暗影贤者埃雷博斯的初步评估
+- 暗影贤者的初步评估
 - 黑暗精灵守卫者的发现和报告
 - 这个历史性时刻的意义
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -288,11 +316,15 @@ export const roundStartEvents: RandomEvent[] = [
         请作为中立的叙述者，描述哥布林巢穴首次抵达香草群岛的历史性时刻。
 
 指导原则：
-1. 参考世界书中的狐族设定，包括九尾神社、红叶商盟、幻月城、红枫港等
+1. 参考世界书中的狐族设定
 2. 描述这是哥布林巢穴首次踏足狐族领土的历史性时刻
 3. 体现狐族的和平理念和商业智慧，以及他们对这个新威胁的初步反应
 4. 语言要优雅神秘，符合狐族的高贵气质
 5. 字数控制在600字左右
+
+重要人物：
+- 樱·红叶 - 九尾神巫女
+- 枫·香草 - 红叶商盟会长
 
 可能的内容方向：
 - 哥布林巢穴抵达的具体场景
@@ -303,7 +335,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -352,11 +384,16 @@ export const roundStartEvents: RandomEvent[] = [
         请作为中立的叙述者，描述赛菲亚帝国对哥布林巢穴威胁的官方反应。
 
 指导原则：
-1. 参考世界书中的赛菲亚帝国设定，包括女帝海岚·赛菲亚、奥雷利安皇都、封建贵族体系等
+1. 参考世界书中的赛菲亚帝国设定
 2. 结合巢穴当前的征服记录和威胁度，描述帝国的具体应对措施
 3. 体现帝国的强大实力和复杂政治体系
 4. 语言要符合中世纪奇幻风格，体现帝国的威严和效率
 5. 字数控制在500字左右
+
+重要人物：
+- 海岚·奥古斯塔·赛菲亚 - 赛菲亚女帝
+- 维多利亚·冯·铁盾 - 卡斯提亚堡领主
+- 奥罗拉·德·星辉 - 维拉诺瓦城城主
 
 可能的内容方向：
 - 女帝的官方声明或宫廷会议
@@ -366,7 +403,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -419,11 +456,15 @@ export const roundStartEvents: RandomEvent[] = [
         请作为中立的叙述者，描述永恒精灵树灵议会对哥布林巢穴威胁的讨论。
 
 指导原则：
-1. 参考世界书中的永恒精灵设定，包括树灵议会、月光女王艾瑟莉娅、世界树结界等
+1. 参考世界书中的永恒精灵设定，包括树灵议会、月光女王塞勒涅·月光、卡拉森林守护者露娜瑞尔·星歌、世界树结界等
 2. 体现精灵的古老智慧和神秘感，以及他们对世界树圣域的保护责任
 3. 结合巢穴威胁度，描述精灵们的不同观点和应对策略
 4. 语言要优雅神秘，符合精灵的高贵气质
 5. 字数控制在500字左右
+
+重要人物：
+- 塞勒涅·月光 - 月光女王
+- 露娜瑞尔·星歌 - 卡拉森林守护者
 
 可能的内容方向：
 - 树灵长老的不同观点
@@ -434,7 +475,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -487,11 +528,15 @@ export const roundStartEvents: RandomEvent[] = [
         请作为中立的叙述者，描述暗影密会对哥布林巢穴威胁的评估和讨论。
 
 指导原则：
-1. 参考世界书中的暗影密会设定，包括暗影贤者埃雷博斯、黑暗巢都、奴隶制经济等
+1. 参考世界书中的暗影密会设定，包括暗影贤者萨拉德拉·暗影、血港总督莫尔德拉·血影、黑暗巢都、奴隶制经济等
 2. 体现黑暗精灵的冷酷和实用主义，以及他们对奴隶制的依赖
 3. 结合巢穴威胁度，描述暗影密会的不同观点和应对策略
 4. 语言要冷酷神秘，符合黑暗精灵的邪恶气质
 5. 字数控制在500字左右
+
+重要人物：
+- 萨拉德拉·暗影 - 暗影贤者
+- 莫尔德拉·血影 - 血港总督
 
 可能的内容方向：
 - 暗影贤者的个人观点
@@ -502,7 +547,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -555,11 +600,14 @@ export const roundStartEvents: RandomEvent[] = [
         请作为中立的叙述者，描述九尾神社对哥布林巢穴威胁的和平回应。
 
 指导原则：
-1. 参考世界书中的九尾神社设定，包括九尾神巫女、幻月城、九尾神教等
+1. 参考世界书中的九尾神社设定，包括九尾神巫女樱·红叶、幻月城、九尾神教等
 2. 体现狐族的和平理念和神秘感，以及他们对世界和平的责任感
 3. 结合巢穴威胁度，描述神巫女的担忧和应对策略
 4. 语言要优雅神秘，符合狐族的高贵气质
 5. 字数控制在500字左右
+
+重要人物：
+- 樱·红叶 - 九尾神巫女
 
 可能的内容方向：
 - 九尾神巫女的和平呼吁
@@ -570,7 +618,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -623,11 +671,14 @@ export const roundStartEvents: RandomEvent[] = [
         请作为中立的叙述者，描述红叶商盟对哥布林巢穴威胁的商业评估。
 
 指导原则：
-1. 参考世界书中的红叶商盟设定，包括商业联合会、红枫港、航运网络等
+1. 参考世界书中的红叶商盟设定，包括红叶商盟会长枫·香草、商业联合会、红枫港、航运网络等
 2. 体现商人的实用主义和利益导向，以及他们对贸易网络的保护
 3. 结合巢穴威胁度，描述商盟的应对措施和商业策略
 4. 语言要现实具体，符合商人的精明气质
 5. 字数控制在500字左右
+
+重要人物：
+- 枫·香草 - 红叶商盟会长
 
 可能的内容方向：
 - 商路中断的具体影响
@@ -638,7 +689,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -704,7 +755,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;
@@ -770,7 +821,7 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
-          const response = await window.TavernHelper.generate({
+          const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
           });
           return response;

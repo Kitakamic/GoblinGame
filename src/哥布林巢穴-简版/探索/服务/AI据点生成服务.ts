@@ -1,3 +1,5 @@
+import { generateWithChainOfThought } from '../../世界书管理/AI生成助手';
+import { ChainOfThoughtMode } from '../../世界书管理/思维链管理器';
 import type { Location, LocationType } from '../类型/探索类型';
 import { LocationParser } from './AI据点解析服务';
 import { continentExploreService } from './大陆探索服务';
@@ -336,8 +338,8 @@ export class AILocationGenerationService {
 
       finalPrompt += customInstruction || '';
 
-      // 直接调用酒馆助手的生成接口
-      const aiResponse = await window.TavernHelper.generate({
+      // 使用带思维链的AI生成（自动切换到据点生成思维链）
+      const aiResponse = await generateWithChainOfThought(ChainOfThoughtMode.LOCATION_GENERATION, {
         user_input: finalPrompt,
       });
 

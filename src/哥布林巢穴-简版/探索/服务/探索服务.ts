@@ -1,4 +1,6 @@
 import { ref, watch } from 'vue';
+import { generateWithChainOfThought } from '../../世界书管理/AI生成助手';
+import { ChainOfThoughtMode } from '../../世界书管理/思维链管理器';
 import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import { INITIAL_LOCATIONS } from '../../存档管理/模块化存档类型';
 import type { EnemyUnit, ExploreState, Location, ScoutResult } from '../类型/探索类型';
@@ -261,8 +263,8 @@ export class ExploreService {
 
           console.log('AI英雄生成提示词:', heroPrompt);
 
-          // 调用AI生成英雄
-          const aiResponse = await window.TavernHelper.generate({
+          // 使用带思维链的AI生成（人物生成模式）
+          const aiResponse = await generateWithChainOfThought(ChainOfThoughtMode.CHARACTER_GENERATION, {
             user_input: heroPrompt,
           });
 

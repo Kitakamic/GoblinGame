@@ -209,6 +209,7 @@ interface DialogueConfig {
   morale?: number; // 士气值
   characterName?: string; // AI角色名称
   showCustomInput?: boolean; // 是否显示自定义输入区域
+  onRetry?: () => Promise<void> | void; // 重试前的回调，用于恢复状态（如士气值）
 }
 
 // 对话选项接口
@@ -241,6 +242,9 @@ const isSending = ref(false);
 
 // 重试状态
 const showRetryButton = ref(false);
+
+// 当前流式传输的页面索引（用于重试时删除）
+const currentStreamingPageIndex = ref(-1);
 
 // 暂存当前对话对，不立即保存到世界书
 const currentDialoguePair = ref<{
@@ -460,17 +464,68 @@ const generateAndHandleAIReply = async () => {
       // 使用自定义AI生成函数
       aiResponse = await props.dialogueConfig.onAIGenerate(buildUserPrompt());
     } else {
-      // 使用默认AI生成
-      const response = await window.TavernHelper.generate({
-        user_input: buildUserPrompt(),
-      });
-      aiResponse = response;
+      // 流式传输相关变量
+      currentStreamingPageIndex.value = -1;
+
+      // 监听流式传输事件
+      const handleStreamToken = (fullText: string) => {
+        // 应用酒馆正则处理
+        const formatted = formatAsTavernRegexedString(fullText, 'ai_output', 'display');
+
+        // 如果有临时页面，更新它；否则创建新页面
+        if (currentStreamingPageIndex.value >= 0) {
+          pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formatted);
+        } else {
+          currentStreamingPageIndex.value = pages.value.length;
+          pages.value.push({ html: safeFormatMessage(formatted) });
+          currentPageIndex.value = currentStreamingPageIndex.value;
+        }
+
+        // 滚动到底部
+        MessageService.scrollToBottom(dialogueContent.value);
+
+        // console.log('📝 流式传输更新:', formatted.substring(0, 50) + '...');
+      };
+
+      // 注册流式传输事件监听
+      eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+      try {
+        // 读取全局流式传输设置
+        const globalVars = getVariables({ type: 'global' });
+        const enableStreamOutput =
+          typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : true; // 默认开启
+
+        // 使用默认AI生成
+        const response = await window.TavernHelper.generate({
+          user_input: buildUserPrompt(),
+          should_stream: enableStreamOutput, // 根据设置启用流式传输
+        });
+        aiResponse = response;
+
+        // 移除事件监听
+        eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+        // 注意：保留 currentStreamingPageIndex，在生成完成后检查是否需更新页面
+      } catch (error) {
+        // 移除事件监听
+        eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+        // 生成失败时删除流式创建的页面并重置索引
+        if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
+          pages.value.splice(currentStreamingPageIndex.value, 1);
+        }
+        currentStreamingPageIndex.value = -1;
+
+        throw error;
+      }
     }
 
     // 检查AI回复是否为空或无效
     if (!aiResponse || aiResponse.trim().length === 0) {
       console.warn('⚠️ AI回复为空，跳过处理');
-      toastr.warning('AI回复为空，请重试');
+      const { toast } = await import('../哥布林巢穴-简版/服务/弹窗提示服务');
+      toast.warning('AI回复为空，请重试');
 
       // AI回复为空时，显示重试按钮而不是清空用户输入
       if (lastUserInput.value) {
@@ -505,10 +560,23 @@ const generateAndHandleAIReply = async () => {
     console.log('🎨 最终显示内容:', formattedResponse);
 
     addAIMessage(formattedResponse, 'AI');
-    pushAIPageWithoutScroll(formattedResponse);
 
-    // 自动切换到最新页
-    currentPageIndex.value = pages.value.length - 1;
+    // 如果流式传输已经创建了页面，就更新它；否则创建新页面
+    if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
+      // 更新流式传输创建的页面
+      pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formattedResponse);
+      currentPageIndex.value = currentStreamingPageIndex.value;
+      console.log('✅ 更新流式传输创建的页面:', currentStreamingPageIndex.value);
+    } else {
+      // 追加新书页
+      console.log('📄 创建新页面（非流式传输）');
+      pushAIPageWithoutScroll(formattedResponse);
+      // 自动切换到最新页
+      currentPageIndex.value = pages.value.length - 1;
+    }
+
+    // 重置流式页面索引（在更新/创建完成后）
+    currentStreamingPageIndex.value = -1;
 
     // AI回复成功后，暂存用户输入和AI回复，等待用户下一步操作时再保存到世界书
     if (isAISuccess && lastUserInput.value) {
@@ -530,7 +598,8 @@ const generateAndHandleAIReply = async () => {
     }
   } catch (error) {
     console.error('AI生成失败:', error);
-    toastr.error('AI生成失败');
+    const { toast } = await import('../哥布林巢穴-简版/服务/弹窗提示服务');
+    toast.error('AI生成失败');
 
     // AI生成失败时，显示重试按钮而不是清空用户输入
     if (lastUserInput.value) {
@@ -636,9 +705,20 @@ const retryAIGeneration = async () => {
   // 清除暂存的AI回复
   currentDialoguePair.value = null;
 
-  // 删除当前页面的AI回复显示
-  if (pages.value.length > 0 && currentPageIndex.value < pages.value.length) {
-    console.log('🗑️ 删除当前页面的AI回复显示');
+  // 删除流式传输创建的页面
+  if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
+    console.log('🗑️ 删除流式传输创建的页面:', currentStreamingPageIndex.value);
+    pages.value.splice(currentStreamingPageIndex.value, 1);
+
+    // 调整当前页面索引
+    if (currentPageIndex.value >= pages.value.length) {
+      currentPageIndex.value = Math.max(0, pages.value.length - 1);
+    }
+  }
+
+  // 如果没有流式传输页面，尝试删除当前页面（向后兼容）
+  else if (pages.value.length > 0 && currentPageIndex.value < pages.value.length) {
+    console.log('🗑️ 删除当前页面的AI回复显示（向后兼容）');
     pages.value.splice(currentPageIndex.value, 1);
     // 调整页面索引
     if (currentPageIndex.value >= pages.value.length) {
@@ -646,10 +726,23 @@ const retryAIGeneration = async () => {
     }
   }
 
+  // 重置流式页面索引
+  currentStreamingPageIndex.value = -1;
+
   // 删除最后一条AI消息
   const lastAIIndex = messages.value.findLastIndex(msg => msg.role === 'assistant');
   if (lastAIIndex >= 0) {
     messages.value.splice(lastAIIndex, 1);
+  }
+
+  // 调用重试前的回调，用于恢复状态（如士气值）
+  if (props.dialogueConfig.onRetry) {
+    console.log('🔄 调用重试前的回调，恢复状态');
+    try {
+      await props.dialogueConfig.onRetry();
+    } catch (error) {
+      console.error('重试回调执行失败:', error);
+    }
   }
 
   // 重新生成
@@ -685,8 +778,11 @@ const deleteConfirmState = ref({
 
 const saveEdit = () => {
   if (editingMessageIndex.value >= 0 && editingMessageIndex.value < pages.value.length) {
-    // 直接更新页面内容
-    pages.value[editingMessageIndex.value].html = editingContent.value;
+    // 将纯文本转换回 HTML 格式
+    const htmlContent = convertTextToHtml(editingContent.value);
+
+    // 更新页面内容
+    pages.value[editingMessageIndex.value].html = htmlContent;
 
     // 消息已通过回调实时保存，不需要批量保存
     editingMessageIndex.value = -1;
@@ -702,10 +798,12 @@ const cancelEdit = () => {
 // 编辑当前页消息
 const editCurrentPageMessage = () => {
   if (currentPageIndex.value >= 0 && currentPageIndex.value < pages.value.length) {
-    // 直接编辑当前页面的内容
+    // 获取当前页面的内容
     const currentPage = pages.value[currentPageIndex.value];
     editingMessageIndex.value = currentPageIndex.value;
-    editingContent.value = currentPage.html;
+
+    // 从 HTML 中提取纯文本，显示给用户编辑
+    editingContent.value = extractTextFromHtml(currentPage.html);
   }
 };
 
@@ -752,9 +850,47 @@ const removeJsonFromResponse = (response: string): string => {
 const safeFormatMessage = (content: string) => {
   return MessageService.formatMessage(content, { enableMarkdown: true, enableCodeHighlight: true, enableQuote: true });
 };
+
+// 从 HTML 中提取纯文本（用于编辑时显示）
+const extractTextFromHtml = (html: string): string => {
+  // 先将 <br> 标签转换为临时标记，避免被 textContent 移除
+  const processedHtml = html
+    .replace(/<br\s*\/?>/gi, '__BR__') // 将 <br> 转换为临时标记
+    .replace(/<\/p>/gi, '__BR__') // 将 </p> 也转换为换行
+    .replace(/<\/div>/gi, '__BR__'); // 将 </div> 也转换为换行
+
+  // 创建一个临时 div 来解析 HTML
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = processedHtml;
+
+  // 获取纯文本
+  let text = tempDiv.textContent || tempDiv.innerText || '';
+
+  // 将临时标记转换为换行符
+  text = text.replace(/__BR__/g, '\n');
+
+  // 移除多余的连续换行（保留空行，但限制最大连续换行数）
+  text = text.replace(/\n{3,}/g, '\n\n');
+
+  return text.trim();
+};
+
+// 将纯文本转换为 HTML（保存时使用）
+const convertTextToHtml = (text: string): string => {
+  // 转义特殊字符
+  let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // 将换行符转换为 <br>
+  html = html.replace(/\n/g, '<br>');
+
+  // 使用 MessageService 格式化（支持引号、粗体等）
+  return MessageService.formatMessage(html, { enableMarkdown: false, enableCodeHighlight: false, enableQuote: true });
+};
 </script>
 
 <style lang="scss">
+@use '../哥布林巢穴-简版/样式/对话样式变量.scss' as *;
+
 /* 通用对话界面样式 - 基于调教界面设计但移除调教特有功能 */
 .generic-dialogue-container {
   position: fixed;
@@ -999,53 +1135,16 @@ const safeFormatMessage = (content: string) => {
 }
 
 .page-content.typo-book {
-  color: #f7efd9;
-  font-family: 'Georgia', 'Times New Roman', serif;
-  font-size: 18px;
-  line-height: 1.85;
-  letter-spacing: 0.3px;
-  text-rendering: optimizeLegibility;
-
-  @media (max-width: 768px) {
-    font-size: 16px;
-    line-height: 1.75;
-    letter-spacing: 0.2px;
-  }
-
-  p {
-    text-indent: 2em;
-    margin: 0 0 12px 0;
-    position: relative;
-    padding-bottom: 8px;
-    border-bottom: 1px dashed rgba(205, 133, 63, 0.15);
-  }
-
-  em,
-  .italic-text {
-    text-decoration: underline dotted rgba(255, 215, 161, 0.5);
-    text-underline-offset: 2px;
-  }
-
-  .strong-text {
-    text-decoration: underline solid rgba(255, 215, 161, 0.35);
-    text-underline-offset: 3px;
-  }
-
-  .quote {
-    border-left-color: rgba(255, 215, 161, 0.45);
-    background: rgba(255, 215, 161, 0.08);
-  }
+  @include typo-book;
 }
 
 .choice-line {
   margin-top: 8px;
-  color: #ffd7a1;
   font-weight: 600;
-}
 
-.choice-prefix {
-  color: #ffbd7a;
-  margin-right: 6px;
+  .choice-prefix {
+    margin-right: 6px;
+  }
 }
 
 /* 初始空白状态样式 */

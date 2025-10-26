@@ -106,7 +106,7 @@ export class MessageService {
    * @returns Promise<Message> AI回复消息
    */
   static async sendMessage(options: MessageSendOptions): Promise<Message> {
-    const { userInput, onSuccess, onError } = options;
+    const { userInput, onSuccess, onError, enableStream, onStreamUpdate } = options;
 
     try {
       // 创建玩家消息
@@ -117,10 +117,45 @@ export class MessageService {
         },
       ]);
 
-      // 调用AI生成
-      const response = await window.TavernHelper.generate({
-        user_input: userInput,
-      });
+      let response = '';
+
+      // 如果启用流式传输
+      if (enableStream && onStreamUpdate) {
+        console.log('🌊 启用流式传输');
+
+        // 监听流式传输事件
+        const handleStreamToken = (text: string) => {
+          console.log('📝 流式传输更新:', text);
+          // 先应用酒馆正则处理
+          const regexResponse = formatAsTavernRegexedString(text, 'ai_output', 'display');
+          onStreamUpdate(regexResponse);
+        };
+
+        // 监听完整文本
+        eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+        try {
+          // 启用流式传输的生成
+          const finalResponse = await window.TavernHelper.generate({
+            user_input: userInput,
+            should_stream: true,
+          });
+
+          response = finalResponse;
+
+          // 移除事件监听
+          eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+        } catch (error) {
+          // 移除事件监听
+          eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+          throw error;
+        }
+      } else {
+        // 普通对话不需要思维链约束，直接调用AI
+        response = await window.TavernHelper.generate({
+          user_input: userInput,
+        });
+      }
 
       // 格式化AI回复
       console.log('🧹 原始AI回复:', response);

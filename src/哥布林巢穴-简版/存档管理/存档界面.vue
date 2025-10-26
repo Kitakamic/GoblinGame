@@ -88,8 +88,8 @@
 </template>
 
 <script setup lang="ts">
-import toastr from 'toastr';
 import { onMounted, ref, watch } from 'vue';
+import { toast } from '../服务/弹窗提示服务';
 import { modularSaveManager } from './模块化存档服务';
 import type { BaseResources, ModularSaveSlot } from './模块化存档类型';
 
@@ -249,7 +249,7 @@ const exportSingleSave = async (slot: number) => {
 
     const saveData = await modularSaveManager.exportSave(slot);
     if (!saveData) {
-      toastr.error('导出存档失败');
+      toast.error('导出存档失败');
       return;
     }
 
@@ -264,10 +264,10 @@ const exportSingleSave = async (slot: number) => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    toastr.success('存档导出成功');
+    toast.success('存档导出成功');
   } catch (error) {
     console.error('导出存档失败:', error);
-    toastr.error('导出存档失败');
+    toast.error('导出存档失败');
   }
 };
 
@@ -301,7 +301,7 @@ const exportAllSaves = async () => {
     }
 
     if (saveDataList.length === 0) {
-      toastr.warning('没有可导出的存档');
+      toast.warning('没有可导出的存档');
       return;
     }
 
@@ -323,10 +323,10 @@ const exportAllSaves = async () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    toastr.success(`成功导出 ${saveDataList.length} 个存档`);
+    toast.success(`成功导出 ${saveDataList.length} 个存档`);
   } catch (error) {
     console.error('导出所有存档失败:', error);
-    toastr.error('导出存档失败');
+    toast.error('导出存档失败');
   }
 };
 
@@ -390,7 +390,7 @@ const handleImportFile = async (event: Event) => {
           }
         }
       }
-      toastr.success(`成功导入 ${successCount} 个存档`);
+      toast.success(`成功导入 ${successCount} 个存档`);
     } else {
       // 单存档导入 - 需要选择槽位
       const slotNumber = prompt('请输入要导入到哪个槽位（0-5）：');
@@ -399,16 +399,16 @@ const handleImportFile = async (event: Event) => {
       }
       const slot = parseInt(slotNumber);
       if (isNaN(slot) || slot < 0 || slot > 5) {
-        toastr.error('无效的槽位号');
+        toast.error('无效的槽位号');
         return;
       }
 
       const success = await modularSaveManager.importSave(slot, fileContent, '导入的存档');
       if (success) {
-        toastr.success('存档导入成功');
+        toast.success('存档导入成功');
         await loadSaveSlots();
       } else {
-        toastr.error('存档导入失败');
+        toast.error('存档导入失败');
       }
     }
 
@@ -421,7 +421,7 @@ const handleImportFile = async (event: Event) => {
     }
   } catch (error) {
     console.error('导入存档失败:', error);
-    toastr.error('导入存档失败：文件格式错误');
+    toast.error('导入存档失败：文件格式错误');
   }
 };
 </script>
