@@ -1103,6 +1103,34 @@ const convertTextToHtml = (text: string): string => {
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 200, 150, 0.1);
+
+  /* 自定义滚动条样式 */
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 5px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, rgba(205, 133, 63, 0.6), rgba(139, 90, 43, 0.5));
+    border-radius: 5px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+
+    &:hover {
+      background: linear-gradient(135deg, rgba(205, 133, 63, 0.8), rgba(139, 90, 43, 0.7));
+    }
+
+    &:active {
+      background: linear-gradient(135deg, rgba(255, 180, 100, 0.9), rgba(205, 133, 63, 0.8));
+    }
+  }
+
+  /* Firefox 滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(205, 133, 63, 0.6) rgba(0, 0, 0, 0.3);
 }
 
 .page {

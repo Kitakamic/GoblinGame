@@ -310,10 +310,18 @@ export class MixedTroopGenerationService {
         分配数量: specialTroopCount,
       });
 
-      const specialLevel = this.getUnitLevelForDifficulty(difficulty) + 2; // 特殊单位等级更高
+      // 特殊单位等级不超过据点的最大等级，但比其他单位稍高
+      const maxLevel = this.getUnitLevelForDifficulty(difficulty);
+      const specialLevel = Math.min(maxLevel, maxLevel - 1 + Math.floor(maxLevel / 2)); // 特殊单位等级稍高
 
       // 为特殊单位分配随机肖像（如果没有指定头像）
       const specialUnitAvatar = specialUnit.avatar || this.getRandomPortraitFromLibrary(specialUnit.race);
+
+      console.log(`[混合部队生成] 特殊单位等级:`, {
+        据点难度: difficulty,
+        据点最大等级: maxLevel,
+        特殊单位等级: specialLevel,
+      });
 
       composition.push({
         name: specialUnit.name,
@@ -451,18 +459,62 @@ export class MixedTroopGenerationService {
 
   /**
    * 根据难度过滤单位
+   * 确保只返回符合据点难度范围的单位
    */
   private static filterUnitsByDifficulty(units: Character[], difficulty: number): Character[] {
     const maxLevel = this.getUnitLevelForDifficulty(difficulty);
-    return units.filter(unit => unit.level <= maxLevel);
+    const minLevel = this.getMinUnitLevelForDifficulty(difficulty);
+
+    console.log(`[混合部队生成] 单位过滤:`, {
+      据点难度: difficulty,
+      最小等级: minLevel,
+      最大等级: maxLevel,
+      过滤前单位数: units.length,
+    });
+
+    const filtered = units.filter(unit => unit.level >= minLevel && unit.level <= maxLevel);
+
+    console.log(`[混合部队生成] 过滤后单位数:`, {
+      过滤后单位数: filtered.length,
+      单位详情: filtered.map(u => ({ name: u.name, level: u.level })),
+    });
+
+    return filtered;
   }
 
   /**
-   * 获取难度对应的单位等级
+   * 获取难度对应的单位等级上限
+   * 据点的部队等级不应该超过据点的难度等级
+   * @param difficulty 据点难度（1-10星）
+   * @returns 该难度允许的最大单位等级（等于据点难度）
    */
   private static getUnitLevelForDifficulty(difficulty: number): number {
-    // 根据星级计算等级：1星=3级，10星=9级
-    return Math.min(9, Math.max(3, 2 + difficulty));
+    // 据点难度就是据点等级，部队等级不应超过据点等级
+    // 1星据点 → 最多1级单位
+    // 2星据点 → 最多2级单位
+    // ...
+    // 10星据点 → 最多10级单位
+    return difficulty;
+  }
+
+  /**
+   * 获取难度的最小单位等级
+   * 确保低级据点不会全是1级单位，高级据点不会出现太多低级单位
+   */
+  private static getMinUnitLevelForDifficulty(difficulty: number): number {
+    // 据点等级越高，最小单位等级也越高
+    // 这样确保高级据点不会出现太多低级单位
+    if (difficulty <= 2) {
+      return 1; // 1-2星：可以是1级
+    } else if (difficulty <= 4) {
+      return difficulty - 2; // 3-4星：至少1级或2级
+    } else if (difficulty <= 6) {
+      return difficulty - 2; // 5-6星：至少3级或4级
+    } else if (difficulty <= 8) {
+      return difficulty - 3; // 7-8星：至少4级或5级
+    } else {
+      return difficulty - 4; // 9-10星：至少5级或6级
+    }
   }
 
   /**
@@ -653,16 +705,24 @@ export class MixedTroopGenerationService {
 
   /**
    * 根据等级判断兵种定位
+   * 兵种定位划分：
+   * - 1级：民兵（平民、村民等）
+   * - 2-4级：基础兵种（守卫、战士、弓箭手等）
+   * - 5-7级：精英兵种（法师、骑士、祭司等）
+   * - 8-9级：禁卫兵种（圣骑士、天使等）
+   * - 10级：传说兵种（恶魔领主等）
    */
   private static getUnitTierByLevel(level: number): string {
     if (level === 1) {
       return '民兵';
     } else if (level >= 2 && level <= 4) {
       return '基础';
-    } else if (level >= 5 && level <= 8) {
+    } else if (level >= 5 && level <= 7) {
       return '精英';
-    } else if (level >= 9 && level <= 10) {
+    } else if (level >= 8 && level <= 9) {
       return '禁卫';
+    } else if (level >= 10) {
+      return '传说';
     } else {
       return '未知';
     }
