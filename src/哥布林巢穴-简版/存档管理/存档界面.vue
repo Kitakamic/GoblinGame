@@ -7,6 +7,19 @@
         <button class="close-btn" @click="closeModal">×</button>
       </div>
 
+      <!-- 导出导入按钮 -->
+      <div class="import-export-buttons">
+        <button class="action-btn export-action" @click="exportAllSaves">
+          <span class="icon">📤</span>
+          <span class="text">导出所有存档</span>
+        </button>
+        <button class="action-btn import-action" @click="triggerImport">
+          <span class="icon">📥</span>
+          <span class="text">导入存档</span>
+        </button>
+        <input ref="fileInput" type="file" accept=".json" style="display: none" @change="handleImportFile" />
+      </div>
+
       <div class="save-slots">
         <div
           v-for="slot in saveSlots"
@@ -53,6 +66,10 @@
                 <span class="icon">💾</span>
                 <span class="text">保存</span>
               </button>
+              <button v-if="slot.timestamp > 0" class="action-btn export-action" @click="exportSingleSave(slot.slot)">
+                <span class="icon">📤</span>
+                <span class="text">导出</span>
+              </button>
             </div>
           </div>
 
@@ -71,6 +88,7 @@
 </template>
 
 <script setup lang="ts">
+import toastr from 'toastr';
 import { onMounted, ref, watch } from 'vue';
 import { modularSaveManager } from './模块化存档服务';
 import type { BaseResources, ModularSaveSlot } from './模块化存档类型';
@@ -119,6 +137,7 @@ const emit = defineEmits<{
 const showModal = ref(props.show);
 const saveSlots = ref<ModularSaveSlot[]>([]);
 const isInitialized = ref(false);
+const fileInput = ref<HTMLInputElement | null>(null);
 
 // 监听props变化
 watch(
@@ -219,6 +238,192 @@ const closeModal = () => {
   showModal.value = false;
   emit('close');
 };
+
+// 导出单个存档
+const exportSingleSave = async (slot: number) => {
+  try {
+    if (!isInitialized.value) {
+      await modularSaveManager.init();
+      isInitialized.value = true;
+    }
+
+    const saveData = await modularSaveManager.exportSave(slot);
+    if (!saveData) {
+      toastr.error('导出存档失败');
+      return;
+    }
+
+    // 创建 Blob 并下载
+    const blob = new Blob([saveData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `哥布林巢穴-存档${slot}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toastr.success('存档导出成功');
+  } catch (error) {
+    console.error('导出存档失败:', error);
+    toastr.error('导出存档失败');
+  }
+};
+
+// 导出所有存档
+const exportAllSaves = async () => {
+  try {
+    if (!isInitialized.value) {
+      await modularSaveManager.init();
+      isInitialized.value = true;
+    }
+
+    // 获取所有有存档的槽位
+    const allSlots = await modularSaveManager.getAllSlots();
+    const saveDataList: any[] = [];
+
+    for (const slot of allSlots) {
+      if (slot.timestamp > 0) {
+        const saveData = await modularSaveManager.exportSave(slot.slot);
+        if (saveData) {
+          const parsedData = JSON.parse(saveData);
+          saveDataList.push({
+            slot: slot.slot,
+            timestamp: slot.timestamp,
+            // 新格式已经包含 gameData 和 worldbookData
+            gameData: parsedData.gameData || parsedData,
+            worldbookData: parsedData.worldbookData || [],
+            metadata: parsedData.metadata || { slot: slot.slot, timestamp: slot.timestamp },
+          });
+        }
+      }
+    }
+
+    if (saveDataList.length === 0) {
+      toastr.warning('没有可导出的存档');
+      return;
+    }
+
+    // 创建包含所有存档的数据
+    const exportData = {
+      version: '1.0.0',
+      exportTime: new Date().toISOString(),
+      saves: saveDataList,
+    };
+
+    // 创建 Blob 并下载
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `哥布林巢穴-全部存档-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toastr.success(`成功导出 ${saveDataList.length} 个存档`);
+  } catch (error) {
+    console.error('导出所有存档失败:', error);
+    toastr.error('导出存档失败');
+  }
+};
+
+// 触发导入文件选择
+const triggerImport = () => {
+  if (fileInput.value) {
+    fileInput.value.click();
+  }
+};
+
+// 处理导入文件
+const handleImportFile = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) {
+    return;
+  }
+
+  try {
+    if (!isInitialized.value) {
+      await modularSaveManager.init();
+      isInitialized.value = true;
+    }
+
+    // 读取文件内容
+    const fileContent = await file.text();
+    const importData = JSON.parse(fileContent);
+
+    // 判断是否是单存档文件还是多存档文件
+    if (importData.saves && Array.isArray(importData.saves)) {
+      // 多存档导入
+      let successCount = 0;
+      for (const saveData of importData.saves) {
+        if (saveData.slot !== undefined) {
+          let saveDataString: string;
+
+          // 判断是新格式还是旧格式
+          if (saveData.gameData && saveData.worldbookData !== undefined) {
+            // 新格式：包含 gameData 和 worldbookData
+            saveDataString = JSON.stringify({
+              gameData: saveData.gameData,
+              worldbookData: saveData.worldbookData,
+              metadata: saveData.metadata,
+            });
+          } else if (saveData.data) {
+            // 旧格式：直接使用 data
+            saveDataString = JSON.stringify(saveData.data);
+          } else {
+            // 最旧格式：直接使用整个 saveData
+            saveDataString = JSON.stringify(saveData);
+          }
+
+          const success = await modularSaveManager.importSave(
+            saveData.slot,
+            saveDataString,
+            saveData.metadata?.saveName || `导入的存档 ${saveData.slot}`,
+          );
+          if (success) {
+            successCount++;
+          }
+        }
+      }
+      toastr.success(`成功导入 ${successCount} 个存档`);
+    } else {
+      // 单存档导入 - 需要选择槽位
+      const slotNumber = prompt('请输入要导入到哪个槽位（0-5）：');
+      if (slotNumber === null) {
+        return;
+      }
+      const slot = parseInt(slotNumber);
+      if (isNaN(slot) || slot < 0 || slot > 5) {
+        toastr.error('无效的槽位号');
+        return;
+      }
+
+      const success = await modularSaveManager.importSave(slot, fileContent, '导入的存档');
+      if (success) {
+        toastr.success('存档导入成功');
+        await loadSaveSlots();
+      } else {
+        toastr.error('存档导入失败');
+      }
+    }
+
+    // 刷新存档列表
+    await loadSaveSlots();
+
+    // 清空文件选择
+    if (target) {
+      target.value = '';
+    }
+  } catch (error) {
+    console.error('导入存档失败:', error);
+    toastr.error('导入存档失败：文件格式错误');
+  }
+};
 </script>
 
 <style lang="scss" scoped>
@@ -297,6 +502,19 @@ const closeModal = () => {
           background: rgba(255, 255, 255, 0.1);
           transform: scale(1.1);
         }
+      }
+    }
+
+    .import-export-buttons {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      justify-content: center;
+      flex-wrap: wrap;
+
+      .action-btn {
+        min-width: 140px;
+        font-size: 12px;
       }
     }
 
@@ -472,6 +690,28 @@ const closeModal = () => {
     &:hover {
       border-color: rgba(34, 197, 94, 0.6);
       background: linear-gradient(180deg, rgba(34, 197, 94, 0.2), rgba(35, 27, 24, 0.95));
+    }
+  }
+
+  &.export-action {
+    border-color: rgba(168, 85, 247, 0.4);
+    background: linear-gradient(180deg, rgba(168, 85, 247, 0.1), rgba(25, 17, 14, 0.9));
+    color: #a78bfa;
+
+    &:hover {
+      border-color: rgba(168, 85, 247, 0.6);
+      background: linear-gradient(180deg, rgba(168, 85, 247, 0.2), rgba(35, 27, 24, 0.95));
+    }
+  }
+
+  &.import-action {
+    border-color: rgba(59, 130, 246, 0.4);
+    background: linear-gradient(180deg, rgba(59, 130, 246, 0.1), rgba(25, 17, 14, 0.9));
+    color: #60a5fa;
+
+    &:hover {
+      border-color: rgba(59, 130, 246, 0.6);
+      background: linear-gradient(180deg, rgba(59, 130, 246, 0.2), rgba(35, 27, 24, 0.95));
     }
   }
 }

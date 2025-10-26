@@ -166,93 +166,6 @@ const BASE_TRAINING_CHARACTERS: Character[] = [
       description: '',
     },
   },
-  // 巢穴秘书官 - 猫娘
-  {
-    id: 'secretary_catgirl',
-    name: '小月',
-    title: '巢穴秘书官',
-    avatar: 'https://files.catbox.moe/catgirl_secretary.jpg',
-    corruptedAvatar: 'https://files.catbox.moe/catgirl_secretary_corrupted.jpg',
-    fullyCorruptedAvatar: 'https://files.catbox.moe/catgirl_secretary_fully_corrupted.jpg',
-    status: 'player',
-    canCombat: true,
-    unitType: 'magical',
-    loyalty: 100,
-    stamina: 100,
-    maxStamina: 100,
-    fertility: 85,
-    maxFertility: 85,
-    offspring: 0,
-    rating: 'A',
-    favorite: true,
-    level: 3,
-    attributes: {
-      attack: 25,
-      defense: 20,
-      intelligence: 45,
-      speed: 35,
-      health: 100,
-    },
-    race: '魔族',
-    age: 18,
-    country: '哥布林巢穴',
-    background: '平民',
-    sexExperience:
-      '小月从小被哥布林之王养大，身体还保持着纯洁，但内心对主人有着深深的依恋和爱慕。她经常在主人不注意时偷偷观察他，心跳加速。每当主人夸奖她时，她的猫耳会不自觉地抖动，尾巴也会开心地摇摆。她渴望能更亲近主人，但又害羞不敢主动表达。在夜深人静时，她会幻想与主人的亲密接触，虽然不知道具体该怎么做，但那种温暖的感觉让她沉醉。',
-    sensitivePoints: ['猫耳', '尾巴', '脖子'],
-    sensitivePointsDetail: [
-      {
-        part: '猫耳',
-        isSensitive: true,
-        description:
-          '小月的猫耳非常敏感，银白色的毛发柔软如丝，轻抚会让她发出可爱的呼噜声，抚摸根部会让她全身颤抖，发出娇羞的呻吟声。她的猫耳会根据情绪变化而摆动，紧张时会贴向脑后，开心时会竖立起来。',
-      },
-      {
-        part: '尾巴',
-        isSensitive: true,
-        description:
-          '蓬松的银白色尾巴根部是她的最敏感点，抚摸这里会让她瞬间失去抵抗力，发出可爱的猫叫声。她的尾巴会根据心情摆动，紧张时会夹在两腿之间，开心时会高高翘起。',
-      },
-      {
-        part: '脖子',
-        isSensitive: true,
-        description:
-          '脖子是猫娘最敏感的部位之一，轻咬或亲吻会让她瞬间瘫软，发出可爱的猫叫声。她的脖子修长白皙，有着淡淡的体香，是她的致命弱点。',
-      },
-    ],
-    lifeStory: {
-      childhood: [
-        '在寒冷的冬夜被遗弃在森林中，只有几个月大的小月蜷缩在树洞里瑟瑟发抖',
-        '被路过的哥布林之王发现并救下，用温暖的怀抱将她带回巢穴',
-        '在巢穴中得到了温暖和关爱，逐渐从恐惧中走出，开始信任这个救她的主人',
-      ],
-      adolescence: [
-        '逐渐展现出聪慧的天赋，学习能力极强，很快掌握了人类语言和基本礼仪',
-        '开始帮助哥布林之王处理巢穴事务，展现出卓越的管理才能',
-        '学会了各种魔法和战斗技巧，成为主人的得力助手，但内心对主人的感情也在悄然变化',
-      ],
-      adulthood: [
-        '成为了巢穴的秘书官，负责管理巢穴的日常事务，将一切打理得井井有条',
-        '对哥布林之王有着深厚的感情，这种感情早已超越了主仆关系',
-        '虽然身体还很纯洁，但内心渴望着与主人更亲密的接触',
-      ],
-      currentState: [
-        '全心全意地侍奉着哥布林之王，将巢穴管理得井井有条',
-        '期待着能为主人做更多的事情，渴望得到主人的认可和宠爱',
-        '在夜深人静时，会偷偷观察主人的睡颜，内心充满爱慕之情',
-      ],
-    },
-    personality: ['忠诚专一', '聪慧机敏', '温柔体贴', '勤奋努力', '娇羞可爱'],
-    fears: '害怕被主人抛弃，担心自己不够好而失去主人的宠爱',
-    secrets: '其实对哥布林之王有着超越主仆关系的感情，渴望成为主人的伴侣',
-    appearance: {
-      height: 155,
-      weight: 42,
-      measurements: 'B85/W58/H82',
-      description:
-        '一只可爱的猫娘，有着柔软的银白色猫耳和蓬松的尾巴。银白色的长发如瀑布般垂至腰间，碧绿色的眼睛如翡翠般清澈，身材娇小但比例完美。总是穿着整洁的黑色秘书装，白色衬衫，黑色短裙，显得既专业又可爱。她的肌肤白皙如雪，有着淡淡的体香，走起路来轻盈优雅，如猫般灵动。',
-    },
-  },
 ];
 
 // 初始调教数据
@@ -278,18 +191,6 @@ const BASE_LOCATIONS: Location[] = [
     region: '巢穴附近',
     race: '人类',
     baseGuards: 80,
-    specialUnit: {
-      name: '村庄守卫队长',
-      race: '人类',
-      unitType: 'physical' as const,
-      attributes: {
-        attack: 15,
-        defense: 20,
-        intelligence: 12,
-        speed: 18,
-        health: 120,
-      },
-    },
   },
   {
     id: 'merchant_camp',
@@ -307,7 +208,7 @@ const BASE_LOCATIONS: Location[] = [
     race: '人类',
     baseGuards: 200,
     specialUnit: {
-      name: '商队护卫队长',
+      name: '商队护卫',
       race: '人类',
       unitType: 'physical' as const,
       attributes: {
@@ -321,7 +222,7 @@ const BASE_LOCATIONS: Location[] = [
   },
   {
     id: 'abandoned_fort',
-    name: '暗影要塞',
+    name: '废弃要塞',
     type: 'ruins',
     icon: '🏰',
     description:
@@ -362,18 +263,6 @@ const BASE_LOCATIONS: Location[] = [
     region: '流放者之地',
     race: '人类',
     baseGuards: 150,
-    specialUnit: {
-      name: '流放者首领',
-      race: '人类',
-      unitType: 'physical' as const,
-      attributes: {
-        attack: 20,
-        defense: 18,
-        intelligence: 14,
-        speed: 16,
-        health: 130,
-      },
-    },
   },
 ] as const;
 

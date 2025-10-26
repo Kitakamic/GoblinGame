@@ -477,7 +477,7 @@ export class ModularSaveManager {
   }
 
   /**
-   * 导出存档数据
+   * 导出存档数据（包含世界书数据）
    */
   async exportSave(slot: number): Promise<string | null> {
     try {
@@ -486,7 +486,23 @@ export class ModularSaveManager {
         throw new Error(`槽位 ${slot} 没有存档`);
       }
 
-      return JSON.stringify(slotData.data, null, 2);
+      // 获取对应的世界书数据
+      const saveId = `slot_${slot}`;
+      const worldbookData = await databaseService.loadWorldbookData(saveId);
+
+      // 创建包含世界书数据的导出对象
+      const exportData = {
+        gameData: slotData.data,
+        worldbookData: worldbookData || [],
+        metadata: {
+          slot: slotData.slot,
+          timestamp: slotData.timestamp,
+          version: slotData.version,
+          exportTime: new Date().toISOString(),
+        },
+      };
+
+      return JSON.stringify(exportData, null, 2);
     } catch (error) {
       console.error('导出存档失败:', error);
       this.handleError(error as Error);
@@ -495,17 +511,51 @@ export class ModularSaveManager {
   }
 
   /**
-   * 导入存档数据
+   * 导入存档数据（包含世界书数据）
    */
   async importSave(slot: number, saveData: string, saveName?: string): Promise<boolean> {
     try {
-      const parsed: ModularGameData = JSON.parse(saveData);
+      const parsed = JSON.parse(saveData);
 
-      return await this.saveToSlot({
-        slot,
-        saveName,
-        gameData: parsed,
-      });
+      // 判断是否是新的导出格式（包含 worldbookData）
+      let gameData: ModularGameData;
+      let worldbookData: any[] = [];
+
+      if (parsed.gameData && parsed.worldbookData !== undefined) {
+        // 新格式：包含世界书数据
+        gameData = parsed.gameData;
+        worldbookData = parsed.worldbookData;
+      } else {
+        // 旧格式：只有游戏数据（向后兼容）
+        gameData = parsed;
+      }
+
+      // 保存游戏数据
+      const saveId = `slot_${slot}`;
+      await databaseService.saveGameData(saveId, gameData as any);
+      await databaseService.upsertSaveMeta(saveId, saveName ?? (slot === 0 ? '自动存档' : `槽位 ${slot}`));
+
+      // 如果有世界书数据，也保存
+      if (worldbookData && worldbookData.length > 0) {
+        await databaseService.saveWorldbookData(saveId, worldbookData);
+      } else {
+        // 如果没有世界书数据，清空世界书数据
+        await databaseService.saveWorldbookData(saveId, []);
+      }
+
+      // 设置当前存档ID
+      databaseService.setCurrentSaveId(saveId);
+
+      // 更新当前游戏数据
+      this.currentGameData = gameData;
+
+      // 触发保存事件
+      if (this.events.onSave) {
+        this.events.onSave(slot, gameData);
+      }
+
+      console.log(`存档已导入到槽位 ${slot}`);
+      return true;
     } catch (error) {
       console.error('导入存档失败:', error);
       this.handleError(error as Error);

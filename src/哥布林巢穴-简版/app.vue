@@ -5,10 +5,17 @@
       <div class="decorative-border">
         <div class="content-wrapper">
           <header class="header">
+            <div class="header-left">
+              <button class="help-btn" title="查看教程" @click="openTutorial">
+                <span class="icon">?</span>
+              </button>
+            </div>
             <h1 class="main-title">哥布林巢穴</h1>
-            <button class="fullscreen-btn" @click="toggleFullscreen">
-              <span class="icon">⛶</span>
-            </button>
+            <div class="header-right">
+              <button class="fullscreen-btn" title="全屏" @click="toggleFullscreen">
+                <span class="icon">⛶</span>
+              </button>
+            </div>
           </header>
 
           <!-- 统计信息 -->
@@ -237,6 +244,22 @@
       @event-triggered="handleRandomEventTriggered"
       @event-completed="handleRandomEventCompleted"
     />
+
+    <!-- 教程确认框 -->
+    <CustomConfirm
+      :show="showTutorialConfirm"
+      title="查看教程"
+      message="即将跳转到教程文档"
+      details="点击确认后将在新标签页打开教程文档。"
+      confirm-text="确认"
+      cancel-text="取消"
+      type="info"
+      :show-cancel="true"
+      :show-close="true"
+      @confirm="handleTutorialConfirm"
+      @cancel="handleTutorialCancel"
+      @close="handleTutorialCancel"
+    />
   </div>
 </template>
 
@@ -368,6 +391,29 @@ function toggleFullscreen() {
   } else {
     document.exitFullscreen();
   }
+}
+
+// 教程确认框状态
+const showTutorialConfirm = ref(false);
+
+// 打开教程（显示确认框）
+function openTutorial() {
+  showTutorialConfirm.value = true;
+}
+
+// 处理教程确认
+function handleTutorialConfirm() {
+  showTutorialConfirm.value = false;
+  // 打开谷歌文档链接
+  window.open(
+    'https://docs.google.com/document/d/1UV8hG4hgYfg6nyRHquQ36pz4-Fb8QCB3cxakLXXbRss/edit?tab=t.0#heading=h.1scl3yr0eg9',
+    '_blank',
+  );
+}
+
+// 处理教程取消
+function handleTutorialCancel() {
+  showTutorialConfirm.value = false;
 }
 
 // 游戏状态管理
@@ -1297,11 +1343,18 @@ onUnmounted(() => {
 /* 标题样式 */
 .header {
   position: relative;
-  text-align: center;
   margin-bottom: 24px;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
+  gap: 12px;
+
+  .header-left,
+  .header-right {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+  }
 
   .main-title {
     margin: 0;
@@ -1313,6 +1366,8 @@ onUnmounted(() => {
       0 0 12px rgba(255, 120, 40, 0.3);
     position: relative;
     display: inline-block;
+    flex: 1;
+    text-align: center;
 
     &::after {
       content: '';
@@ -1326,24 +1381,60 @@ onUnmounted(() => {
     }
   }
 
+  .header-buttons {
+    display: flex;
+    gap: 8px;
+  }
+
+  .help-btn,
   .fullscreen-btn {
-    position: absolute;
-    right: 0;
-    background: rgba(205, 133, 63, 0.2);
-    border: 1px solid rgba(205, 133, 63, 0.3);
+    background: rgba(40, 26, 20, 0.9);
+    border: 2px solid rgba(255, 180, 120, 0.6);
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 5px 10px;
     cursor: pointer;
     transition: all 0.2s ease;
+    min-width: 36px;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.3),
+      inset 0 1px 2px rgba(255, 200, 150, 0.2);
 
     &:hover {
-      background: rgba(205, 133, 63, 0.3);
+      background: rgba(255, 180, 120, 0.15);
+      border-color: rgba(255, 180, 120, 0.9);
       transform: scale(1.1);
+      box-shadow:
+        0 4px 12px rgba(255, 180, 120, 0.3),
+        inset 0 1px 2px rgba(255, 200, 150, 0.3);
     }
 
     .icon {
       font-size: 16px;
-      filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+      font-weight: 700;
+      color: #ffd7a1;
+      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }
+  }
+
+  .help-btn {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(96, 165, 250, 0.6);
+
+    &:hover {
+      background: rgba(59, 130, 246, 0.3);
+      border-color: rgba(96, 165, 250, 0.9);
+      box-shadow:
+        0 4px 12px rgba(96, 165, 250, 0.3),
+        inset 0 1px 2px rgba(147, 197, 253, 0.3);
+    }
+
+    .icon {
+      color: #93c5fd;
     }
   }
 }
@@ -1699,8 +1790,23 @@ onUnmounted(() => {
     padding: 15px;
   }
 
+  .header {
+    gap: 8px;
+  }
+
   .main-title {
     font-size: 24px;
+  }
+
+  .help-btn,
+  .fullscreen-btn {
+    padding: 4px 8px;
+    min-width: 32px;
+    min-height: 28px;
+
+    .icon {
+      font-size: 14px;
+    }
   }
 
   .stats-container {
