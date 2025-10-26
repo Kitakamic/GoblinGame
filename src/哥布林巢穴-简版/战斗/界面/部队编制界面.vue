@@ -34,16 +34,10 @@
                   {{ captain.name }}
                 </div>
 
-                <!-- 操作按钮 - 放在右上角 -->
+                <!-- 操作按钮 - 放在右上角，竖向排列 -->
                 <div class="captain-actions">
-                  <button class="configure-troops-btn" title="配置部队" @click.stop="openTroopConfig(index)">⚙️</button>
                   <button class="remove-captain-btn" title="移除队长" @click.stop="removeCaptain(index)">×</button>
-                </div>
-
-                <!-- 等级标识 - 放在操作按钮下面 -->
-                <div class="captain-level-badge">
-                  <span class="level-icon">⭐</span>
-                  <span class="level-value">{{ captain.level || Math.floor(captain.offspring / 10) }}</span>
+                  <button class="configure-troops-btn" title="配置部队" @click.stop="openTroopConfig(index)">⚙️</button>
                 </div>
 
                 <!-- 四维和部队信息网格 -->
@@ -76,6 +70,34 @@
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <!-- 等级标签 - 横向显示在右上角 -->
+              <div
+                class="captain-level-badge"
+                style="
+                  position: absolute;
+                  top: 6px;
+                  right: 6px;
+                  padding: 3px 6px;
+                  border-radius: 4px;
+                  font-size: 10px;
+                  font-weight: 700;
+                  text-align: center;
+                  z-index: 10;
+                  background: rgba(255, 215, 0, 0.9);
+                  color: #000;
+                  display: inline-flex;
+                  align-items: center;
+                  gap: 4px;
+                  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+                  white-space: nowrap;
+                "
+              >
+                <span style="font-size: 10px">LV.</span>
+                <span style="font-size: 11px; font-weight: 700">{{
+                  captain.level || Math.floor(captain.offspring / 10)
+                }}</span>
               </div>
             </div>
             <div v-else class="empty-slot" @click="openCaptainSelection">
@@ -1554,7 +1576,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 // 队长肖像图片区域
@@ -1607,35 +1629,16 @@ defineExpose({
   white-space: nowrap;
 }
 
-// 操作按钮 - 放在右上角
+// 操作按钮 - 放在等级标签下面，竖向排列
 .captain-actions {
   position: absolute;
-  top: 6px;
+  top: 36px;
   right: 6px;
   z-index: 4;
   display: flex;
-  gap: 4px;
-
-  .configure-troops-btn {
-    background: rgba(0, 0, 0, 0.6);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 24px;
-    height: 24px;
-    cursor: pointer;
-    font-size: 10px;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.8);
-      transform: scale(1.1);
-    }
-  }
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
 
   .remove-captain-btn {
     background: rgba(220, 38, 38, 0.8);
@@ -1657,33 +1660,26 @@ defineExpose({
       transform: scale(1.1);
     }
   }
-}
 
-// 等级标签 - 放在操作按钮下面
-.captain-level-badge {
-  position: absolute;
-  top: 40px;
-  right: 6px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  text-align: center;
-  z-index: 3;
-  background: rgba(255, 215, 0, 0.9);
-  color: #000;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  .configure-troops-btn {
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    font-size: 10px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
 
-  .level-icon {
-    font-size: 11px;
-  }
-
-  .level-value {
-    font-size: 12px;
-    font-weight: 700;
+    &:hover {
+      background: rgba(0, 0, 0, 0.8);
+      transform: scale(1.1);
+    }
   }
 }
 
@@ -1715,27 +1711,29 @@ defineExpose({
 // 四维和部队信息网格
 .captain-info-grid {
   position: absolute;
-  bottom: 30px;
-  left: 4px;
-  right: 4px;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 3;
-  display: grid;
-  grid-template-rows: 1fr 1fr; // 部队信息和四维各占1行
-  gap: 2px;
-  height: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 90%;
 }
 
 .captain-stats {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 2px;
+  gap: 4px;
+  width: 100%;
 
   .stat-item {
     display: flex;
     justify-content: space-between;
     font-size: 10px;
     color: #f0e6d2;
-    padding: 2px 4px;
+    padding: 3px 6px;
     background: rgba(0, 0, 0, 0.6);
     border-radius: 4px;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
@@ -1746,31 +1744,38 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 4px;
+  width: 100%;
 
   .troop-count {
-    font-size: 9px;
-    color: #f59e0b;
-    font-weight: 600;
+    font-size: 11px;
+    color: #ffd700;
+    font-weight: 700;
     text-align: center;
-    padding: 2px 4px;
-    background: rgba(245, 158, 11, 0.2);
-    border-radius: 3px;
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    padding: 3px 6px;
+    background: rgba(245, 158, 11, 0.6);
+    border-radius: 4px;
+    border: 1px solid rgba(245, 158, 11, 0.8);
+    text-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.9),
+      0 0 4px rgba(255, 215, 0, 0.5);
     width: 100%;
+    letter-spacing: 0.5px;
   }
 
   .health-count {
-    font-size: 9px;
-    color: #dc2626;
-    font-weight: 600;
+    font-size: 11px;
+    color: #ff4444;
+    font-weight: 700;
     text-align: center;
-    padding: 2px 4px;
-    background: rgba(220, 38, 38, 0.2);
-    border-radius: 3px;
-    border: 1px solid rgba(220, 38, 38, 0.3);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    padding: 3px 6px;
+    background: rgba(220, 38, 38, 0.6);
+    border-radius: 4px;
+    border: 1px solid rgba(220, 38, 38, 0.8);
+    text-shadow:
+      0 1px 3px rgba(0, 0, 0, 0.9),
+      0 0 4px rgba(255, 68, 68, 0.5);
     width: 100%;
+    letter-spacing: 0.5px;
   }
 }
 
@@ -2327,18 +2332,20 @@ defineExpose({
 
 @media (max-width: 768px) {
   .army-formation-container {
-    padding: 12px;
+    padding: 9px;
   }
 
   .captains-grid {
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    gap: 6px;
     flex: 1;
     min-height: 0;
   }
 
   .captain-slot {
-    height: 260px;
+    height: calc(50vh - 130px); // 使用视口高度计算，更灵活
+    min-height: 200px; // 设置最小高度
+    max-height: 300px; // 设置最大高度
     padding: 0;
   }
 
@@ -2350,11 +2357,11 @@ defineExpose({
     }
 
     .captain-info h4 {
-      font-size: 16px;
+      font-size: 14px;
     }
 
     .captain-level {
-      font-size: 12px;
+      font-size: 10px;
     }
 
     .captain-actions {
@@ -2370,18 +2377,40 @@ defineExpose({
   }
 
   .captain-stats {
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 4px;
+    margin-bottom: 0;
 
     .stat-item {
-      font-size: 12px;
+      font-size: 10px;
       padding: 4px 6px;
     }
   }
 
   .captain-troops {
     .troop-count {
-      font-size: 12px;
+      font-size: 11px;
+      color: #ffd700;
+      font-weight: 700;
+      background: rgba(245, 158, 11, 0.6);
+      border: 1px solid rgba(245, 158, 11, 0.8);
+      text-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.9),
+        0 0 4px rgba(255, 215, 0, 0.5);
+      letter-spacing: 0.5px;
+      padding: 3px 6px;
+    }
+
+    .health-count {
+      font-size: 11px;
+      color: #ff4444;
+      font-weight: 700;
+      background: rgba(220, 38, 38, 0.6);
+      border: 1px solid rgba(220, 38, 38, 0.8);
+      text-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.9),
+        0 0 4px rgba(255, 68, 68, 0.5);
+      letter-spacing: 0.5px;
+      padding: 3px 6px;
     }
   }
 
@@ -2417,8 +2446,8 @@ defineExpose({
 
 /* 部队配置弹窗专用样式 */
 .troop-config-modal .modal-content {
-  max-width: 500px;
-  max-height: 85vh;
+  max-width: 600px;
+  max-height: 90vh;
 }
 
 /* 配置管理弹窗样式 */
@@ -3033,6 +3062,159 @@ defineExpose({
     .bonus-stats .bonus-item {
       padding: 4px 6px;
       font-size: 11px;
+    }
+  }
+}
+
+/* 高分辨率适配 - 1080P及以上 (1920x1080) - 仅部队卡元素 */
+@media (min-width: 1920px) {
+  // 队长名称
+  .captain-name-vertical-left {
+    font-size: 22px;
+    padding: 12px 6px;
+  }
+
+  // 操作按钮
+  .captain-actions {
+    top: 54px;
+    right: 9px;
+    gap: 9px;
+
+    .remove-captain-btn,
+    .configure-troops-btn {
+      width: 40px;
+      height: 40px;
+      font-size: 20px;
+    }
+  }
+
+  // 等级标签
+  :deep(.captain-level-badge) {
+    top: 9px;
+    right: 9px;
+    padding: 6px 12px;
+    font-size: 18px;
+    gap: 6px;
+
+    span {
+      font-size: 18px !important;
+    }
+  }
+
+  // 四维属性
+  .captain-stats .stat-item {
+    font-size: 18px;
+    padding: 4px 8px;
+  }
+
+  // 部队和血量
+  .captain-troops {
+    .troop-count,
+    .health-count {
+      font-size: 18px;
+      padding: 6px 12px;
+    }
+  }
+}
+
+/* 2K分辨率适配 (2560x1440) - 仅部队卡元素 */
+@media (min-width: 2560px) {
+  // 队长名称
+  .captain-name-vertical-left {
+    font-size: 32px;
+    padding: 16px 8px;
+  }
+
+  // 操作按钮
+  .captain-actions {
+    top: 72px;
+    right: 12px;
+    gap: 12px;
+
+    .remove-captain-btn,
+    .configure-troops-btn {
+      width: 56px;
+      height: 56px;
+      font-size: 28px;
+    }
+  }
+
+  // 等级标签
+  :deep(.captain-level-badge) {
+    top: 12px;
+    right: 12px;
+    padding: 8px 16px;
+    font-size: 26px;
+    gap: 8px;
+
+    span {
+      font-size: 26px !important;
+    }
+  }
+
+  // 四维属性
+  .captain-stats .stat-item {
+    font-size: 26px;
+    padding: 6px 12px;
+  }
+
+  // 部队和血量
+  .captain-troops {
+    .troop-count,
+    .health-count {
+      font-size: 28px;
+      padding: 8px 16px;
+    }
+  }
+}
+
+/* 4K分辨率适配 (3840x2160) - 仅部队卡元素 */
+@media (min-width: 3840px) {
+  // 队长名称
+  .captain-name-vertical-left {
+    font-size: 48px;
+    padding: 24px 12px;
+  }
+
+  // 操作按钮
+  .captain-actions {
+    top: 108px;
+    right: 18px;
+    gap: 18px;
+
+    .remove-captain-btn,
+    .configure-troops-btn {
+      width: 84px;
+      height: 84px;
+      font-size: 42px;
+    }
+  }
+
+  // 等级标签
+  :deep(.captain-level-badge) {
+    top: 18px;
+    right: 18px;
+    padding: 12px 24px;
+    font-size: 40px;
+    gap: 12px;
+
+    span {
+      font-size: 40px !important;
+    }
+  }
+
+  // 四维属性
+  .captain-stats .stat-item {
+    font-size: 40px;
+    padding: 9px 18px;
+  }
+
+  // 部队和血量
+  .captain-troops {
+    .troop-count,
+    .health-count {
+      font-size: 42px;
+      padding: 12px 24px;
     }
   }
 }

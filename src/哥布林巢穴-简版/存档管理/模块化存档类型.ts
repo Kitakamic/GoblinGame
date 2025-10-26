@@ -135,7 +135,7 @@ const BASE_TRAINING_CHARACTERS: Character[] = [
     offspring: 0,
     rating: 'S',
     favorite: true,
-    level: 1, // 初始等级，实际等级将根据我方最高等级人物动态计算
+    level: 0, // 初始等级，实际等级将根据我方最高等级人物动态计算
     attributes: {
       attack: 40,
       defense: 50,
@@ -166,120 +166,92 @@ const BASE_TRAINING_CHARACTERS: Character[] = [
       description: '',
     },
   },
+  // 巢穴秘书官 - 猫娘
   {
-    id: 'legendarychar_Alicia',
-    name: '维奥莱塔·德·翡翠',
-    title: '翡翠王国女王',
-    avatar: 'https://kitakamis.online/hero_portaits/女王1.png',
-    corruptedAvatar: 'https://kitakamis.online/hero_portaits/女王2.png',
-    fullyCorruptedAvatar: 'https://kitakamis.online/hero_portaits/女王3.png',
-    status: 'surrendered',
+    id: 'secretary_catgirl',
+    name: '小月',
+    title: '巢穴秘书官',
+    avatar: 'https://files.catbox.moe/catgirl_secretary.jpg',
+    corruptedAvatar: 'https://files.catbox.moe/catgirl_secretary_corrupted.jpg',
+    fullyCorruptedAvatar: 'https://files.catbox.moe/catgirl_secretary_fully_corrupted.jpg',
+    status: 'player',
     canCombat: true,
     unitType: 'magical',
     loyalty: 100,
-    stamina: 160,
-    maxStamina: 160,
-    fertility: 185,
-    maxFertility: 185,
+    stamina: 100,
+    maxStamina: 100,
+    fertility: 85,
+    maxFertility: 85,
     offspring: 0,
-    rating: 'S',
-    favorite: false,
-    level: 0, // 初始等级基于后代数量，新角色为0级
+    rating: 'A',
+    favorite: true,
+    level: 3,
     attributes: {
-      attack: 38, // 攻击力：物理攻击能力，战士类角色较高
-      defense: 32, // 防御力：物理防御能力，坦克类角色较高
-      intelligence: 42, // 智力：魔法攻击和法术能力，法师类角色较高
-      speed: 35, // 速度：行动速度和闪避能力，刺客类角色较高
-      health: 240, // 生命值：生存能力，所有角色都需要
+      attack: 25,
+      defense: 20,
+      intelligence: 45,
+      speed: 35,
+      health: 100,
     },
-    race: '人类',
-    age: 32,
-    country: '翡翠王国',
-    background: '王族',
+    race: '魔族',
+    age: 18,
+    country: '哥布林巢穴',
+    background: '平民',
     sexExperience:
-      '艾莉西亚的性经验仅限于与已故丈夫埃德温,两人的性生活和谐美满。埃德温温柔体贴，总是能让她达到高潮。自从丈夫去世后，她便守寡至今，将所有精力都投入到治国之中，但身体深处那份被压抑的欲望有时会在梦中苏醒。',
-    sensitivePoints: ['子宫'],
+      '小月从小被哥布林之王养大，身体还保持着纯洁，但内心对主人有着深深的依恋和爱慕。她经常在主人不注意时偷偷观察他，心跳加速。每当主人夸奖她时，她的猫耳会不自觉地抖动，尾巴也会开心地摇摆。她渴望能更亲近主人，但又害羞不敢主动表达。在夜深人静时，她会幻想与主人的亲密接触，虽然不知道具体该怎么做，但那种温暖的感觉让她沉醉。',
+    sensitivePoints: ['猫耳', '尾巴', '脖子'],
     sensitivePointsDetail: [
       {
-        part: '嘴巴',
-        isSensitive: false,
-        description:
-          '艾莉西亚的嘴唇饱满柔软，天然带着玫瑰色的光泽。她的唇形完美，上唇略薄而下唇丰盈，接吻时会有微微的颤抖。她的舌头灵活而湿润，口腔内部温暖紧致，当被深入侵犯时会本能地吸吮和纠缠。',
-      },
-      {
-        part: '胸部',
-        isSensitive: false,
-        description:
-          '艾莉西亚的胸部丰满挺拔，E罩杯的乳房在紧身衣物下展现出完美的形状。她的乳房触感柔软却富有弹性，乳晕呈现淡粉色，直径约三厘米，乳头在未受刺激时呈现可爱的粉红色。由于长期穿着束胸作战，她的乳房保持着极佳的形状，几乎没有下垂。当被抚摸时，乳头会迅速充血变硬，但整体敏感度属于中等水平。',
-      },
-      {
-        part: '阴道',
-        isSensitive: false,
-        description:
-          '艾莉西亚的阴道因为只与丈夫有过性经验而保持着极佳的紧致度。外阴唇饱满而富有弹性，内阴唇小巧粉嫩，阴蒂隐藏在包皮之下。阴道内壁布满细密的褶皱，收缩力极强，在被插入时会本能地紧紧吸附。由于守寡多年，她的阴道已经恢复到近乎处女般的紧致状态，初次进入需要充分的润滑和扩张。',
-      },
-      {
-        part: '子宫',
+        part: '猫耳',
         isSensitive: true,
         description:
-          '艾莉西亚最大的秘密就是她的子宫极度敏感，这是连她已故的丈夫都不完全了解的体质。当有异物深入触碰到子宫口时，她会产生近乎失控的快感，这种快感直接冲击大脑，让她几乎无法维持理智。她的子宫口在兴奋时会微微张开，内部温度比阴道更高，当被精液灌满时会产生强烈的满足感。正是因为这个过于敏感的弱点，她在与丈夫亲密时总是小心控制深度，害怕自己失态的模样被看到。如果这个秘密被人发现并利用，她引以为傲的理智和自制力将彻底崩溃。',
+          '小月的猫耳非常敏感，银白色的毛发柔软如丝，轻抚会让她发出可爱的呼噜声，抚摸根部会让她全身颤抖，发出娇羞的呻吟声。她的猫耳会根据情绪变化而摆动，紧张时会贴向脑后，开心时会竖立起来。',
       },
       {
-        part: '后庭',
-        isSensitive: false,
+        part: '尾巴',
+        isSensitive: true,
         description:
-          '艾莉西亚的后庭紧致而从未被开发过，臀部饱满圆润，臀肉紧实而富有弹性。她的肛门呈现健康的浅粉色，周围皮肤细腻光滑。由于从未有过这方面的经验，她的后庭保持着完全的紧闭状态，即使是手指也难以轻易进入。她对这个部位有着本能的抗拒和羞耻感，认为从后方被侵犯是极度屈辱的行为。',
+          '蓬松的银白色尾巴根部是她的最敏感点，抚摸这里会让她瞬间失去抵抗力，发出可爱的猫叫声。她的尾巴会根据心情摆动，紧张时会夹在两腿之间，开心时会高高翘起。',
+      },
+      {
+        part: '脖子',
+        isSensitive: true,
+        description:
+          '脖子是猫娘最敏感的部位之一，轻咬或亲吻会让她瞬间瘫软，发出可爱的猫叫声。她的脖子修长白皙，有着淡淡的体香，是她的致命弱点。',
       },
     ],
     lifeStory: {
       childhood: [
-        '艾莉西亚出生于赛菲亚帝国的一个没落王族家庭，她的家族曾经显赫一时，但在一次宫廷政变中失势，被流放到古拉尔大陆。年幼的她跟随父母在这片死亡之地艰难求生，目睹了无数同行者在恶劣环境中死去。她的父亲是一位骑士，母亲则是宫廷魔法师，双方都将毕生所学倾囊相授。在那个充满危险的童年里，她学会了如何在荒野中寻找水源和食物，如何识别有毒的植物和生物，更学会了如何在绝望中保持希望。她的父亲常说"我们虽然失去了帝国，但没有失去血统的荣耀"，这句话深深烙印在她幼小的心灵中。',
+        '在寒冷的冬夜被遗弃在森林中，只有几个月大的小月蜷缩在树洞里瑟瑟发抖',
+        '被路过的哥布林之王发现并救下，用温暖的怀抱将她带回巢穴',
+        '在巢穴中得到了温暖和关爱，逐渐从恐惧中走出，开始信任这个救她的主人',
       ],
       adolescence: [
-        '十五岁那年，艾莉西亚的父母在一次哥布林袭击中双双丧生，她被当时翡翠王国的建立者——年轻的国王埃德温所救。埃德温被她的美貌和坚韧所吸引，更欣赏她身上那种王族的气质。在埃德温的培养下，她不仅学习了治国之道，更精进了战斗技艺。两人在患难中产生了深厚的感情,二十岁时她成为了翡翠王国的王后。作为王后，她协助埃德温建立了翡翠宫的防御体系，整合了大陆上的各个流亡族群，用铁腕手段镇压了数次叛乱。那段时期是她人生中最幸福的时光，她与埃德温并肩作战，将翡翠王国从一个简陋的据点发展成为古拉尔大陆上最强大的势力。',
+        '逐渐展现出聪慧的天赋，学习能力极强，很快掌握了人类语言和基本礼仪',
+        '开始帮助哥布林之王处理巢穴事务，展现出卓越的管理才能',
+        '学会了各种魔法和战斗技巧，成为主人的得力助手，但内心对主人的感情也在悄然变化',
       ],
       adulthood: [
-        '二十八岁那年，一场突如其来的瘟疫席卷了翡翠王国，埃德温在照顾病患时不幸染病去世，没有留下子嗣。年轻的艾莉西亚突然成为了寡妇，面对着国内各派系的虎视眈眈和外部势力的不断侵扰。她以惊人的意志力稳住了局面，用雷霆手段处决了三个试图篡位的贵族，亲自率军击退了两次大规模的哥布林入侵。在血与火的洗礼中，她从一个温柔的王后蜕变为铁腕的女王。她取消了国王的称号，独自以王后之名统治翡翠王国，向所有人证明了女性同样可以成为强大的统治者。',
+        '成为了巢穴的秘书官，负责管理巢穴的日常事务，将一切打理得井井有条',
+        '对哥布林之王有着深厚的感情，这种感情早已超越了主仆关系',
+        '虽然身体还很纯洁，但内心渴望着与主人更亲密的接触',
       ],
       currentState: [
-        '如今三十二岁的艾莉西亚已经统治翡翠王国四年，她将这个小国治理得井井有条，甚至开始向周边地区扩张势力。但寡居的生活也让她倍感孤独，夜深人静时，她常常会想念已故的丈夫。朝堂上的她是铁血女王，但卸下王冠后，她也只是一个渴望被爱的女人。最近哥布林的活动越来越频繁，她预感到一场更大的风暴即将来临，为此她加强了翡翠宫的防御，同时派出探子侦查哥布林巢穴的动向。她不知道的是，她的美貌和身份已经让她成为了哥布林王风花的重点目标。',
+        '全心全意地侍奉着哥布林之王，将巢穴管理得井井有条',
+        '期待着能为主人做更多的事情，渴望得到主人的认可和宠爱',
+        '在夜深人静时，会偷偷观察主人的睡颜，内心充满爱慕之情',
       ],
     },
-    personality: ['坚韧不屈', '深谋远虑', '外冷内热'],
-    fears:
-      '艾莉西亚最大的恐惧是失去控制和尊严。作为从底层爬起来的流亡王族，她深知权力的脆弱。她害怕再次经历童年时的无助，害怕被人当作玩物和弱者。这种恐惧驱使她必须时刻保持强势，绝不在任何人面前展露软弱。',
-    secrets:
-      '艾莉西亚的身体对于强烈的刺激有着异常敏感的反应，这是她从未告诉任何人的秘密。即使是与丈夫亲密时，她也会刻意控制自己的反应，因为她担心过于激烈的表现会有损王后的威严。这个秘密让她既困扰又羞耻，她害怕有一天会被人发现并利用这个弱点。',
+    personality: ['忠诚专一', '聪慧机敏', '温柔体贴', '勤奋努力', '娇羞可爱'],
+    fears: '害怕被主人抛弃，担心自己不够好而失去主人的宠爱',
+    secrets: '其实对哥布林之王有着超越主仆关系的感情，渴望成为主人的伴侣',
     appearance: {
-      height: 172,
-      weight: 58,
-      measurements: '96-62-94',
-      cupSize: 'E',
+      height: 155,
+      weight: 42,
+      measurements: 'B85/W58/H82',
       description:
-        '维奥莱塔拥有一头如同瀑布般倾泻而下的棕色长发，发丝在光线下会泛起琥珀色的微光，平时她会将这头秀发编成精致的辫子盘于脑后，显露出优雅修长的颈项。她的肌肤呈现出健康的蜜色，这是长年在古拉尔大陆恶劣环境下生存留下的印记，却丝毫不减其魅力，反而增添了一种野性的韵味。她的五官轮廓分明，高挺的鼻梁，饱满的嘴唇带着天然的玫瑰色泽，一双碧绿色的眼眸如同翡翠般璀璨，眼神中既有女性的柔情也有统治者的威严。她的身材高挑匀称，双肩宽阔却不失女性的柔美线条，E罩杯的丰满胸部在紧身的王室礼服下勾勒出诱人的曲线。纤细的腰肢和浑圆饱满的臀部形成完美的对比，修长笔直的双腿肌肉线条流畅，显然经过长期的战斗训练。她的手指修长但掌心有薄茧，那是常年握剑留下的痕迹。在她的左肩胛骨处有一道淡淡的伤疤，那是早年一次暗杀中留下的纪念。她的锁骨精致迷人，每当她穿着露肩礼服时，那若隐若现的锁骨线条总能吸引无数目光。她习惯佩戴翡翠王国的象征——一条镶嵌着巨大翡翠的项链，宝石正好垂落在她深邃的乳沟之间。',
-      clothing: {
-        head: '翡翠宝石王冠',
-        top: '深绿色丝质礼服',
-        bottom: '深绿色宫廷长裙',
-        socks: '深绿色丝质长袜',
-        shoes: '深绿色翡翠高跟鞋',
-        underwear: '淡绿色蕾丝内衣',
-        accessories: '翡翠宝石项链',
-        toys: '无',
-      },
-      originalClothing: {
-        head: '翡翠宝石王冠',
-        top: '深绿色丝质礼服',
-        bottom: '深绿色宫廷长裙',
-        socks: '深绿色丝质长袜',
-        shoes: '深绿色翡翠高跟鞋',
-        underwear: '淡绿色蕾丝内衣',
-        accessories: '翡翠宝石项链',
-        toys: '无',
-      },
+        '一只可爱的猫娘，有着柔软的银白色猫耳和蓬松的尾巴。银白色的长发如瀑布般垂至腰间，碧绿色的眼睛如翡翠般清澈，身材娇小但比例完美。总是穿着整洁的黑色秘书装，白色衬衫，黑色短裙，显得既专业又可爱。她的肌肤白皙如雪，有着淡淡的体香，走起路来轻盈优雅，如猫般灵动。',
     },
-    locationId: 'emerald_palace_capital',
-    capturedAt: '帝国历1074年1月1日', // 使用游戏开始时间作为默认值
   },
 ];
 
@@ -293,43 +265,70 @@ export const INITIAL_TRAINING_DATA: TrainingModuleData = {
 const BASE_LOCATIONS: Location[] = [
   {
     id: 'small_village_1',
-    name: '小村庄',
+    name: '石溪村',
     type: 'village',
     icon: '🏘️',
-    description: '一个普通的人类村庄，防御薄弱',
+    description:
+      '位于古拉尔大陆边缘的小型人类村庄，以石溪为名。村民们以农耕和简单的手工艺为生，防御设施简陋，只有几座木制瞭望塔和简单的栅栏。村庄中心有一座小教堂，是村民们的信仰中心。这里的人们生活简朴，对外来者既好奇又警惕。',
     difficulty: 1,
     distance: 5,
-    rewards: { gold: 50, food: 30, slaves: 2 },
+    rewards: { gold: 50, food: 30, slaves: 5 },
     status: 'unknown',
     continent: '古拉尔大陆',
     region: '巢穴附近',
     race: '人类',
     baseGuards: 80,
+    specialUnit: {
+      name: '村庄守卫队长',
+      race: '人类',
+      unitType: 'physical' as const,
+      attributes: {
+        attack: 15,
+        defense: 20,
+        intelligence: 12,
+        speed: 18,
+        health: 120,
+      },
+    },
   },
   {
     id: 'merchant_camp',
-    name: '商队营地',
-    type: 'village',
+    name: '银月商队营地',
+    type: 'trade_caravan',
     icon: '🏕️',
-    description: '临时商队营地，有丰富的货物',
+    description:
+      '一支来自远方的贸易商队在此临时驻扎。商队由经验丰富的商人组成，携带着各种珍贵的货物和商品。营地周围有坚固的马车围栏，商队护卫们日夜巡逻。这里不仅有丰富的物资，还可能遇到来自其他大陆的稀有商品。商队头领是一位精明的商人，对哥布林的威胁有所耳闻。',
     difficulty: 1,
     distance: 8,
-    rewards: { gold: 100, food: 20 },
+    rewards: { gold: 100, food: 20, slaves: 3 },
     status: 'unknown',
     continent: '古拉尔大陆',
     region: '巢穴附近',
     race: '人类',
     baseGuards: 200,
+    specialUnit: {
+      name: '商队护卫队长',
+      race: '人类',
+      unitType: 'physical' as const,
+      attributes: {
+        attack: 18,
+        defense: 22,
+        intelligence: 16,
+        speed: 20,
+        health: 140,
+      },
+    },
   },
   {
     id: 'abandoned_fort',
-    name: '废弃要塞',
+    name: '暗影要塞',
     type: 'ruins',
     icon: '🏰',
-    description: '古老的废弃要塞，可能有宝藏',
+    description:
+      '一座古老的军事要塞，曾经是某个王国的边境防御工事。随着王国的衰落，要塞被遗弃，但其中仍保留着许多珍贵的军事装备和宝藏。要塞内部结构复杂，有地下通道和秘密房间。然而，这里也被亡灵和古代诅咒所占据，成为了危险的地方。要塞的城墙虽然破败，但仍然坚固，内部可能隐藏着强大的魔法物品。',
     difficulty: 3,
     distance: 12,
-    rewards: { gold: 200 },
+    rewards: { gold: 200, food: 10, slaves: 0 },
     status: 'unknown',
     continent: '古拉尔大陆',
     region: '巢穴附近',
@@ -338,7 +337,7 @@ const BASE_LOCATIONS: Location[] = [
     specialUnit: {
       name: '古代守卫',
       race: '亡灵',
-      class: '骷髅战士',
+      unitType: 'physical' as const,
       attributes: {
         attack: 25,
         defense: 30,
@@ -353,15 +352,28 @@ const BASE_LOCATIONS: Location[] = [
     name: '流放者村落',
     type: 'village',
     icon: '🏚️',
-    description: '被流放种族的小型聚居地，环境恶劣但居民顽强',
+    description:
+      '位于古拉尔大陆边缘的流放者聚居地，由被各国驱逐的罪犯、政治犯和异端分子组成。村落建在贫瘠的山丘上，房屋简陋但防御严密。这里的居民虽然被主流社会抛弃，但形成了自己的生存法则和战斗技巧。他们对外来者极度警惕，对哥布林的威胁有着丰富的应对经验。村落中心有一座简陋的审判堂，是流放者们制定规则的地方。',
     difficulty: 2,
     distance: 15,
-    rewards: { gold: 80, food: 40, slaves: 3 },
+    rewards: { gold: 80, food: 40, slaves: 8 },
     status: 'unknown',
     continent: '古拉尔大陆',
     region: '流放者之地',
     race: '人类',
     baseGuards: 150,
+    specialUnit: {
+      name: '流放者首领',
+      race: '人类',
+      unitType: 'physical' as const,
+      attributes: {
+        attack: 20,
+        defense: 18,
+        intelligence: 14,
+        speed: 16,
+        health: 130,
+      },
+    },
   },
 ] as const;
 

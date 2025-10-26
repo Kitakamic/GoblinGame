@@ -150,7 +150,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '翡翠禁卫',
       race: '人类',
-      class: '重装魔法剑士',
+      unitType: 'magical' as const,
       attributes: {
         attack: 26,
         defense: 28,
@@ -300,7 +300,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '精英骑士',
       race: '人类',
-      class: '重装骑士',
+      unitType: 'physical' as const,
       attributes: {
         attack: 22,
         defense: 28,
@@ -450,7 +450,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '精灵守护者',
       race: '永恒精灵',
-      class: '魔法剑士',
+      unitType: 'magical' as const,
       attributes: {
         attack: 24,
         defense: 20,
@@ -600,7 +600,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '狐族幻术师',
       race: '狐族',
-      class: '幻术师',
+      unitType: 'magical' as const,
       attributes: {
         attack: 20,
         defense: 18,
@@ -750,7 +750,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '狐族商人',
       race: '狐族',
-      class: '商人',
+      unitType: 'physical' as const,
       attributes: {
         attack: 22,
         defense: 20,
@@ -900,7 +900,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '黑暗精灵战士',
       race: '黑暗精灵',
-      class: '黑暗战士',
+      unitType: 'physical' as const,
       attributes: {
         attack: 28,
         defense: 24,
@@ -1050,7 +1050,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '暗影法师',
       race: '黑暗精灵',
-      class: '黑暗法师',
+      unitType: 'magical' as const,
       attributes: {
         attack: 22,
         defense: 20,
@@ -1200,7 +1200,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '帝国重装骑士',
       race: '人类',
-      class: '重装骑士',
+      unitType: 'physical' as const,
       attributes: {
         attack: 30,
         defense: 35,
@@ -1350,7 +1350,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '炼金术师',
       race: '人类',
-      class: '炼金术师',
+      unitType: 'magical' as const,
       attributes: {
         attack: 25,
         defense: 22,
@@ -1500,7 +1500,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '皇家禁卫军',
       race: '人类',
-      class: '皇家禁卫',
+      unitType: 'physical' as const,
       attributes: {
         attack: 35,
         defense: 40,
@@ -1640,7 +1640,7 @@ export const CUSTOM_LOCATIONS: Location[] = [
     specialUnit: {
       name: '月光禁卫',
       race: '永恒精灵',
-      class: '月光法师',
+      unitType: 'magical' as const,
       attributes: {
         attack: 40,
         defense: 35,

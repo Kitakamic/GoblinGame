@@ -1,204 +1,205 @@
 <template>
   <div class="advanced-battle-interface" :class="{ 'modal-mode': isModal }">
-    <!-- 战斗主体区域 -->
-    <div class="battle-main">
-      <!-- 战斗内容区域 -->
-      <div class="battle-content">
-        <!-- 左侧：我方单位信息 -->
-        <div class="units-panel allies-panel">
-          <div class="units-grid">
-            <div v-for="unit in allies" :key="unit.id" class="unit-card" :class="{ 'unit-dead': !unit.isAlive }">
-              <!-- 单位名称 - 竖直显示在左侧 -->
-              <div class="unit-name-vertical-left">
-                {{ unit.name }}
-              </div>
+    <!-- 左侧：我方单位信息 -->
+    <div class="units-panel allies-panel">
+      <div class="units-grid">
+        <div
+          v-for="unit in allies"
+          :key="unit.id"
+          class="unit-card"
+          :class="{ 'unit-dead': !unit.isAlive }"
+          :style="unitCardSize"
+        >
+          <!-- 单位名称 - 竖直显示在左侧 -->
+          <div class="unit-name-vertical-left">
+            {{ unit.name }}
+          </div>
 
-              <!-- 单位肖像图片区域 -->
-              <div class="unit-portrait" :title="unit.troops ? '点击查看下辖部队' : ''" @click="showTroopsInfo(unit)">
-                <img
-                  v-if="unit.avatar && unit.avatar.startsWith('http')"
-                  :src="unit.avatar"
-                  :alt="unit.name"
-                  @error="handleImageError"
-                />
-                <div v-else class="default-portrait">
-                  <span class="portrait-icon">{{ getUnitAvatar(unit) }}</span>
-                </div>
+          <!-- 单位肖像图片区域 -->
+          <div class="unit-portrait" :title="unit.troops ? '点击查看下辖部队' : ''" @click="showTroopsInfo(unit)">
+            <img
+              v-if="unit.avatar && unit.avatar.startsWith('http')"
+              :src="unit.avatar"
+              :alt="unit.name"
+              @error="handleImageError"
+            />
+            <div v-else class="default-portrait">
+              <span class="portrait-icon">{{ getUnitAvatar(unit) }}</span>
+            </div>
 
-                <!-- 血量条 - 水平显示在顶部中心 -->
-                <div class="unit-health-bar-horizontal">
-                  <div class="health-fill-horizontal" :style="{ width: getHealthPercentage(unit) + '%' }"></div>
-                </div>
-                <div class="health-text-horizontal">{{ unit.currentHealth }}/{{ unit.maxHealth }}</div>
-              </div>
+            <!-- 血量条 - 水平显示在顶部中心 -->
+            <div class="unit-health-bar-horizontal" :style="{ width: healthBarWidth }">
+              <div class="health-fill-horizontal" :style="{ width: getHealthPercentage(unit) + '%' }"></div>
+            </div>
+            <div class="health-text-horizontal">{{ unit.currentHealth }}/{{ unit.maxHealth }}</div>
+          </div>
 
-              <!-- 四维属性显示 -->
-              <div class="unit-attributes-vertical">
-                <div class="attr-item">
-                  <span class="attr-icon">⚔️</span>
-                  <span class="attr-value">{{ unit.attributes.attack }}</span>
-                </div>
-                <div class="attr-item">
-                  <span class="attr-icon">🛡️</span>
-                  <span class="attr-value">{{ unit.attributes.defense }}</span>
-                </div>
-                <div class="attr-item">
-                  <span class="attr-icon">🔮</span>
-                  <span class="attr-value">{{ unit.attributes.intelligence }}</span>
-                </div>
-                <div class="attr-item">
-                  <span class="attr-icon">💨</span>
-                  <span class="attr-value">{{ unit.attributes.speed }}</span>
-                </div>
-              </div>
+          <!-- 四维属性显示 -->
+          <div class="unit-attributes-vertical">
+            <div class="attr-item">
+              <span class="attr-icon">⚔️</span>
+              <span class="attr-value">{{ unit.attributes.attack }}</span>
+            </div>
+            <div class="attr-item">
+              <span class="attr-icon">🛡️</span>
+              <span class="attr-value">{{ unit.attributes.defense }}</span>
+            </div>
+            <div class="attr-item">
+              <span class="attr-icon">🔮</span>
+              <span class="attr-value">{{ unit.attributes.intelligence }}</span>
+            </div>
+            <div class="attr-item">
+              <span class="attr-icon">💨</span>
+              <span class="attr-value">{{ unit.attributes.speed }}</span>
             </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <!-- 中间：历史记录 -->
-        <div class="battle-log-panel">
-          <div class="log-container">
-            <!-- 战斗状态显示 -->
-            <div v-if="battleStatus === 'idle'" class="battle-status-section">
-              <div class="battle-controls">
-                <button
-                  v-if="hasEnemyCharacters"
-                  class="dialogue-btn"
-                  :class="{ disabled: !canStartDialogue }"
-                  :title="canStartDialogue ? '战前讲话 - 降低敌方士气' : '战前对话已完成，无法再次进行'"
-                  :disabled="!canStartDialogue"
-                  @click="startPreBattleDialogue"
-                >
-                  💬 战前讲话
-                </button>
-                <button class="manual-battle-btn" @click="startManualBattle">
-                  ⚔️ 手动战斗
-                  <span v-if="selectedTarget" class="focus-target-hint">(集火: {{ selectedTarget.name }})</span>
-                </button>
-                <button class="auto-battle-btn" @click="startAutoBattle">🤖 自动战斗</button>
-                <button class="retreat-btn" @click="retreat">🏃 撤退</button>
-              </div>
-            </div>
-
-            <!-- 战斗结束 -->
-            <div v-if="battleStatus === 'finished'" class="battle-end-section">
-              <!-- 历史记录按钮 -->
-              <div class="history-button-container">
-                <button class="history-btn" title="查看战斗历史" @click="showBattleHistory">📜 查看战斗记录</button>
-                <!-- 只有胜利且有人物单位时才显示战斗总结按钮 -->
-                <button
-                  v-if="battleResult?.victory && hasEnemyCharacters"
-                  class="summary-btn"
-                  title="生成战斗总结"
-                  @click="showBattleSummary"
-                >
-                  📝 生成战斗总结
-                </button>
-                <!-- 胜利时显示收获按钮 -->
-                <button v-if="battleResult?.victory" class="harvest-btn" @click="showRewards">🎁 开始收获</button>
-                <!-- 失败时显示撤退和重来按钮 -->
-                <button v-if="!battleResult?.victory" class="retreat-btn" @click="retreat">🏃 撤退</button>
-                <button v-if="!battleResult?.victory" class="retry-btn" @click="retryBattle">🔄 再来一次</button>
-              </div>
-            </div>
-
-            <!-- 当前行动显示 -->
-            <div v-if="currentTurnData && battleStatus === 'fighting'" class="action-list">
-              <div class="action-messages">
-                <div
-                  v-for="(action, actionIndex) in currentTurnData.actions"
-                  :key="actionIndex"
-                  class="action-item"
-                  :class="getActionClass(action)"
-                >
-                  <div class="action-description">
-                    {{ action.description }}
-                    <span v-if="action.damage" class="action-damage">
-                      (伤害: {{ action.damage }} <span v-if="action.critical" class="critical-mark">💥</span>)
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <!-- 翻页按钮 - 左右样式 -->
-              <div v-if="battleHistory.length > 0" class="pagination-controls-horizontal">
-                <button
-                  class="pagination-btn left-pagination"
-                  :disabled="currentDisplayTurn <= 1"
-                  title="上一回合"
-                  @click="previousTurn"
-                >
-                  ←
-                </button>
-                <button
-                  class="pagination-btn right-pagination"
-                  :disabled="false"
-                  :title="isManualMode && battleStatus === 'fighting' ? '执行下一回合战斗' : '下一回合'"
-                  @click="handleRightArrow"
-                >
-                  →
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 右侧：敌方单位信息 -->
-        <div class="units-panel enemies-panel">
-          <div class="units-grid">
-            <div
-              v-for="unit in enemies"
-              :key="unit.id"
-              class="unit-card"
-              :class="{
-                'unit-dead': !unit.isAlive,
-                'unit-selected': selectedTarget?.id === unit.id,
-                'unit-selectable': unit.isAlive,
-              }"
-              @click="selectTarget(unit)"
+    <!-- 中间：历史记录 -->
+    <div class="battle-log-panel">
+      <div class="log-container">
+        <!-- 战斗状态显示 -->
+        <div v-if="battleStatus === 'idle'" class="battle-status-section">
+          <div class="battle-controls">
+            <button
+              v-if="hasEnemyCharacters"
+              class="dialogue-btn"
+              :class="{ disabled: !canStartDialogue }"
+              :title="canStartDialogue ? '战前讲话 - 降低敌方士气' : '战前对话已完成，无法再次进行'"
+              :disabled="!canStartDialogue"
+              @click="startPreBattleDialogue"
             >
-              <!-- 单位名称 - 竖直显示在左侧 -->
-              <div class="unit-name-vertical-left">
-                {{ unit.name }}
-              </div>
+              💬 战前讲话
+            </button>
+            <button class="manual-battle-btn" @click="startManualBattle">
+              ⚔️ 手动战斗
+              <span v-if="selectedTarget" class="focus-target-hint">(集火: {{ selectedTarget.name }})</span>
+            </button>
+            <button class="auto-battle-btn" @click="startAutoBattle">🤖 自动战斗</button>
+            <button class="retreat-btn" @click="retreat">🏃 撤退</button>
+          </div>
+        </div>
 
-              <!-- 单位肖像图片区域 -->
-              <div class="unit-portrait" :title="unit.troops ? '点击查看下辖部队' : ''" @click="showTroopsInfo(unit)">
-                <img
-                  v-if="unit.avatar && unit.avatar.startsWith('http')"
-                  :src="unit.avatar"
-                  :alt="unit.name"
-                  @error="handleImageError"
-                />
-                <div v-else class="default-portrait">
-                  <span class="portrait-icon">{{ getUnitAvatar(unit) }}</span>
-                </div>
+        <!-- 战斗结束 -->
+        <div v-if="battleStatus === 'finished'" class="battle-end-section">
+          <!-- 历史记录按钮 -->
+          <div class="history-button-container">
+            <button class="history-btn" title="查看战斗历史" @click="showBattleHistory">📜 查看战斗记录</button>
+            <!-- 只有胜利且有人物单位时才显示战斗总结按钮 -->
+            <button
+              v-if="battleResult?.victory && hasEnemyCharacters"
+              class="summary-btn"
+              title="生成战斗总结"
+              @click="showBattleSummary"
+            >
+              📝 生成战斗总结
+            </button>
+            <!-- 胜利时显示收获按钮 -->
+            <button v-if="battleResult?.victory" class="harvest-btn" @click="showRewards">🎁 开始收获</button>
+            <!-- 失败时显示撤退和重来按钮 -->
+            <button v-if="!battleResult?.victory" class="retreat-btn" @click="retreat">🏃 撤退</button>
+            <button v-if="!battleResult?.victory" class="retry-btn" @click="retryBattle">🔄 再来一次</button>
+          </div>
+        </div>
 
-                <!-- 血量条 - 水平显示在顶部中心 -->
-                <div class="unit-health-bar-horizontal">
-                  <div class="health-fill-horizontal" :style="{ width: getHealthPercentage(unit) + '%' }"></div>
-                </div>
-                <div class="health-text-horizontal">{{ unit.currentHealth }}/{{ unit.maxHealth }}</div>
+        <!-- 当前行动显示 -->
+        <div v-if="currentTurnData && battleStatus === 'fighting'" class="action-list">
+          <div class="action-messages">
+            <div
+              v-for="(action, actionIndex) in currentTurnData.actions"
+              :key="actionIndex"
+              class="action-item"
+              :class="getActionClass(action)"
+            >
+              <div class="action-description">
+                {{ action.description }}
+                <span v-if="action.damage" class="action-damage">
+                  (伤害: {{ action.damage }} <span v-if="action.critical" class="critical-mark">💥</span>)
+                </span>
               </div>
+            </div>
+          </div>
+          <!-- 翻页按钮 - 左右样式 -->
+          <div v-if="battleHistory.length > 0" class="pagination-controls-horizontal">
+            <button
+              class="pagination-btn left-pagination"
+              :disabled="currentDisplayTurn <= 1"
+              title="上一回合"
+              @click="previousTurn"
+            >
+              ←
+            </button>
+            <button
+              class="pagination-btn right-pagination"
+              :disabled="false"
+              :title="isManualMode && battleStatus === 'fighting' ? '执行下一回合战斗' : '下一回合'"
+              @click="handleRightArrow"
+            >
+              →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
-              <!-- 四维属性显示 -->
-              <div class="unit-attributes-vertical">
-                <div class="attr-item">
-                  <span class="attr-icon">⚔️</span>
-                  <span class="attr-value">{{ unit.attributes.attack }}</span>
-                </div>
-                <div class="attr-item">
-                  <span class="attr-icon">🛡️</span>
-                  <span class="attr-value">{{ unit.attributes.defense }}</span>
-                </div>
-                <div class="attr-item">
-                  <span class="attr-icon">🔮</span>
-                  <span class="attr-value">{{ unit.attributes.intelligence }}</span>
-                </div>
-                <div class="attr-item">
-                  <span class="attr-icon">💨</span>
-                  <span class="attr-value">{{ unit.attributes.speed }}</span>
-                </div>
-              </div>
+    <!-- 右侧：敌方单位信息 -->
+    <div class="units-panel enemies-panel">
+      <div class="units-grid">
+        <div
+          v-for="unit in enemies"
+          :key="unit.id"
+          class="unit-card"
+          :class="{
+            'unit-dead': !unit.isAlive,
+            'unit-selected': selectedTarget?.id === unit.id,
+            'unit-selectable': unit.isAlive,
+          }"
+          :style="unitCardSize"
+          @click="selectTarget(unit)"
+        >
+          <!-- 单位名称 - 竖直显示在左侧 -->
+          <div class="unit-name-vertical-left">
+            {{ unit.name }}
+          </div>
+
+          <!-- 单位肖像图片区域 -->
+          <div class="unit-portrait" :title="unit.troops ? '点击查看下辖部队' : ''" @click="showTroopsInfo(unit)">
+            <img
+              v-if="unit.avatar && unit.avatar.startsWith('http')"
+              :src="unit.avatar"
+              :alt="unit.name"
+              @error="handleImageError"
+            />
+            <div v-else class="default-portrait">
+              <span class="portrait-icon">{{ getUnitAvatar(unit) }}</span>
+            </div>
+
+            <!-- 血量条 - 水平显示在顶部中心 -->
+            <div class="unit-health-bar-horizontal" :style="{ width: healthBarWidth }">
+              <div class="health-fill-horizontal" :style="{ width: getHealthPercentage(unit) + '%' }"></div>
+            </div>
+            <div class="health-text-horizontal">{{ unit.currentHealth }}/{{ unit.maxHealth }}</div>
+          </div>
+
+          <!-- 四维属性显示 -->
+          <div class="unit-attributes-vertical">
+            <div class="attr-item">
+              <span class="attr-icon">⚔️</span>
+              <span class="attr-value">{{ unit.attributes.attack }}</span>
+            </div>
+            <div class="attr-item">
+              <span class="attr-icon">🛡️</span>
+              <span class="attr-value">{{ unit.attributes.defense }}</span>
+            </div>
+            <div class="attr-item">
+              <span class="attr-icon">🔮</span>
+              <span class="attr-value">{{ unit.attributes.intelligence }}</span>
+            </div>
+            <div class="attr-item">
+              <span class="attr-icon">💨</span>
+              <span class="attr-value">{{ unit.attributes.speed }}</span>
             </div>
           </div>
         </div>
@@ -389,7 +390,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineEmits, defineProps, onMounted, ref } from 'vue';
+import { computed, defineEmits, defineProps, onMounted, onUnmounted, ref } from 'vue';
 import GenericDialogueInterface from '../../../通用对话界面/通用对话界面.vue';
 import { WorldbookService } from '../../世界书管理/世界书服务';
 import type { Character } from '../../人物管理/类型/人物类型';
@@ -473,24 +474,68 @@ const currentTurnData = computed(() => {
   return battleHistory.value[currentDisplayTurn.value - 1] || null;
 });
 
+// 面板高度响应式数据
+const panelHeight = ref(400);
+
+// 计算部队卡尺寸 - 按照新逻辑
+const unitCardSize = computed(() => {
+  // 1080P以上必须一行6个单位
+  if (window.innerWidth >= 1920) {
+    // 先计算高度（占满面板）
+    const cardHeight = panelHeight.value; // 单位卡的高度
+
+    // 根据单位卡的高度计算宽度：宽度 = 高度 * 0.5
+    const cardWidth = cardHeight * 0.5; // 宽度为高度的0.5
+
+    return {
+      width: `${cardWidth}px`,
+      height: '90%',
+      maxWidth: `${cardWidth}px`,
+    };
+  }
+
+  // 1080P以下保持原有逻辑
+  return {
+    width: '110px',
+    height: '180px',
+    maxWidth: 'none',
+  };
+});
+
+// 计算血量条宽度 - 基于卡片宽度
+const healthBarWidth = computed(() => {
+  if (window.innerWidth >= 1920) {
+    const cardHeight = panelHeight.value;
+    const cardWidth = cardHeight * 0.5;
+    // 血量条宽度为卡片宽度的80%
+    return `${cardWidth * 0.8}px`;
+  }
+  return '80px'; // 1080P以下默认宽度
+});
+
 // 检查当前战斗据点中是否有敌方人物（enemy状态且可战斗）
 const hasEnemyCharacters = computed(() => {
   try {
-    // 检查当前战斗据点的英雄人物
+    // 只检查当前战斗据点的英雄人物，不检查调教模块
     const target = props.battleData?.target;
     if (target?.rewards?.heroes && Array.isArray(target.rewards.heroes)) {
-      return target.rewards.heroes.some((hero: Character) => hero.status === 'enemy' && hero.canCombat === true);
+      const hasEnemies = target.rewards.heroes.some(
+        (hero: Character) => hero.status === 'enemy' && hero.canCombat === true,
+      );
+      console.log('据点敌方人物检查:', {
+        targetName: target.name,
+        heroes: target.rewards.heroes,
+        hasEnemies,
+      });
+      return hasEnemies;
     }
 
-    // 如果没有据点数据，检查调教模块中的人物作为后备
-    const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
-    if (trainingData && trainingData.characters) {
-      return trainingData.characters.some((char: Character) => char.status === 'enemy' && char.canCombat === true);
-    }
+    console.log('据点没有英雄数据，不显示战前对话');
+    return false;
   } catch (error) {
     console.error('检查敌方人物失败:', error);
+    return false;
   }
-  return false;
 });
 
 // 检查是否可以开始战前对话
@@ -1349,6 +1394,13 @@ const loadEnemyCharacters = () => {
 const initializeBattleData = () => {
   console.log('开始初始化战斗数据...');
 
+  // 重置战前对话状态 - 每次进入新据点都应该重置
+  dialogueCompleted.value = false;
+  enemyMorale.value = 100;
+  showDialogueInterface.value = false;
+  dialogueConfig.value = null;
+  showDialogueConfirm.value = false;
+
   // 如果已经初始化过，直接返回
   if (isInitialized.value && allies.value.length > 0) {
     console.log('战斗数据已初始化，跳过重复初始化');
@@ -1797,30 +1849,78 @@ const applyMoraleEffect = () => {
   console.log('敌方单位属性已根据士气调整');
 };
 
+// 监听战斗数据变化，重置对话状态
+watch(
+  () => props.battleData?.target,
+  (newTarget, oldTarget) => {
+    if (newTarget && newTarget !== oldTarget) {
+      console.log('检测到据点变化，重置战前对话状态');
+      // 重置战前对话状态
+      dialogueCompleted.value = false;
+      enemyMorale.value = 100;
+      showDialogueInterface.value = false;
+      dialogueConfig.value = null;
+      showDialogueConfirm.value = false;
+    }
+  },
+  { deep: true },
+);
+
+// 更新面板高度
+const updatePanelHeight = () => {
+  const panel = document.querySelector('.units-panel');
+  if (panel) {
+    panelHeight.value = panel.clientHeight;
+  }
+};
+
 onMounted(() => {
   initializeBattleData();
+  updatePanelHeight();
+
+  // 监听窗口大小变化
+  window.addEventListener('resize', updatePanelHeight);
+});
+
+// 组件卸载时清理监听器
+onUnmounted(() => {
+  window.removeEventListener('resize', updatePanelHeight);
 });
 </script>
 
 <style scoped>
 .advanced-battle-interface {
+  --panel-width: 275px;
+  --gap: 1rem;
+  --padding: 1rem;
+  /* 动态高度变量 */
+  --unit-card-min-height: 120px;
+  --unit-card-max-height: 200px;
+  --unit-card-height-ratio: 15vh;
+  /* 字体大小变量 */
+  --unit-name-font-size: 14px; /* 1080P人物名称增大 */
+  --health-text-font-size: 12px; /* 1080P血量文字增大 */
+  --attr-font-size: 8px;
+  --attr-icon-font-size: 8px;
+
   width: 100%;
-  max-height: calc(100vh - 100px);
+  height: 100%;
   background: linear-gradient(180deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));
   color: #f0e6d2;
   font-family: 'Arial', sans-serif;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  gap: var(--gap);
+  padding: var(--padding);
 }
 
 .advanced-battle-interface.modal-mode {
-  height: 100%;
   background: transparent;
-  display: flex;
-  flex-direction: column;
   flex: 1;
 }
+
+/* 所有情况下都使用垂直布局 */
 
 .battle-header-modal {
   background: rgba(0, 0, 0, 0.4);
@@ -2076,16 +2176,19 @@ onMounted(() => {
 
 .battle-controls {
   display: flex;
-  gap: 1rem;
+  gap: 0.5rem;
   justify-content: center;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* 桌面端禁止换行 */
+  overflow-x: auto; /* 如果按钮太多，允许水平滚动 */
+  padding: 0.5rem 0;
 }
 
 @media (min-width: 769px) {
   .battle-controls {
     flex-wrap: nowrap;
     gap: 0.8rem;
+    overflow-x: visible; /* 桌面端不需要滚动 */
   }
 
   .dialogue-btn,
@@ -2093,16 +2196,21 @@ onMounted(() => {
   .auto-battle-btn,
   .retreat-btn {
     min-width: 120px;
-    height: 44px;
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
+    height: 48px;
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
   }
 }
 
+/* 通用按钮样式 */
 .dialogue-btn,
 .manual-battle-btn,
 .auto-battle-btn,
-.retreat-btn {
+.retreat-btn,
+.history-btn,
+.summary-btn,
+.harvest-btn,
+.retry-btn {
   padding: 0.8rem 1.5rem;
   border-radius: 12px;
   cursor: pointer;
@@ -2115,7 +2223,7 @@ onMounted(() => {
   overflow: hidden;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  min-width: 140px;
+  min-width: 120px;
   height: 48px;
   display: flex;
   align-items: center;
@@ -2207,22 +2315,6 @@ onMounted(() => {
   }
 }
 
-/* 初始状态的撤退按钮样式 */
-.battle-controls .retreat-btn {
-  background: linear-gradient(135deg, rgba(107, 114, 128, 0.4), rgba(75, 85, 99, 0.4));
-  border: 2px solid rgba(107, 114, 128, 0.6);
-  color: #d1d5db;
-  box-shadow: 0 4px 15px rgba(107, 114, 128, 0.3);
-
-  &:hover {
-    background: linear-gradient(135deg, rgba(107, 114, 128, 0.6), rgba(75, 85, 99, 0.6));
-    transform: translateY(-2px) scale(1.01);
-    box-shadow: 0 6px 20px rgba(107, 114, 128, 0.4);
-    border-color: rgba(107, 114, 128, 0.8);
-    color: #f3f4f6;
-  }
-}
-
 .battle-status,
 .battle-result-info {
   display: flex;
@@ -2263,251 +2355,144 @@ onMounted(() => {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
-.battle-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1rem;
-  overflow: hidden;
-  min-height: 0;
-}
-
-@media (min-width: 769px) {
-  .battle-main {
-    gap: 0.5rem;
-    padding: 0.25rem 0.5rem;
-    max-height: 690px;
-  }
-}
-
-/* 高分辨率屏幕优化 */
-@media (min-width: 1920px) {
-  .battle-main {
-    max-height: 1000px;
-    gap: 1rem;
-    padding: 0.5rem 1rem;
-  }
-}
-
-@media (min-width: 2560px) {
-  .battle-main {
-    max-height: 1400px;
-    gap: 1.5rem;
-    padding: 1rem 1.5rem;
-  }
-}
-
-.battle-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  overflow: hidden;
-  min-height: 0;
-}
-
-@media (min-width: 769px) {
-  .battle-content {
-    gap: 0.15rem;
-  }
-}
-
-/* 高分辨率屏幕优化 - 战斗内容区域 */
-@media (min-width: 1920px) {
-  .battle-content {
-    gap: 1rem;
-    flex-direction: column;
-  }
-}
-
-@media (min-width: 2560px) {
-  .battle-content {
-    gap: 1.5rem;
-  }
-}
-
-@media (min-width: 3840px) {
-  .battle-content {
-    gap: 2rem;
-  }
-}
-
 @media (max-width: 768px) {
-  .battle-main {
-    gap: 0.1rem !important;
-    padding: 0.1rem !important;
+  .advanced-battle-interface {
+    --gap: 0.5rem;
+    --padding: 0.5rem;
   }
 
-  .battle-content {
-    flex-direction: column !important;
-    gap: 0.1rem !important;
-    height: 100% !important;
+  .battle-log-panel {
+    height: 150px; /* 移动端固定高度 */
   }
 
-  .log-header {
-    flex-direction: row !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    gap: 0.5rem !important;
+  /* 移动端按钮容器样式 */
+  .battle-controls,
+  .history-button-container {
+    gap: 0.3rem;
+    padding: 0.3rem 0;
+    flex-wrap: wrap; /* 移动端允许换行 */
+    overflow-x: visible; /* 不需要滚动 */
   }
 
-  .log-controls {
-    justify-content: center !important;
+  /* 移动端按钮样式 */
+  .dialogue-btn,
+  .manual-battle-btn,
+  .auto-battle-btn,
+  .retreat-btn,
+  .history-btn,
+  .summary-btn,
+  .harvest-btn,
+  .retry-btn {
+    min-width: 100px; /* 基础最小宽度 */
+    height: 36px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    white-space: nowrap; /* 确保文字不换行 */
   }
 
-  .log-controls .control-btn {
-    padding: 0.4rem 0.8rem !important;
-    font-size: 0.8rem !important;
+  /* 移动端长文字按钮特殊处理 */
+  .history-btn,
+  .summary-btn {
+    min-width: 120px; /* 长文字按钮需要更宽 */
+  }
+
+  .manual-battle-btn {
+    min-width: 110px; /* 手动战斗按钮稍宽 */
   }
 
   .units-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-    gap: 2px !important;
-    justify-content: center !important;
-    align-content: center !important;
-    justify-items: center !important;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    justify-content: center;
+    align-content: center;
+    justify-items: center;
+    /* 移动端使用固定行高 */
+    grid-auto-rows: 120px;
   }
 
   .unit-card {
-    width: 80px !important;
-    height: 120px !important;
-    margin-left: 20px !important; /* 移动端为左侧名称留出空间 */
+    width: 100%;
+    height: 100%; /* 填满网格单元格 */
+    margin-left: 20px; /* 移动端为左侧名称留出空间 */
   }
 
   .unit-name-vertical-left {
-    left: -20px !important; /* 移动端调整位置 */
-    width: 16px !important;
-    font-size: 8px !important;
-    padding: 4px 2px !important;
+    left: -10px; /* 移动端偏移，根据8px字体计算 */
+    width: 16px; /* 根据8px字体调整宽度 */
+    font-size: 8px;
+    padding: 4px 2px;
   }
 
   .unit-health-bar-horizontal {
-    width: clamp(50px, 12vw, 70px) !important;
-    height: 4px !important;
-    top: 4px !important;
+    width: clamp(50px, 12vw, 70px);
+    height: 4px;
+    top: 4px;
   }
 
   .health-text-horizontal {
-    top: 4px !important;
-    font-size: clamp(5px, 1.5vw, 7px) !important;
-    line-height: 4px !important;
-    z-index: 4 !important;
+    top: 4px;
+    font-size: clamp(5px, 1.5vw, 7px);
+    line-height: 4px;
+    z-index: 4;
   }
 
   .unit-attributes-vertical {
-    bottom: 8px !important;
-    left: 6px !important;
-    gap: 2px !important;
+    bottom: 8px;
+    left: 6px;
+    gap: 2px;
   }
 
   .attr-item {
-    font-size: 8px !important;
-    padding: 2px 4px !important;
-    gap: 4px !important;
+    font-size: 8px;
+    padding: 2px 4px;
+    gap: 4px;
   }
 
   .attr-item .attr-icon {
-    font-size: 8px !important;
-    width: 8px !important;
+    font-size: 8px;
+    width: 8px;
   }
 }
 
 .units-panel {
-  flex: 1;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(205, 133, 63, 0.2);
   border-radius: 10px;
   padding: 1rem;
   overflow-y: auto;
-  min-height: 0;
   display: flex;
   flex-direction: column;
+  flex: 1; /* 平均分配剩余空间 */
+  min-height: 0; /* 允许收缩 */
 }
 
-@media (min-width: 769px) {
-  .units-panel {
-    flex: 0 0 275px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    min-height: 300px;
-    max-height: 100%;
-  }
-
-  .enemies-panel {
-    flex: 0 0 275px;
-    margin-top: 0;
-    min-height: 300px;
-    max-height: 100%;
+/* 当显示6个或更多部队卡时，调整高度比例 */
+@media (min-width: 1200px) {
+  .advanced-battle-interface {
+    --unit-card-height-ratio: 12vh; /* 降低高度比例，让更多卡片能显示 */
   }
 }
 
-/* 高分辨率屏幕优化 - 单位面板宽度和高度 */
+/* 高分辨率屏幕优化 - 保持历史记录面板高度为100px */
 @media (min-width: 1920px) {
-  .units-panel {
-    flex: 0 0 350px;
-    min-height: 400px;
-    max-height: 100%;
-  }
-
-  .enemies-panel {
-    flex: 0 0 350px;
-    min-height: 400px;
-    max-height: 100%;
+  .advanced-battle-interface {
+    --gap: 1.5rem;
+    --padding: 1.5rem;
+    --unit-card-height-ratio: 10vh; /* 进一步降低高度比例 */
   }
 }
 
 @media (min-width: 2560px) {
-  .units-panel {
-    flex: 0 0 450px;
-    min-height: 600px;
-    max-height: 100%;
-  }
-
-  .enemies-panel {
-    flex: 0 0 450px;
-    min-height: 600px;
-    max-height: 100%;
+  .advanced-battle-interface {
+    --gap: 2rem;
+    --padding: 2rem;
   }
 }
 
 @media (min-width: 3840px) {
-  .units-panel {
-    flex: 0 0 600px;
-    min-height: 900px;
-    max-height: 100%;
-  }
-
-  .enemies-panel {
-    flex: 0 0 600px;
-    min-height: 900px;
-    max-height: 100%;
-  }
-}
-
-@media (max-width: 768px) {
-  .allies-panel {
-    flex: 0 0 260px !important;
-    height: 100px !important;
-  }
-
-  .enemies-panel {
-    flex: 0 0 260px !important;
-    height: 100px !important;
-    margin-top: 0px !important;
-  }
-}
-
-@media (max-width: 768px) {
-  .units-panel {
-    padding: 0.25rem;
-  }
-
-  .battle-log-panel {
-    padding: 0.25rem;
-    flex: 0 0 200px !important;
-    height: 200px !important;
-    max-height: 170px !important;
+  .advanced-battle-interface {
+    --gap: 2.5rem;
+    --padding: 2.5rem;
   }
 }
 
@@ -2522,24 +2507,14 @@ onMounted(() => {
 
 .units-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   align-content: start;
   flex: 1;
   min-height: 0;
-}
-
-@media (min-width: 769px) {
-  .units-grid {
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: 1fr;
-    gap: 8px;
-    align-content: center;
-    justify-content: center;
-    width: 100%;
-    flex: 1;
-    min-height: 0;
-  }
+  /* 1080P以上强制6列 */
+  grid-template-columns: repeat(6, 1fr);
+  grid-auto-rows: 1fr;
+  height: 95%;
 }
 
 .unit-card {
@@ -2553,47 +2528,48 @@ onMounted(() => {
     0 4px 12px rgba(0, 0, 0, 0.4);
   transition: all 0.3s ease;
   cursor: pointer;
-  width: 120px;
-  height: 180px;
   display: flex;
   flex-direction: column;
   overflow: visible; /* 允许左侧名称显示 */
   margin-left: 30px; /* 为左侧名称留出空间 */
+  /* 尺寸由JavaScript动态计算 */
 }
 
-@media (min-width: 769px) {
-  .unit-card {
-    width: auto;
-    height: 100%;
-    margin-left: 20px;
-    flex: 1;
-    min-height: 200px;
-    max-height: 400px;
+/* 2K屏幕字体调整 */
+@media (min-width: 2560px) and (max-width: 3839px) {
+  .advanced-battle-interface {
+    --unit-name-font-size: 20px; /* 人物名称额外增大 */
+    --health-text-font-size: 16px; /* 血量文字增大 */
+    --attr-font-size: 12px;
+    --attr-icon-font-size: 12px;
+  }
+
+  .unit-name-vertical-left {
+    width: 40px; /* 根据20px字体调整宽度 */
+    left: -50px; /* 2K偏移，根据20px字体计算 */
   }
 }
 
-/* 高分辨率屏幕优化 - 单位卡片高度 */
-@media (min-width: 1920px) {
-  .unit-card {
-    height: 100%;
-    min-height: 300px;
-    max-height: 500px;
-  }
-}
-
-@media (min-width: 2560px) {
-  .unit-card {
-    height: 100%;
-    min-height: 400px;
-    max-height: 600px;
-  }
-}
-
+/* 4K屏幕字体调整 */
 @media (min-width: 3840px) {
-  .unit-card {
-    height: 100%;
-    min-height: 400px;
-    max-height: 600px;
+  .advanced-battle-interface {
+    --unit-name-font-size: 28px; /* 人物名称额外增大 */
+    --health-text-font-size: 22px; /* 血量文字增大 */
+    --attr-font-size: 16px;
+    --attr-icon-font-size: 16px;
+  }
+
+  .unit-name-vertical-left {
+    width: 56px; /* 根据28px字体调整宽度 */
+    left: -70px; /* 4K偏移，根据28px字体计算 */
+  }
+}
+
+/* 1080P以下使用原有布局 */
+@media (max-width: 1919px) {
+  .units-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    grid-auto-rows: 180px;
   }
 }
 
@@ -2666,13 +2642,13 @@ onMounted(() => {
 /* 单位名称 - 竖直显示在左侧 */
 .unit-name-vertical-left {
   position: absolute;
-  left: -30px; /* 放在单位卡左侧 */
+  left: -35px; /* 1080P基础偏移，根据14px字体 */
   top: 0;
   bottom: 0;
-  width: 24px;
+  width: 28px; /* 根据14px字体调整宽度 */
   z-index: 3;
   color: #ffd7a1;
-  font-size: 10px;
+  font-size: var(--unit-name-font-size);
   font-weight: 700;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   background: rgba(0, 0, 0, 0.6);
@@ -2689,12 +2665,21 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 
-@media (min-width: 769px) {
+/* 平板/小屏幕调整 */
+@media (min-width: 769px) and (max-width: 1919px) {
   .unit-name-vertical-left {
-    left: -20px;
-    width: 16px;
-    font-size: 8px;
+    left: -10px; /* 平板偏移，根据8px字体计算 */
+    width: 16px; /* 根据8px字体调整宽度 */
+    font-size: var(--unit-name-font-size); /* 使用CSS变量而不是硬编码 */
     padding: 4px 2px;
+  }
+}
+
+/* 强制移动端调整 - 更高优先级 */
+@media (max-width: 768px) {
+  .unit-name-vertical-left {
+    left: -20px !important; /* 强制移动端偏移 */
+    width: 18px !important; /* 强制移动端宽度 */
   }
 }
 
@@ -2704,7 +2689,7 @@ onMounted(() => {
   top: 6px;
   left: 50%;
   transform: translateX(-50%);
-  width: clamp(60px, 15vw, 100px);
+  /* 宽度由JavaScript动态计算 */
   height: 6px;
   background: rgba(0, 0, 0, 0.4);
   border-radius: 3px;
@@ -2714,7 +2699,7 @@ onMounted(() => {
 
 @media (min-width: 769px) {
   .unit-health-bar-horizontal {
-    width: clamp(50px, 12vw, 80px);
+    /* 宽度由JavaScript动态计算 */
     height: 4px;
     top: 4px;
   }
@@ -2734,7 +2719,7 @@ onMounted(() => {
   left: 50%;
   transform: translateX(-50%);
   color: #fff;
-  font-size: clamp(6px, 2vw, 10px);
+  font-size: var(--health-text-font-size);
   text-align: center;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
   z-index: 4;
@@ -2745,7 +2730,7 @@ onMounted(() => {
 @media (min-width: 769px) {
   .health-text-horizontal {
     top: 4px;
-    font-size: clamp(5px, 1.5vw, 8px);
+    font-size: var(--health-text-font-size); /* 使用CSS变量而不是硬编码 */
     line-height: 4px;
   }
 }
@@ -2777,40 +2762,40 @@ onMounted(() => {
   background: rgba(0, 0, 0, 0.6);
   padding: 3px 6px;
   border-radius: 3px;
-  font-size: clamp(8px, 2.2vw, 12px);
+  font-size: var(--attr-font-size);
 }
 
 @media (min-width: 769px) {
   .attr-item {
-    font-size: clamp(7px, 1.6vw, 10px);
+    font-size: var(--attr-font-size); /* 使用CSS变量而不是硬编码 */
     padding: 2px 5px;
     gap: 4px;
   }
 }
 
 .attr-item .attr-icon {
-  font-size: clamp(8px, 2.2vw, 12px);
+  font-size: var(--attr-icon-font-size);
   color: #f0e6d2;
-  width: clamp(8px, 2.2vw, 12px);
+  width: var(--attr-icon-font-size);
   text-align: center;
 }
 
 @media (min-width: 769px) {
   .attr-item .attr-icon {
-    font-size: clamp(7px, 1.6vw, 10px);
-    width: clamp(7px, 1.6vw, 10px);
+    font-size: var(--attr-icon-font-size); /* 使用CSS变量而不是硬编码 */
+    width: var(--attr-icon-font-size);
   }
 }
 
 .attr-item .attr-value {
-  font-size: clamp(8px, 2.2vw, 12px);
+  font-size: var(--attr-font-size);
   color: #ffd7a1;
   font-weight: 600;
 }
 
 @media (min-width: 769px) {
   .attr-item .attr-value {
-    font-size: clamp(7px, 1.6vw, 10px);
+    font-size: var(--attr-font-size); /* 使用CSS变量而不是硬编码 */
   }
 }
 
@@ -3085,51 +3070,29 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
   margin-bottom: 1.5rem;
   width: 100%;
   order: -1; /* 确保在顶部 */
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* 桌面端禁止换行 */
+  overflow-x: auto; /* 如果按钮太多，允许水平滚动 */
+  padding: 0.5rem 0;
 }
 
 @media (min-width: 769px) {
   .history-button-container {
     flex-wrap: nowrap;
     gap: 0.8rem;
-  }
-
-  .history-btn,
-  .summary-btn,
-  .harvest-btn {
-    min-width: 120px;
-    height: 44px;
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
+    overflow-x: visible; /* 桌面端不需要滚动 */
   }
 }
 
 /* 历史记录按钮样式 */
 .history-btn {
-  padding: 0.8rem 1.5rem;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 700;
-  transition: all 0.3s ease;
-  border: 2px solid rgba(107, 114, 128, 0.8);
-  white-space: nowrap;
   background: linear-gradient(135deg, #6b7280, #4b5563, #374151);
   color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
+  border: 2px solid rgba(107, 114, 128, 0.8);
   box-shadow: 0 6px 20px rgba(107, 114, 128, 0.4);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  position: relative;
-  overflow: hidden;
-  min-width: 140px;
-  height: 48px;
 
   &::before {
     content: '';
@@ -3156,26 +3119,10 @@ onMounted(() => {
 
 /* 战斗总结按钮样式 */
 .summary-btn {
-  padding: 0.8rem 1.5rem;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 700;
-  transition: all 0.3s ease;
-  border: 2px solid rgba(124, 58, 237, 0.8);
-  white-space: nowrap;
   background: linear-gradient(135deg, #7c3aed, #5b21b6, #4c1d95);
   color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
+  border: 2px solid rgba(124, 58, 237, 0.8);
   box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  position: relative;
-  overflow: hidden;
-  min-width: 140px;
-  height: 48px;
 
   &::before {
     content: '';
@@ -3232,22 +3179,14 @@ onMounted(() => {
 }
 
 .battle-log-panel {
-  flex: 0 0 120px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(205, 133, 63, 0.2);
   border-radius: 10px;
   padding: 0.5rem;
   display: flex;
   flex-direction: column;
-  max-height: 120px;
-}
-
-@media (min-width: 769px) {
-  .battle-log-panel {
-    flex: 1;
-    max-height: 120px;
-    min-height: 120px;
-  }
+  height: 150px; /* 固定高度 */
+  flex-shrink: 0; /* 不允许收缩 */
 }
 
 .log-header {
@@ -3474,22 +3413,7 @@ onMounted(() => {
   background: linear-gradient(135deg, #059669, #047857, #065f46);
   border: 2px solid rgba(5, 150, 105, 0.8);
   color: #ffffff;
-  padding: 0.8rem 1.5rem;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 700;
-  transition: all 0.3s ease;
-  white-space: nowrap;
   box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  position: relative;
-  overflow: hidden;
-  min-width: 140px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 
   &::before {
     content: '';
@@ -3514,47 +3438,11 @@ onMounted(() => {
   }
 }
 
-/* 撤退和重来按钮样式 */
-.retreat-btn,
-.retry-btn {
-  padding: 0.8rem 1.5rem;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 1rem;
-  font-weight: 700;
-  transition: all 0.3s ease;
-  border: 2px solid transparent;
-  white-space: nowrap;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  min-width: 140px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s ease;
-  }
-
-  &:hover::before {
-    left: 100%;
-  }
-}
-
 .retreat-btn {
   background: linear-gradient(135deg, rgba(107, 114, 128, 0.4), rgba(75, 85, 99, 0.4));
   border: 2px solid rgba(107, 114, 128, 0.6);
   color: #d1d5db;
+  box-shadow: 0 4px 15px rgba(107, 114, 128, 0.3);
 
   &:hover {
     background: linear-gradient(135deg, rgba(107, 114, 128, 0.6), rgba(75, 85, 99, 0.6));
@@ -3576,16 +3464,6 @@ onMounted(() => {
     transform: translateY(-3px) scale(1.02);
     box-shadow: 0 8px 25px rgba(59, 130, 246, 0.6);
     border-color: rgba(59, 130, 246, 1);
-  }
-}
-
-@media (min-width: 769px) {
-  .retreat-btn,
-  .retry-btn {
-    min-width: 120px;
-    height: 44px;
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
   }
 }
 

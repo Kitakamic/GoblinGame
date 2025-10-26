@@ -2163,28 +2163,60 @@ onMounted(async () => {
   background: linear-gradient(180deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));
   border: 2px solid rgba(205, 133, 63, 0.4);
   border-radius: 16px;
-  width: 95%;
-  height: 95%;
-  max-width: 1800px;
-  max-height: 1200px;
+  width: calc(100vw - 20px);
+  height: calc(100vh - 20px);
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px);
   overflow: hidden;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
   animation: modalSlideIn 0.3s ease-out;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
+/* 手机端 - 完全覆盖 */
 @media (max-width: 768px) {
   .battle-modal {
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-    max-width: none;
-    max-height: none;
+    width: calc(100vw - 10px);
+    height: calc(100vh - 10px);
+    border-radius: 8px;
+    max-width: calc(100vw - 10px);
+    max-height: calc(100vh - 10px);
   }
 
   .battle-modal .modal-content {
-    height: calc(100% - 5px);
+    height: calc(100% - 60px);
+  }
+}
+
+/* 1080P - 留出更多边界 */
+@media (min-width: 769px) and (max-width: 1920px) {
+  .battle-modal {
+    width: calc(100vw - 40px);
+    height: calc(100vh - 40px);
+    max-width: calc(100vw - 40px);
+    max-height: calc(100vh - 40px);
+  }
+}
+
+/* 2K - 留出适中边界 */
+@media (min-width: 1921px) and (max-width: 2560px) {
+  .battle-modal {
+    width: calc(100vw - 60px);
+    height: calc(100vh - 60px);
+    max-width: calc(100vw - 60px);
+    max-height: calc(100vh - 60px);
+  }
+}
+
+/* 4K - 留出较大边界 */
+@media (min-width: 2561px) {
+  .battle-modal {
+    width: calc(100vw - 80px);
+    height: calc(100vh - 80px);
+    max-width: calc(100vw - 80px);
+    max-height: calc(100vh - 80px);
   }
 }
 
@@ -2195,6 +2227,8 @@ onMounted(async () => {
   padding: 20px 24px;
   border-bottom: 1px solid rgba(205, 133, 63, 0.2);
   background: rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  min-height: 60px;
 }
 
 .battle-modal .modal-header h3 {
@@ -2202,6 +2236,30 @@ onMounted(async () => {
   color: #ffd7a1;
   font-size: 20px;
   font-weight: 700;
+}
+
+/* 手机端头部优化 */
+@media (max-width: 768px) {
+  .battle-modal .modal-header {
+    padding: 12px 16px;
+    min-height: 50px;
+  }
+
+  .battle-modal .modal-header h3 {
+    font-size: 16px;
+  }
+}
+
+/* 高分辨率头部优化 */
+@media (min-width: 1921px) {
+  .battle-modal .modal-header {
+    padding: 24px 32px;
+    min-height: 70px;
+  }
+
+  .battle-modal .modal-header h3 {
+    font-size: 24px;
+  }
 }
 
 .battle-modal .close-button {
@@ -2225,6 +2283,21 @@ onMounted(async () => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0; /* 确保flex子元素可以收缩 */
+}
+
+/* 手机端内容区域优化 */
+@media (max-width: 768px) {
+  .battle-modal .modal-content {
+    height: calc(100vh - 50px - 10px); /* 减去头部高度和边界 */
+  }
+}
+
+/* 高分辨率内容区域优化 */
+@media (min-width: 1921px) {
+  .battle-modal .modal-content {
+    height: calc(100vh - 70px - 60px); /* 减去头部高度和边界 */
+  }
 }
 
 .attack-modal-overlay {

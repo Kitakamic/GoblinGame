@@ -775,6 +775,7 @@ const processCharacterTurn = () => {
         hasChanges = true;
       } else if (character.status === 'training') {
         // 处理调教完成
+        // 未堕落人物正常处理调教完成
         character.loyalty = Math.min(100, character.loyalty + Math.floor(Math.random() * 10) + 5);
 
         // 检查堕落值是否达到100%，提示玩家可以手动触发堕落

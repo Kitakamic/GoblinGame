@@ -32,7 +32,7 @@
 
                 <!-- 等级标签 -->
                 <div class="character-level-badge">
-                  <span class="level-icon">⭐</span>
+                  <span class="level-icon">LV.</span>
                   <span class="level-value">{{ Math.floor(character.offspring / 10) }}</span>
                 </div>
               </div>

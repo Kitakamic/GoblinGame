@@ -550,10 +550,33 @@ const buildUserPrompt = (): string => {
 }
 [/OPTIONS_JSON]
 
-[当前调教角色: ${props.character.name}]
+<character_info>
+当前调教角色: ${props.character.name}
+  - 状态: ${props.character.status}
+  - 堕落值: ${props.character.loyalty}%
+  - 体力: ${props.character.stamina}/${props.character.maxStamina || 200}
+  - 生育值: ${props.character.fertility}/${props.character.maxFertility || 200}
+  - 已生育数量: ${props.character.offspring}
+当前服装状态:
+${
+  props.character.appearance?.clothing
+    ? `
+head: "${props.character.appearance.clothing.head || '无'}"
+top: "${props.character.appearance.clothing.top || '无'}"
+bottom: "${props.character.appearance.clothing.bottom || '无'}"
+socks: "${props.character.appearance.clothing.socks || '无'}"
+shoes: "${props.character.appearance.clothing.shoes || '无'}"
+underwear: "${props.character.appearance.clothing.underwear || '无'}"
+accessories: "${props.character.appearance.clothing.accessories || '无'}"
+toys: "${props.character.appearance.clothing.toys || '无'}"
+`
+    : '无服装信息'
+}
+</character_info>
 
-
+<user_message>
 ${latestUserMessage.content}
+</user_message>
 `;
   }
   return '';
@@ -750,63 +773,71 @@ const generateAndHandleAIReply = async () => {
 
     if (attributeChanges && AttributeChangeParseService.validateAttributeChanges(attributeChanges)) {
       console.log('✅ 属性变化验证通过，开始应用变化...');
-      const newAttributes = AttributeChangeParseService.applyAttributeChanges(
-        attributeChanges,
-        props.character.loyalty,
-        props.character.stamina,
-        props.character.maxStamina || 200,
-      );
-      console.log('🎯 应用后的新属性:', newAttributes);
 
-      // 创建更新后的人物对象
-      const updatedCharacter = {
-        ...props.character,
-        loyalty: newAttributes.loyalty,
-        stamina: newAttributes.stamina,
-        // 生育值保持不变，不参与调教计算
-      };
-
-      // 处理头像切换（基于堕落值变化）
-      const previousLoyalty = props.character.loyalty;
-      const avatarResult = AvatarSwitchService.handleCorruptionChange(updatedCharacter, previousLoyalty);
-
-      if (avatarResult.switched) {
-        console.log(
-          `🖼️ 头像已切换: ${props.character.name} 堕落值从 ${previousLoyalty}% 变为 ${newAttributes.loyalty}%`,
+      // 检查是否已堕落，已堕落人物不应用属性变化
+      if (props.character.status === 'surrendered') {
+        console.log('🚫 已堕落人物不应用属性变化，保持原有属性');
+        // 已堕落人物不应用任何属性变化，直接使用原有人物数据
+        pendingAttributeChanges.value = {
+          loyalty: props.character.loyalty,
+          stamina: props.character.stamina,
+          character: props.character,
+        };
+      } else {
+        // 未堕落人物正常应用属性变化
+        const newAttributes = AttributeChangeParseService.applyAttributeChanges(
+          attributeChanges,
+          props.character.loyalty,
+          props.character.stamina,
+          props.character.maxStamina || 200,
         );
-        console.log(`📊 堕落等级: ${AvatarSwitchService.getCorruptionLevelDescription(newAttributes.loyalty)}`);
+        console.log('🎯 应用后的新属性:', newAttributes);
 
-        // 显示头像切换提示
-        toastRef.value?.info(`${props.character.name} 的堕落值达到 ${newAttributes.loyalty}%，头像已切换！`, {
-          title: '头像切换',
-          duration: 3000,
-        });
+        // 创建更新后的人物对象
+        const updatedCharacter = {
+          ...props.character,
+          loyalty: newAttributes.loyalty,
+          stamina: newAttributes.stamina,
+          // 生育值保持不变，不参与调教计算
+        };
+
+        // 处理头像切换（基于堕落值变化）
+        const previousLoyalty = props.character.loyalty;
+        const avatarResult = AvatarSwitchService.handleCorruptionChange(updatedCharacter, previousLoyalty);
+
+        if (avatarResult.switched) {
+          console.log(
+            `🖼️ 头像已切换: ${props.character.name} 堕落值从 ${previousLoyalty}% 变为 ${newAttributes.loyalty}%`,
+          );
+          console.log(`📊 堕落等级: ${AvatarSwitchService.getCorruptionLevelDescription(newAttributes.loyalty)}`);
+
+          // 显示头像切换提示
+          toastRef.value?.info(`${props.character.name} 的堕落值达到 ${newAttributes.loyalty}%，头像已切换！`, {
+            title: '头像切换',
+            duration: 3000,
+          });
+        }
+
+        // 使用头像切换后的人物对象
+        const finalCharacter = avatarResult.character;
+
+        // 检查体力是否过低
+        if (AttributeChangeParseService.isStaminaTooLow(finalCharacter.stamina)) {
+          finalCharacter.status = 'training';
+          toastRef.value?.warning(`${finalCharacter.name} 体力过低，无法继续调教！`);
+        }
+
+        // 暂存属性变化，等待下一轮对话开始前应用
+        pendingAttributeChanges.value = {
+          loyalty: newAttributes.loyalty,
+          stamina: newAttributes.stamina,
+          character: finalCharacter,
+        };
+
+        // 通知父组件更新人物数据（但不触发自动调教）
+        emit('update-character', finalCharacter, false);
+        console.log('📤 已通知父组件更新人物数据（不触发自动调教）');
       }
-
-      // 使用头像切换后的人物对象
-      const finalCharacter = avatarResult.character;
-
-      // 检查体力是否过低
-      if (AttributeChangeParseService.isStaminaTooLow(finalCharacter.stamina)) {
-        finalCharacter.status = 'training';
-        toastRef.value?.warning(`${finalCharacter.name} 体力过低，无法继续调教！`);
-      }
-
-      // 暂存属性变化，等待下一轮对话开始前应用
-      pendingAttributeChanges.value = {
-        loyalty: newAttributes.loyalty,
-        stamina: newAttributes.stamina,
-        character: finalCharacter,
-      };
-
-      console.log('📝 暂存属性变化，等待下一轮对话开始前应用:', {
-        loyalty: newAttributes.loyalty,
-        stamina: newAttributes.stamina,
-      });
-
-      // 通知父组件更新人物数据（但不触发自动调教）
-      emit('update-character', finalCharacter, false);
-      console.log('📤 已通知父组件更新人物数据（不触发自动调教）');
     } else {
       console.warn('⚠️ 属性变化解析失败或验证不通过');
       console.log('📊 解析结果:', attributeChanges);
@@ -1032,18 +1063,23 @@ const confirmCloseTraining = async () => {
 
   // 消息已通过世界书服务自动保存
 
-  // 创建更新后的人物对象，设置为调教中状态
+  // 创建更新后的人物对象
+  // 检查是否已堕落，已堕落人物不进入调教状态
   const updatedCharacter = {
     ...props.character,
-    status: 'training' as const,
-    lastTraining: new Date(),
+    status: props.character.status === 'surrendered' ? props.character.status : ('training' as const),
+    lastTraining: props.character.status === 'surrendered' ? props.character.lastTraining : new Date(),
   };
 
   // 处理头像切换（确保头像与当前堕落值匹配）
   const avatarResult = AvatarSwitchService.handleCorruptionChange(updatedCharacter, updatedCharacter.loyalty);
   const finalCharacter = avatarResult.character;
 
-  console.log('🎯 调教界面关闭，设置人物状态为调教中');
+  if (props.character.status === 'surrendered') {
+    console.log('🎯 调教界面关闭，已堕落人物保持堕落状态');
+  } else {
+    console.log('🎯 调教界面关闭，设置人物状态为调教中');
+  }
 
   // 确保人物数据被更新到存档系统
   try {

@@ -144,7 +144,7 @@ export class ExploreService {
         ? {
             name: specialUnit.name,
             race: specialUnit.race,
-            unitType: specialUnit.class, // 将class映射为unitType
+            unitType: specialUnit.unitType, // 使用 unitType 而不是 class
             troopCount: 0, // 特殊单位的部队数量将由生成服务自动计算
             attributes: specialUnit.attributes,
           }

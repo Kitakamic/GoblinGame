@@ -38,7 +38,7 @@
 
           <!-- 等级标签 -->
           <div class="character-level-badge">
-            <span class="level-icon">⭐</span>
+            <span class="level-icon">LV.</span>
             <span class="level-value">{{ Math.floor(character.offspring / 10) }}</span>
           </div>
         </div>
@@ -121,13 +121,15 @@
           >
             <span class="btn-icon">⚔️</span>
           </button>
-          <!-- 堕落按钮 - 只在忠诚度达到100%且未堕落且未编制时显示 -->
+          <!-- 堕落按钮 - 只在忠诚度达到100%且未堕落且未编制且未在调教/交配中时显示 -->
           <button
             v-if="
               selectedCharacter &&
               selectedCharacter.loyalty >= 100 &&
               selectedCharacter.status !== 'surrendered' &&
-              selectedCharacter.status !== 'deployed'
+              selectedCharacter.status !== 'deployed' &&
+              selectedCharacter.status !== 'training' &&
+              selectedCharacter.status !== 'breeding'
             "
             class="wheel-btn corruption"
             :class="{ 'btn-5': true }"
@@ -922,7 +924,7 @@ const updateCharacter = (updatedCharacter: Character, shouldTriggerAutoTraining:
   // 使用头像切换后的人物对象
   const finalCharacter = avatarResult.character;
 
-  // 检查堕落值是否达到100%，提示玩家可以手动触发堕落
+  // 检查堕落值是否达到100%，提示玩家可以手动触发堕落（已堕落人物不参与判定）
   if (
     finalCharacter.loyalty >= 100 &&
     finalCharacter.status !== 'surrendered' &&
@@ -955,7 +957,7 @@ const updateCharacter = (updatedCharacter: Character, shouldTriggerAutoTraining:
     console.log('✅ 更新选中的人物数据');
   }
 
-  // 融合系统：手动调教结束后自动进行自动调教
+  // 融合系统：手动调教结束后自动进行自动调教（已堕落人物不参与）
   console.log('🔍 检查自动调教条件:', {
     shouldTriggerAutoTraining,
     characterStatus: finalCharacter.status,
@@ -967,6 +969,7 @@ const updateCharacter = (updatedCharacter: Character, shouldTriggerAutoTraining:
 
   if (
     shouldTriggerAutoTraining &&
+    finalCharacter.status !== 'surrendered' && // 已堕落人物不参与自动调教
     (finalCharacter.status === 'imprisoned' || finalCharacter.status === 'training') &&
     selectedCharacter.value?.id === finalCharacter.id
   ) {
@@ -1360,6 +1363,7 @@ const batchTraining = async () => {
     return;
   }
 
+  // 只对关押中且未堕落的人物进行批量调教
   const imprisonedCharacters = characters.value.filter(c => c.status === 'imprisoned' && c.stamina >= 20);
   imprisonedCharacters.forEach(character => {
     startTraining(character);

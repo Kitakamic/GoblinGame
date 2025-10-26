@@ -244,14 +244,7 @@ export class CharacterWorldbookManager {
 
 \`\`\`json
 ${JSON.stringify(fixedInfo, null, 2)}
-\`\`\`
-
-## ${character.name} 当前状态
-- 状态: ${character.status}
-- 堕落值: ${character.loyalty}%
-- 体力: ${character.stamina}/${character.maxStamina || 200}
-- 生育值: ${character.fertility}/${character.maxFertility || 200}
-- 子嗣数量: ${character.offspring}`;
+\`\`\``;
   }
 
   /**

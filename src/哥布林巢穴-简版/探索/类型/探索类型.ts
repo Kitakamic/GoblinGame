@@ -66,7 +66,7 @@ export interface Location {
   specialUnit?: {
     name: string;
     race: string;
-    class: string;
+    unitType: 'physical' | 'magical'; // 统一使用 unitType 字段
     attributes: {
       attack: number;
       defense: number;
@@ -112,7 +112,7 @@ export interface EnemyUnit {
   avatar?: string; // 头像
   country?: string; // 所属国家
   // 战斗相关属性
-  unitType?: string; // 单位类型（physical/magical/support等）
+  unitType: 'physical' | 'magical'; // 单位类型（必须字段）
   canLeadRaces?: string[]; // 可领导的种族
   // 英雄相关属性
   isHero?: boolean; // 是否为英雄单位

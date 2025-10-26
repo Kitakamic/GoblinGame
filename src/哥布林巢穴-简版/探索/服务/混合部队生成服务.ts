@@ -318,7 +318,7 @@ export class MixedTroopGenerationService {
       composition.push({
         name: specialUnit.name,
         race: specialUnit.race,
-        class: specialUnit.unitType,
+        unitType: specialUnit.unitType, // 使用 unitType 而不是 class
         troopCount: specialTroopCount,
         level: specialLevel,
         avatar: specialUnitAvatar,
@@ -349,7 +349,7 @@ export class MixedTroopGenerationService {
         composition.push({
           name: selectedMilitia.name,
           race: selectedMilitia.race,
-          class: selectedMilitia.unitType,
+          unitType: selectedMilitia.unitType, // 使用 unitType 而不是 class
           troopCount: militiaCount,
           level: selectedMilitia.level, // 使用实际等级
           avatar: militiaAvatar, // 使用民兵自己的头像
@@ -416,7 +416,7 @@ export class MixedTroopGenerationService {
         composition.push({
           name: unit.name,
           race: unit.race,
-          class: unit.unitType,
+          unitType: unit.unitType, // 使用 unitType 而不是 class
           troopCount: troopCount,
           level: unit.level,
           avatar: unitAvatar, // 使用单位自己的头像
@@ -581,7 +581,7 @@ export class MixedTroopGenerationService {
         id,
         name: composition.name,
         race: composition.race,
-        class: composition.unitType,
+        class: composition.unitType, // 保持 class 字段用于显示
         level: composition.level,
         troopCount: composition.troopCount,
         attributes: {
@@ -593,7 +593,7 @@ export class MixedTroopGenerationService {
         },
         avatar: composition.avatar || this.getAvatarFromDatabase(composition.race),
         country: this.getCountryFromDatabase(composition.race),
-        unitType: this.getUnitTypeForComposition(composition),
+        unitType: this.getUnitTypeForComposition(composition), // 使用正确的 unitType
         canLeadRaces: [composition.race],
         // 添加部下信息
         troops: composition.troops,
@@ -809,11 +809,11 @@ export class MixedTroopGenerationService {
   /**
    * 为部队构成获取合适的单位类型
    */
-  private static getUnitTypeForComposition(composition: any): string {
+  private static getUnitTypeForComposition(composition: any): 'physical' | 'magical' {
     try {
       // 如果是特殊单位（AI生成的），直接使用其unitType
-      if (composition.isSpecial && composition.class) {
-        return composition.class === 'magical' ? 'magical' : 'physical';
+      if (composition.isSpecial && composition.unitType) {
+        return composition.unitType === 'magical' ? 'magical' : 'physical';
       }
 
       // 如果是队长单位（英雄或特殊单位），使用其部下的单位类型
@@ -832,7 +832,7 @@ export class MixedTroopGenerationService {
   /**
    * 从单位数据表中获取单位类型
    */
-  private static getUnitTypeFromDatabase(unitClass: string, race: string): string {
+  private static getUnitTypeFromDatabase(unitClass: string, race: string): 'physical' | 'magical' {
     try {
       // 获取该种族的所有单位
       const raceUnits = getUnitsByRace(race);
@@ -859,7 +859,7 @@ export class MixedTroopGenerationService {
       }
 
       if (matchingUnit) {
-        return matchingUnit.unitType || 'physical';
+        return matchingUnit.unitType === 'magical' ? 'magical' : 'physical';
       }
 
       // 如果都没找到，返回默认类型
