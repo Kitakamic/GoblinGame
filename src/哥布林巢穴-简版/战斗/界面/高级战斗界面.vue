@@ -7,7 +7,11 @@
           v-for="unit in allies"
           :key="unit.id"
           class="unit-card"
-          :class="{ 'unit-dead': !unit.isAlive }"
+          :class="{
+            'unit-dead': !unit.isAlive,
+            'unit-physical': unit.type === 'physical',
+            'unit-magical': unit.type === 'magical',
+          }"
           :style="unitCardSize"
         >
           <!-- 单位名称 - 竖直显示在左侧 -->
@@ -155,6 +159,8 @@
             'unit-dead': !unit.isAlive,
             'unit-selected': selectedTarget?.id === unit.id,
             'unit-selectable': unit.isAlive,
+            'unit-physical': unit.type === 'physical',
+            'unit-magical': unit.type === 'magical',
           }"
           :style="unitCardSize"
           @click="selectTarget(unit)"
@@ -2744,12 +2750,46 @@ onUnmounted(() => {
   filter: grayscale(100%);
 }
 
-/* 集火目标选中状态 */
+/* 物理单位边框 - 红色 */
+.unit-card.unit-physical:not(.unit-selected) {
+  border-color: rgba(220, 38, 38, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3);
+}
+
+.unit-card.unit-physical:not(.unit-selected):hover {
+  border-color: rgba(220, 38, 38, 0.8) !important;
+  box-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+}
+
+/* 魔法单位边框 - 蓝色 */
+.unit-card.unit-magical:not(.unit-selected) {
+  border-color: rgba(59, 130, 246, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.unit-card.unit-magical:not(.unit-selected):hover {
+  border-color: rgba(59, 130, 246, 0.8) !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+/* 集火目标选中状态 - 金色边框（最高优先级） */
 .unit-card.unit-selected {
-  border: 3px solid #ff6b6b !important;
-  box-shadow: 0 0 20px rgba(255, 107, 107, 0.6) !important;
-  transform: scale(1.05);
-  background: linear-gradient(135deg, rgba(255, 107, 107, 0.1), rgba(255, 107, 107, 0.05)) !important;
+  border: 3px solid #ffd700 !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+  transform: scale(1.05) !important;
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 215, 0, 0.08)) !important;
+}
+
+/* 选中状态的物理单位 - 确保金色覆盖 */
+.unit-card.unit-selected.unit-physical {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+}
+
+/* 选中状态的魔法单位 - 确保金色覆盖 */
+.unit-card.unit-selected.unit-magical {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
 }
 
 /* 可选择状态 */

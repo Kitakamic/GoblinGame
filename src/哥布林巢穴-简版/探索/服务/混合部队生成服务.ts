@@ -274,7 +274,8 @@ export class MixedTroopGenerationService {
           composition.push({
             name: hero.name,
             race: hero.race,
-            class: hero.unitType,
+            class: hero.unitType, // 保持向后兼容
+            unitType: hero.unitType, // 添加unitType字段供战斗系统使用
             troopCount: heroTroopCount,
             level: heroLevel, // 固定为1（堕落等级）
             avatar: heroAvatar, // 使用英雄自己的肖像
@@ -813,20 +814,47 @@ export class MixedTroopGenerationService {
       return this.getDefaultEliteUnit();
     }
 
+    // 确定队长的单位类型（物理或魔法）
+    const captainUnitType = this.getUnitTypeForComposition(captain);
+    console.log(`[混合部队生成] 队长 ${captain.name} 的单位类型: ${captainUnitType}`);
+
     // 优先选择同种族的单位
     const sameRaceUnits = baseUnits.filter(unit => unit.race === captain.race);
     const availableUnits = sameRaceUnits.length > 0 ? sameRaceUnits : baseUnits;
 
-    // 选择当前据点生成的单位中等级最高的那个
-    const sortedByLevel = availableUnits.sort((a, b) => b.level - a.level);
-    const selectedTroop = sortedByLevel[0]; // 直接选择等级最高的
+    // 优先选择与自己单位类型一致的单位
+    const sameTypeUnits = availableUnits.filter(unit => {
+      const unitType = this.getUnitTypeForComposition(unit);
+      return unitType === captainUnitType;
+    });
+
+    let selectedTroop;
+    let selectionReason;
+
+    if (sameTypeUnits.length > 0) {
+      // 有同类型单位，选择其中等级最高的
+      const sortedByLevel = sameTypeUnits.sort((a, b) => b.level - a.level);
+      selectedTroop = sortedByLevel[0];
+      selectionReason = `选择同类型(${captainUnitType})中等级最高的单位`;
+    } else {
+      // 没有同类型单位，选择等级最高的
+      const sortedByLevel = availableUnits.sort((a, b) => b.level - a.level);
+      selectedTroop = sortedByLevel[0];
+      selectionReason = `据点没有同类型单位，选择等级最高的单位`;
+    }
 
     console.log(`[混合部队生成] 为队长 ${captain.name} 选择部下:`, {
-      队长等级: Math.floor(captain.offspring / 10),
+      队长等级: captain.level,
       队长种族: captain.race,
-      候选单位: availableUnits.map(u => ({ name: u.name, level: u.level, race: u.race })),
+      队长单位类型: captainUnitType,
+      候选单位: availableUnits.map(u => ({
+        name: u.name,
+        level: u.level,
+        race: u.race,
+        unitType: this.getUnitTypeForComposition(u),
+      })),
       选中单位: selectedTroop.name,
-      选择理由: '选择据点中等级最高的单位',
+      选择理由: selectionReason,
     });
 
     return selectedTroop;
@@ -871,18 +899,30 @@ export class MixedTroopGenerationService {
    */
   private static getUnitTypeForComposition(composition: any): 'physical' | 'magical' {
     try {
+      // 如果是英雄单位，优先使用自己的unitType
+      if (composition.isHero && composition.unitType) {
+        console.log(`[混合部队生成] 英雄单位 ${composition.name} 使用自己的unitType:`, composition.unitType);
+        return composition.unitType === 'magical' ? 'magical' : 'physical';
+      }
+
       // 如果是特殊单位（AI生成的），直接使用其unitType
       if (composition.isSpecial && composition.unitType) {
         return composition.unitType === 'magical' ? 'magical' : 'physical';
       }
 
-      // 如果是队长单位（英雄或特殊单位），使用其部下的单位类型
+      // 如果已经有unitType字段（普通单位），直接使用
+      if (composition.unitType === 'physical' || composition.unitType === 'magical') {
+        console.log(`[混合部队生成] 普通单位 ${composition.name} 使用自己的unitType:`, composition.unitType);
+        return composition.unitType;
+      }
+
+      // 如果是队长单位（特殊单位），使用其部下的单位类型
       if (composition.isCaptain && composition.troops) {
         return this.getUnitTypeFromDatabase(composition.troops.type, composition.race);
       }
 
-      // 如果是普通单位，使用自己的单位类型
-      return this.getUnitTypeFromDatabase(composition.unitType, composition.race);
+      // 最后尝试从数据库中获取单位类型
+      return this.getUnitTypeFromDatabase(composition.unitType || composition.name, composition.race);
     } catch (error) {
       console.error(`[混合部队生成] 获取部队单位类型失败:`, error);
       return 'physical';

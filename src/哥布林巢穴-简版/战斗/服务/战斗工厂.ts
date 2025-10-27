@@ -72,6 +72,8 @@ export class BattleFactory {
   public static createBattleUnitFromEnemyCharacter(enemyCharacter: Character): BattleUnit | null {
     if (!enemyCharacter || enemyCharacter.status !== 'enemy' || !enemyCharacter.canCombat) return null;
 
+    console.log(`[战斗工厂] 创建敌方战斗单位: ${enemyCharacter.name}, unitType:`, enemyCharacter.unitType);
+
     return {
       id: enemyCharacter.name, // 使用名称作为ID
       name: enemyCharacter.name,

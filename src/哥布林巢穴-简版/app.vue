@@ -5,16 +5,8 @@
       <div class="decorative-border">
         <div class="content-wrapper">
           <header class="header">
-            <div class="header-left">
-              <button class="help-btn" title="游戏设置" @click="openSettings">
-                <span class="icon">⚙️</span>
-              </button>
-            </div>
-            <h1 class="main-title">哥布林巢穴</h1>
-            <div class="header-right">
-              <button class="fullscreen-btn" title="全屏" @click="toggleFullscreen">
-                <span class="icon">⛶</span>
-              </button>
+            <div class="header-center">
+              <h1 class="main-title">哥布林巢穴</h1>
             </div>
           </header>
 
@@ -283,6 +275,12 @@
       @cancel="handleTutorialCancel"
       @close="handleTutorialCancel"
     />
+
+    <!-- 全局悬浮球 -->
+    <GlobalFAB @open-settings="openSettings" />
+
+    <!-- 欢迎提示弹窗 -->
+    <WelcomeModal :show="showWelcomeModal" @confirm="handleWelcomeConfirm" @close="handleWelcomeClose" />
   </div>
 </template>
 
@@ -298,10 +296,13 @@ import { modularSaveManager } from './存档管理/模块化存档服务';
 import { continentExploreService } from './探索/服务/大陆探索服务';
 import { SummaryCheckService } from './服务/总结检查服务';
 import { TimeParseService } from './服务/时间解析服务';
+import { checkAndShowWelcome, markWelcomeAsShown } from './服务/欢迎提示服务';
 import { PlayerLevelService } from './服务/玩家等级服务';
 import { BreedingService } from './服务/生育服务';
 import { ConfirmService, confirmState } from './服务/确认框服务';
+import GlobalFAB from './组件/全局悬浮球.vue';
 import TextStyleSettings from './组件/文字样式设置.vue';
+import WelcomeModal from './组件/欢迎提示弹窗.vue';
 import GameSettingsPanel from './组件/游戏设置面板.vue';
 import CustomConfirm from './组件/自定义确认框.vue';
 
@@ -408,18 +409,6 @@ const triggerDateUpdateAnimation = () => {
   }
 };
 
-// 全屏功能
-function toggleFullscreen() {
-  const element = document.querySelector('.mini-goblin');
-  if (!document.fullscreenElement) {
-    element?.requestFullscreen().catch(err => {
-      console.error(`Error attempting to enable fullscreen: ${err}`);
-    });
-  } else {
-    document.exitFullscreen();
-  }
-}
-
 // 设置面板状态
 const showSettings = ref(false);
 const showTextStyleSettings = ref(false);
@@ -468,6 +457,20 @@ function handleTutorialConfirm() {
 // 处理教程取消
 function handleTutorialCancel() {
   showTutorialConfirm.value = false;
+}
+
+// 欢迎弹窗状态
+const showWelcomeModal = ref(false);
+
+// 处理欢迎弹窗确认
+function handleWelcomeConfirm() {
+  markWelcomeAsShown();
+  showWelcomeModal.value = false;
+}
+
+// 处理欢迎弹窗关闭（实际上不允许关闭，必须点击"我知道了"）
+function handleWelcomeClose() {
+  // 不允许点击关闭
 }
 
 // 游戏状态管理
@@ -1362,6 +1365,11 @@ onMounted(async () => {
   } else {
     console.log('开始新游戏');
   }
+
+  // 检查并显示欢迎弹窗
+  if (checkAndShowWelcome()) {
+    showWelcomeModal.value = true;
+  }
 });
 
 // 组件卸载时保存数据
@@ -1428,15 +1436,14 @@ onUnmounted(() => {
   position: relative;
   margin-bottom: 24px;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  gap: 12px;
 
-  .header-left,
-  .header-right {
+  .header-center {
     display: flex;
     align-items: center;
-    flex: 0 0 auto;
+    justify-content: center;
+    flex: 1;
   }
 
   .main-title {
@@ -1449,8 +1456,6 @@ onUnmounted(() => {
       0 0 12px rgba(255, 120, 40, 0.3);
     position: relative;
     display: inline-block;
-    flex: 1;
-    text-align: center;
 
     &::after {
       content: '';
@@ -1461,63 +1466,6 @@ onUnmounted(() => {
       width: 80%;
       height: 2px;
       background: linear-gradient(90deg, transparent, rgba(255, 180, 120, 0.6), transparent);
-    }
-  }
-
-  .header-buttons {
-    display: flex;
-    gap: 8px;
-  }
-
-  .help-btn,
-  .fullscreen-btn {
-    background: rgba(40, 26, 20, 0.9);
-    border: 2px solid rgba(255, 180, 120, 0.6);
-    border-radius: 6px;
-    padding: 5px 10px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    min-width: 36px;
-    min-height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow:
-      0 2px 8px rgba(0, 0, 0, 0.3),
-      inset 0 1px 2px rgba(255, 200, 150, 0.2);
-
-    &:hover {
-      background: rgba(255, 180, 120, 0.15);
-      border-color: rgba(255, 180, 120, 0.9);
-      transform: scale(1.1);
-      box-shadow:
-        0 4px 12px rgba(255, 180, 120, 0.3),
-        inset 0 1px 2px rgba(255, 200, 150, 0.3);
-    }
-
-    .icon {
-      font-size: 16px;
-      font-weight: 700;
-      color: #ffd7a1;
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
-      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-    }
-  }
-
-  .help-btn {
-    background: rgba(59, 130, 246, 0.2);
-    border-color: rgba(96, 165, 250, 0.6);
-
-    &:hover {
-      background: rgba(59, 130, 246, 0.3);
-      border-color: rgba(96, 165, 250, 0.9);
-      box-shadow:
-        0 4px 12px rgba(96, 165, 250, 0.3),
-        inset 0 1px 2px rgba(147, 197, 253, 0.3);
-    }
-
-    .icon {
-      color: #93c5fd;
     }
   }
 }
@@ -1918,17 +1866,6 @@ onUnmounted(() => {
 
   .main-title {
     font-size: 24px;
-  }
-
-  .help-btn,
-  .fullscreen-btn {
-    padding: 4px 8px;
-    min-width: 32px;
-    min-height: 28px;
-
-    .icon {
-      font-size: 14px;
-    }
   }
 
   .stats-container {

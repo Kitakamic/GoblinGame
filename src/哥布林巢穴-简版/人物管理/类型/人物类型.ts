@@ -107,10 +107,12 @@ export interface CharacterAppearance {
   cupSize?: string; // 罩杯
   /** 外貌详细描述 */
   description?: string;
-  /** 衣着信息 */
+  /** 衣着信息（正常状态） */
   clothing?: CharacterClothing;
   /** 原始衣着信息（用于重置功能） */
   originalClothing?: CharacterClothing;
+  /** 堕落衣着信息（loyalty=100时显示） */
+  corruptedClothing?: CharacterClothing;
 }
 
 // ==================== 敏感点相关类型 ====================

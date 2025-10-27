@@ -13,7 +13,12 @@
             v-for="(captain, index) in captainSlots"
             :key="index"
             class="captain-slot"
-            :class="{ empty: !captain, selected: selectedCaptainIndex === index }"
+            :class="{
+              empty: !captain,
+              selected: selectedCaptainIndex === index,
+              'captain-physical': captain?.unitType === 'physical',
+              'captain-magical': captain?.unitType === 'magical',
+            }"
             @click="selectCaptain(index)"
           >
             <div v-if="captain" class="captain-card">
@@ -169,7 +174,7 @@
               </div>
               <div class="captain-level">等级 {{ captain.level || Math.floor(captain.offspring / 10) }}</div>
             </div>
-            <div v-if="captain.isUsed" class="used-badge">已使用</div>
+            <div v-if="captain.isUsed" class="used-badge">已加入</div>
           </div>
         </div>
       </div>
@@ -1547,8 +1552,9 @@ defineExpose({
   }
 
   &.selected {
-    border-color: rgba(52, 152, 219, 0.6);
-    box-shadow: 0 0 15px rgba(52, 152, 219, 0.3);
+    border-color: #ffd700 !important;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+    border-width: 3px !important;
   }
 
   &.empty {
@@ -2318,6 +2324,42 @@ defineExpose({
   .captain-slot {
     height: calc(100vh - 280px);
   }
+}
+
+/* 物理队长边框 - 红色 */
+.captain-slot.captain-physical:not(.selected) {
+  border-color: rgba(220, 38, 38, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.3);
+}
+
+.captain-slot.captain-physical:not(.selected):hover {
+  border-color: rgba(220, 38, 38, 0.8) !important;
+  box-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+}
+
+/* 魔法队长边框 - 蓝色 */
+.captain-slot.captain-magical:not(.selected) {
+  border-color: rgba(59, 130, 246, 0.6) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.captain-slot.captain-magical:not(.selected):hover {
+  border-color: rgba(59, 130, 246, 0.8) !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+/* 选中状态的物理队长 - 确保金色覆盖 */
+.captain-slot.selected.captain-physical {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+  border-width: 3px !important;
+}
+
+/* 选中状态的魔法队长 - 确保金色覆盖 */
+.captain-slot.selected.captain-magical {
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.8) !important;
+  border-width: 3px !important;
 }
 
 /* 响应式设计 */

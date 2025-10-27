@@ -227,6 +227,7 @@ import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { WorldbookService } from '../世界书管理/世界书服务';
 import { AvatarSwitchService } from '../人物管理/服务/头像切换服务';
+import { ClothingSwitchService } from '../人物管理/服务/衣着切换服务';
 import CharacterCardInterface from '../人物管理/界面/人物卡界面.vue';
 import OutfitInterface from '../人物管理/界面/换装界面.vue';
 import type { Character } from '../人物管理/类型/人物类型';
@@ -1069,8 +1070,12 @@ const triggerCorruption = async (character: Character) => {
     console.log(`${character.name} 已完成堕落，状态已更新为已堕落`);
 
     // 切换到完全堕落头像
-    const corruptedCharacter = AvatarSwitchService.switchToFullyCorruptedAvatar(character);
+    let corruptedCharacter = AvatarSwitchService.switchToFullyCorruptedAvatar(character);
     console.log(`🖼️ ${character.name} 头像已切换到完全堕落状态`);
+
+    // 切换到堕落衣着
+    corruptedCharacter = ClothingSwitchService.switchToCorruptedClothing(corruptedCharacter);
+    console.log(`👗 ${character.name} 衣着已切换到堕落状态`);
 
     // 更新世界书描述
     await WorldbookService.updateCharacterEntry(corruptedCharacter);
@@ -1089,13 +1094,19 @@ const triggerCorruption = async (character: Character) => {
     // 强制刷新头像显示
     forceRefreshCharacterAvatar(corruptedCharacter.id, corruptedCharacter.avatar || '');
 
-    // 保存数据到存档系统
+    // 保存调教数据（参考换装界面的保存方式）
     saveTrainingData();
+
+    // 保存到存档系统
     modularSaveManager.saveCurrentGameData(0);
+
+    // 显示堕落完成提示（包含衣着切换信息）
+    const hasCorruptedClothing = !!corruptedCharacter.appearance?.corruptedClothing;
+    const clothingChange = hasCorruptedClothing ? '，衣着已切换为堕落装扮！' : '';
 
     // 显示堕落完成提示
     toastRef.value?.success(
-      `堕落成功！${corruptedCharacter.name} 已完全堕落，对主人绝对忠诚！威胁度增加：⚠️ +${threatReward}。`,
+      `堕落成功！${corruptedCharacter.name} 已完全堕落，对主人绝对忠诚！${clothingChange} 威胁度增加：⚠️ +${threatReward}。`,
       { title: '堕落完成', duration: 5000 },
     );
   }

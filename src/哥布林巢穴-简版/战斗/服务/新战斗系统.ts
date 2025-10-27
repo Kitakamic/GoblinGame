@@ -225,11 +225,10 @@ export class NewBattleSystem {
    */
   private selectActionType(unit: BattleUnit): ActionType {
     // 根据单位类型选择行动：物理单位使用物理攻击，魔法单位使用魔法攻击
-    if (unit.type === 'magical') {
-      return ActionType.MAGICAL_ATTACK;
-    } else {
-      return ActionType.PHYSICAL_ATTACK;
-    }
+    console.log(`[战斗系统] 单位 ${unit.name} 的 type 为: ${unit.type}`);
+    const actionType = unit.type === 'magical' ? ActionType.MAGICAL_ATTACK : ActionType.PHYSICAL_ATTACK;
+    console.log(`[战斗系统] 单位 ${unit.name} 选择了行动类型:`, actionType);
+    return actionType;
   }
 
   /**
