@@ -138,10 +138,22 @@ export class MoraleDialogueService {
     // 构建AI提示词
     const prompt = this.buildAIPrompt(userInput, context, actualCurrentMorale);
 
+    // 读取全局流式传输设置
+    const globalVars = getVariables({ type: 'global' });
+    const enableStreamOutput =
+      typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : true; // 默认开启
+
     // 使用带思维链的AI生成（自动切换到战前对话思维链）
     const response = await generateWithChainOfThought(ChainOfThoughtMode.PRE_BATTLE_DIALOGUE, {
       user_input: prompt,
+      should_stream: enableStreamOutput, // 根据设置启用流式传输
     });
+
+    // 检查AI回复是否为空或无效
+    if (!response || response.trim().length === 0) {
+      console.warn('⚠️ 战前对话AI回复为空');
+      throw new Error('AI回复为空，请重试');
+    }
 
     // 解析AI输出并处理士气变化
     this.processMoraleChange(response, actualCurrentMorale, onMoraleChange);

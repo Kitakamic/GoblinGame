@@ -60,23 +60,64 @@
         <!-- 正文字体 -->
         <div class="style-item">
           <label class="style-label">
-            <span class="label-text">正文字体</span>
-            <span class="label-preview" :style="{ fontFamily: textFont }">预览文字</span>
+            <span class="label-text">正文字体（移动端不支持自定义字体）</span>
+            <span class="label-preview" :style="{ fontFamily: normalizedFontFamily }">预览文字</span>
           </label>
-          <select v-model="textFont" class="font-select" @change="updateStyle">
+          <select v-model="textFont" class="font-select font-preview-select" @change="updateStyle">
             <!-- 中文字体 -->
-            <option value="'Microsoft YaHei', '微软雅黑', sans-serif">微软雅黑</option>
-            <option value="'SimSun', '宋体', serif">宋体</option>
-            <option value="'SimHei', '黑体', sans-serif">黑体</option>
-            <option value="'KaiTi', '楷体', serif">楷体</option>
-            <option value="'SimLi', '隶书', serif">隶书</option>
-            <option value="'FangSong', '仿宋', serif">仿宋</option>
+            <option
+              value="'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Hiragino Sans GB', sans-serif"
+              :style="{ fontFamily: 'Microsoft YaHei, 微软雅黑, PingFang SC, Hiragino Sans GB, sans-serif' }"
+            >
+              微软雅黑
+            </option>
+            <option
+              value="'SimSun', '宋体', 'STSong', 'Songti SC', serif"
+              :style="{ fontFamily: 'SimSun, 宋体, STSong, Songti SC, serif' }"
+            >
+              宋体
+            </option>
+            <option
+              value="'SimHei', '黑体', 'STHeiti', 'Heiti SC', sans-serif"
+              :style="{ fontFamily: 'SimHei, 黑体, STHeiti, Heiti SC, sans-serif' }"
+            >
+              黑体
+            </option>
+            <option
+              value="'KaiTi', '楷体', 'Kaiti SC', 'STKaiti', serif"
+              :style="{ fontFamily: 'KaiTi, 楷体, Kaiti SC, STKaiti, serif' }"
+            >
+              楷体
+            </option>
+            <option value="'SimLi', '隶书', 'STLiti', serif" :style="{ fontFamily: 'SimLi, 隶书, STLiti, serif' }">
+              隶书
+            </option>
+            <option
+              value="'FangSong', '仿宋', 'FangSong SC', serif"
+              :style="{ fontFamily: 'FangSong, 仿宋, FangSong SC, serif' }"
+            >
+              仿宋
+            </option>
             <!-- 西文字体 -->
-            <option value="Georgia, 'Times New Roman', serif">Georgia (衬线)</option>
-            <option value="Arial, 'Helvetica', sans-serif">Arial (无衬线)</option>
-            <option value="Verdana, sans-serif">Verdana (无衬线)</option>
-            <option value="'Palatino Linotype', 'Book Antiqua', serif">Palatino (衬线)</option>
-            <option value="'Courier New', monospace">Courier New (等宽)</option>
+            <option
+              value="Georgia, 'Times New Roman', serif"
+              :style="{ fontFamily: 'Georgia, Times New Roman, serif' }"
+            >
+              Georgia (衬线)
+            </option>
+            <option value="Arial, 'Helvetica', sans-serif" :style="{ fontFamily: 'Arial, Helvetica, sans-serif' }">
+              Arial (无衬线)
+            </option>
+            <option value="Verdana, sans-serif" :style="{ fontFamily: 'Verdana, sans-serif' }">Verdana (无衬线)</option>
+            <option
+              value="'Palatino Linotype', 'Book Antiqua', serif"
+              :style="{ fontFamily: 'Palatino Linotype, Book Antiqua, serif' }"
+            >
+              Palatino (衬线)
+            </option>
+            <option value="'Courier New', monospace" :style="{ fontFamily: 'Courier New, monospace' }">
+              Courier New (等宽)
+            </option>
           </select>
         </div>
 
@@ -105,7 +146,7 @@ const defaultItalicColor = '#ff69b4';
 const defaultStrongColor = '#f7efd9';
 const defaultDoubleQuoteColor = '#ffd7a1';
 const defaultSingleQuoteColor = '#ffbd7a';
-const defaultTextFont = "'Microsoft YaHei', '微软雅黑', sans-serif";
+const defaultTextFont = "'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Hiragino Sans GB', sans-serif";
 
 // 响应式数据
 const textColor = ref(defaultTextColor);
@@ -114,6 +155,12 @@ const strongColor = ref(defaultStrongColor);
 const doubleQuoteColor = ref(defaultDoubleQuoteColor);
 const singleQuoteColor = ref(defaultSingleQuoteColor);
 const textFont = ref(defaultTextFont);
+
+// 计算属性：规范化字体名称供预览使用（移除引号）
+const normalizedFontFamily = computed(() => {
+  // 移除字体名称中的所有引号，以便在 Vue style 绑定中正确显示
+  return textFont.value.replace(/['"]/g, '');
+});
 
 // 加载保存的设置
 const loadSavedStyles = () => {
@@ -136,7 +183,27 @@ const loadSavedStyles = () => {
       singleQuoteColor.value = characterVars['dialogue_single_quote_color'];
     }
     if (characterVars['dialogue_text_font']) {
-      textFont.value = characterVars['dialogue_text_font'];
+      // 字体迁移：将旧的字体值升级为包含移动端支持的新字体值
+      const savedFont = characterVars['dialogue_text_font'];
+      const fontMigrationMap: Record<string, string> = {
+        "'Microsoft YaHei', '微软雅黑', sans-serif":
+          "'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Hiragino Sans GB', sans-serif",
+        "'SimSun', '宋体', serif": "'SimSun', '宋体', 'STSong', 'Songti SC', serif",
+        "'SimHei', '黑体', sans-serif": "'SimHei', '黑体', 'STHeiti', 'Heiti SC', sans-serif",
+        "'KaiTi', '楷体', serif": "'KaiTi', '楷体', 'Kaiti SC', 'STKaiti', serif",
+        "'SimLi', '隶书', serif": "'SimLi', '隶书', 'STLiti', serif",
+        "'FangSong', '仿宋', serif": "'FangSong', '仿宋', 'FangSong SC', serif",
+      };
+
+      // 如果是旧字体值，自动升级
+      if (fontMigrationMap[savedFont]) {
+        textFont.value = fontMigrationMap[savedFont];
+        console.log('🔄 字体已升级为移动端兼容版本:', savedFont, '->', textFont.value);
+        // 自动保存升级后的字体
+        saveStyles();
+      } else {
+        textFont.value = savedFont;
+      }
     }
 
     // 应用已加载的设置
@@ -381,6 +448,14 @@ onMounted(() => {
   option {
     background: rgba(40, 26, 20, 0.98);
     color: #f0e6d2;
+    padding: 8px;
+    font-size: 16px;
+  }
+
+  // 为字体选择器的选项增加字体大小，便于预览
+  &.font-preview-select option {
+    font-size: 18px;
+    padding: 10px;
   }
 }
 

@@ -1108,13 +1108,39 @@ const playCorruptionAnimation = async (character: Character): Promise<void> => {
     const animationElement = document.createElement('div');
     animationElement.className = 'corruption-animation';
     animationElement.innerHTML = `
-      <div class="corruption-hearts">
-        <div class="heart heart-1">💖</div>
-        <div class="heart heart-2">💖</div>
-        <div class="heart heart-3">💖</div>
-        <div class="heart heart-4">💖</div>
+      <div class="corruption-backdrop">
+        <div class="corruption-particles">
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+          <div class="particle"></div>
+        </div>
+        <div class="corruption-rings">
+          <div class="ring ring-1"></div>
+          <div class="ring ring-2"></div>
+          <div class="ring ring-3"></div>
+        </div>
+        <div class="corruption-symbols">
+          <div class="symbol symbol-1">⚠</div>
+          <div class="symbol symbol-2">⚡</div>
+          <div class="symbol symbol-3">🔥</div>
+          <div class="symbol symbol-4">💀</div>
+        </div>
+        <div class="corruption-content">
+          <div class="corruption-title">堕落仪式</div>
+          <div class="corruption-name">${character.name}</div>
+          <div class="corruption-progress">
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+          </div>
+          <div class="corruption-status">正在完成堕落转化...</div>
+        </div>
       </div>
-      <div class="corruption-text">${character.name} 正在堕落...</div>
     `;
 
     // 添加动画样式
@@ -1122,72 +1148,331 @@ const playCorruptionAnimation = async (character: Character): Promise<void> => {
     style.textContent = `
       .corruption-animation {
         position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 999999;
+        pointer-events: none;
+        animation: fadeInBackdrop 0.3s ease-out;
+      }
+
+      @keyframes fadeInBackdrop {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      .corruption-backdrop {
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at center, rgba(139, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.95) 70%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .corruption-particles {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+
+      .corruption-particles .particle {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        background: radial-gradient(circle, rgba(255, 69, 0, 0.9), transparent);
+        border-radius: 50%;
+        animation: floatParticle 3s ease-in-out infinite;
+      }
+
+      .corruption-particles .particle:nth-child(1) {
+        left: 10%;
+        top: 20%;
+        animation-delay: 0s;
+      }
+
+      .corruption-particles .particle:nth-child(2) {
+        left: 30%;
+        top: 10%;
+        animation-delay: 0.5s;
+      }
+
+      .corruption-particles .particle:nth-child(3) {
+        left: 60%;
+        top: 15%;
+        animation-delay: 1s;
+      }
+
+      .corruption-particles .particle:nth-child(4) {
+        left: 80%;
+        top: 25%;
+        animation-delay: 1.5s;
+      }
+
+      .corruption-particles .particle:nth-child(5) {
+        left: 15%;
+        bottom: 20%;
+        animation-delay: 0.3s;
+      }
+
+      .corruption-particles .particle:nth-child(6) {
+        left: 50%;
+        bottom: 15%;
+        animation-delay: 0.8s;
+      }
+
+      .corruption-particles .particle:nth-child(7) {
+        right: 15%;
+        bottom: 25%;
+        animation-delay: 1.2s;
+      }
+
+      .corruption-particles .particle:nth-child(8) {
+        right: 10%;
+        top: 30%;
+        animation-delay: 1.7s;
+      }
+
+      @keyframes floatParticle {
+        0%, 100% {
+          transform: translateY(0) translateX(0);
+          opacity: 0.3;
+        }
+        50% {
+          transform: translateY(-30px) translateX(20px);
+          opacity: 1;
+        }
+      }
+
+      .corruption-rings {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+
+      .corruption-rings .ring {
+        position: absolute;
+        border: 3px solid rgba(255, 69, 0, 0.3);
+        border-radius: 50%;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        z-index: 10000;
-        pointer-events: none;
-        text-align: center;
-        color: #ff69b4;
-        font-weight: bold;
-        font-size: 24px;
-        text-shadow: 0 0 10px rgba(255, 105, 180, 0.8);
+        animation: ringPulse 2s ease-out infinite;
       }
 
-      .corruption-hearts {
+      .ring-1 {
+        width: 200px;
+        height: 200px;
+        animation-delay: 0s;
+      }
+
+      .ring-2 {
+        width: 350px;
+        height: 350px;
+        border-color: rgba(255, 140, 0, 0.4);
+        animation-delay: 0.3s;
+      }
+
+      .ring-3 {
+        width: 500px;
+        height: 500px;
+        border-color: rgba(255, 99, 71, 0.3);
+        animation-delay: 0.6s;
+      }
+
+      @keyframes ringPulse {
+        0% {
+          transform: translate(-50%, -50%) scale(0.8);
+          opacity: 1;
+        }
+        100% {
+          transform: translate(-50%, -50%) scale(1.3);
+          opacity: 0;
+        }
+      }
+
+      .corruption-symbols {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+      }
+
+      .corruption-symbols .symbol {
+        position: absolute;
+        font-size: 48px;
+        animation: symbolFloat 2.5s ease-in-out infinite;
+        filter: drop-shadow(0 0 10px rgba(255, 69, 0, 0.8));
+      }
+
+      .symbol-1 {
+        top: 20%;
+        left: 15%;
+        animation-delay: 0s;
+      }
+
+      .symbol-2 {
+        top: 15%;
+        right: 20%;
+        animation-delay: 0.6s;
+      }
+
+      .symbol-3 {
+        bottom: 25%;
+        left: 20%;
+        animation-delay: 1.2s;
+      }
+
+      .symbol-4 {
+        bottom: 20%;
+        right: 15%;
+        animation-delay: 1.8s;
+      }
+
+      @keyframes symbolFloat {
+        0%, 100% {
+          transform: translateY(0) rotate(0deg);
+          opacity: 0.6;
+        }
+        50% {
+          transform: translateY(-15px) rotate(10deg);
+          opacity: 1;
+        }
+      }
+
+      .corruption-content {
         position: relative;
-        width: 300px;
-        height: 150px;
+        z-index: 10;
+        text-align: center;
+        color: #ffd7a1;
+        animation: contentSlideIn 0.5s ease-out;
+      }
+
+      @keyframes contentSlideIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .corruption-title {
+        font-size: 48px;
+        font-weight: bold;
+        color: #ff6b6b;
+        text-shadow: 
+          0 0 10px rgba(255, 69, 0, 0.8),
+          0 0 20px rgba(255, 69, 0, 0.6),
+          0 0 30px rgba(255, 69, 0, 0.4);
+        margin-bottom: 20px;
+        animation: titleGlow 2s ease-in-out infinite;
+        letter-spacing: 4px;
+      }
+
+      @keyframes titleGlow {
+        0%, 100% {
+          text-shadow: 
+            0 0 10px rgba(255, 69, 0, 0.8),
+            0 0 20px rgba(255, 69, 0, 0.6),
+            0 0 30px rgba(255, 69, 0, 0.4);
+        }
+        50% {
+          text-shadow: 
+            0 0 20px rgba(255, 69, 0, 1),
+            0 0 40px rgba(255, 69, 0, 0.8),
+            0 0 60px rgba(255, 69, 0, 0.6);
+        }
+      }
+
+      .corruption-name {
+        font-size: 32px;
+        font-weight: 600;
+        color: #ffd7a1;
+        margin-bottom: 40px;
+        text-shadow: 
+          0 2px 10px rgba(0, 0, 0, 0.8),
+          0 0 20px rgba(255, 140, 0, 0.5);
+        animation: namePulse 1.5s ease-in-out infinite;
+      }
+
+      @keyframes namePulse {
+        0%, 100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+      }
+
+      .corruption-progress {
+        width: 400px;
         margin: 0 auto 20px;
       }
 
-      .heart {
-        position: absolute;
-        font-size: 35px;
-        animation: corruptionHeart 2.5s ease-in-out infinite;
-        filter: drop-shadow(0 0 8px rgba(255, 105, 180, 0.6));
+      .progress-bar {
+        width: 100%;
+        height: 12px;
+        background: rgba(40, 26, 20, 0.8);
+        border: 2px solid rgba(255, 69, 0, 0.5);
+        border-radius: 10px;
+        overflow: hidden;
+        position: relative;
       }
 
-      .heart-1 { top: 20px; left: 50px; animation-delay: 0s; }
-      .heart-2 { top: 40px; right: 50px; animation-delay: 0.6s; }
-      .heart-3 { top: 60px; left: 100px; animation-delay: 1.2s; }
-      .heart-4 { top: 80px; right: 100px; animation-delay: 1.8s; }
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, 
+          rgba(255, 69, 0, 0.8) 0%, 
+          rgba(255, 140, 0, 0.9) 50%,
+          rgba(255, 69, 0, 0.8) 100%);
+        animation: progressFill 2s ease-out forwards;
+        box-shadow: 0 0 20px rgba(255, 69, 0, 0.6);
+      }
 
-      @keyframes corruptionHeart {
+      @keyframes progressFill {
+        from {
+          width: 0%;
+        }
+        to {
+          width: 100%;
+        }
+      }
+
+      .corruption-status {
+        font-size: 20px;
+        color: #ffbd7a;
+        text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+        animation: statusBlink 1s ease-in-out infinite;
+      }
+
+      @keyframes statusBlink {
         0%, 100% {
-          transform: scale(1) rotate(0deg) translateY(0px);
           opacity: 0.7;
         }
-        25% {
-          transform: scale(1.3) rotate(90deg) translateY(-10px);
-          opacity: 1;
-        }
         50% {
-          transform: scale(1.5) rotate(180deg) translateY(-20px);
-          opacity: 0.9;
-        }
-        75% {
-          transform: scale(1.3) rotate(270deg) translateY(-10px);
           opacity: 1;
         }
-      }
-
-      .corruption-text {
-        animation: corruptionText 1.5s ease-in-out infinite;
-      }
-
-      @keyframes corruptionText {
-        0%, 100% { opacity: 0.7; transform: scale(1); }
-        50% { opacity: 1; transform: scale(1.1); }
       }
     `;
 
     document.head.appendChild(style);
-    document.body.appendChild(animationElement);
+
+    // 根据是否在全屏模式，将动画添加到正确的位置
+    const targetParent = document.fullscreenElement || document.body;
+    targetParent.appendChild(animationElement);
 
     // 2秒后移除动画
     setTimeout(() => {
-      document.body.removeChild(animationElement);
+      targetParent.removeChild(animationElement);
       document.head.removeChild(style);
       resolve();
     }, 2000);

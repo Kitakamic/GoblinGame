@@ -364,6 +364,9 @@ const retryMessage = ref('');
 // 当前流式传输的页面索引（用于重试时删除）
 const currentStreamingPageIndex = ref(-1);
 
+// 最后一次生成创建的页面索引（用于重试时删除）
+const lastGeneratedPageIndex = ref(-1);
+
 // 暂存当前对话对，不立即保存到世界书
 const currentDialoguePair = ref<{
   userInput: string;
@@ -761,6 +764,7 @@ const generateAndHandleAIReply = async () => {
 
     // 流式传输相关变量
     currentStreamingPageIndex.value = -1;
+    lastGeneratedPageIndex.value = -1; // 重置最后生成的页面索引
 
     // 监听流式传输事件
     const handleStreamToken = (fullText: string) => {
@@ -818,6 +822,12 @@ const generateAndHandleAIReply = async () => {
     if (!response || response.trim().length === 0) {
       console.warn('⚠️ AI回复为空，跳过处理');
       toastRef.value?.warning('AI回复为空，请重试', { title: '生成失败' });
+
+      // 生成失败时删除流式创建的页面并重置索引
+      if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
+        pages.value.splice(currentStreamingPageIndex.value, 1);
+      }
+      currentStreamingPageIndex.value = -1;
 
       // AI回复为空时，显示重试按钮而不是清空用户输入
       if (lastUserInput.value) {
@@ -947,11 +957,13 @@ const generateAndHandleAIReply = async () => {
       // 更新流式传输创建的页面
       pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formattedResponse);
       currentPageIndex.value = currentStreamingPageIndex.value;
+      lastGeneratedPageIndex.value = currentStreamingPageIndex.value; // 记录创建的页面索引
       console.log('✅ 更新流式传输创建的页面:', currentStreamingPageIndex.value);
     } else {
       // 追加新书页并自动切换到下一页
       console.log('📄 创建新页面（非流式传输）');
       pushAIPage(formattedResponse);
+      lastGeneratedPageIndex.value = currentPageIndex.value; // 记录创建的页面索引
     }
 
     // 重置流式页面索引（在更新/创建完成后）
@@ -1032,6 +1044,10 @@ const retryAIGeneration = async () => {
   currentDialoguePair.value = null;
   pendingAttributeChanges.value = null;
 
+  // 清空上次生成的选项
+  options.value = [];
+  saveCurrentOptions(); // 清除保存的选项
+
   // 恢复到上一次生成前的状态（originalCharacter 在每次生成开始时会更新）
   if (originalCharacter.value) {
     console.log('🔄 恢复到上一次生成前的状态:', originalCharacter.value);
@@ -1041,7 +1057,23 @@ const retryAIGeneration = async () => {
     await nextTick();
   }
 
-  // 删除流式传输创建的页面
+  // 删除最后一次生成创建的页面（如果存在）
+  if (lastGeneratedPageIndex.value >= 0 && lastGeneratedPageIndex.value < pages.value.length) {
+    console.log('🗑️ 删除最后生成的页面:', lastGeneratedPageIndex.value);
+    pages.value.splice(lastGeneratedPageIndex.value, 1);
+
+    // 调整当前页面索引
+    if (currentPageIndex.value >= pages.value.length) {
+      currentPageIndex.value = Math.max(0, pages.value.length - 1);
+    }
+
+    // 调整流式页面索引（如果有的话）
+    if (currentStreamingPageIndex.value >= lastGeneratedPageIndex.value) {
+      currentStreamingPageIndex.value = -1;
+    }
+  }
+
+  // 删除流式传输创建的页面（如果流式失败但已创建页面）
   if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
     console.log('🗑️ 删除流式传输创建的页面:', currentStreamingPageIndex.value);
     pages.value.splice(currentStreamingPageIndex.value, 1);
@@ -1052,18 +1084,9 @@ const retryAIGeneration = async () => {
     }
   }
 
-  // 如果没有流式传输页面，尝试删除当前页面（向后兼容）
-  else if (pages.value.length > 0 && currentPageIndex.value < pages.value.length) {
-    console.log('🗑️ 删除当前页面的AI回复显示（向后兼容）');
-    pages.value.splice(currentPageIndex.value, 1);
-    // 调整页面索引
-    if (currentPageIndex.value >= pages.value.length) {
-      currentPageIndex.value = Math.max(0, pages.value.length - 1);
-    }
-  }
-
-  // 重置流式页面索引
+  // 重置所有页面索引
   currentStreamingPageIndex.value = -1;
+  lastGeneratedPageIndex.value = -1;
 
   // 重新生成（会使用 originalCharacter 作为基准）
   await generateAndHandleAIReply();

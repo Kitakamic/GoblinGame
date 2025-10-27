@@ -246,6 +246,9 @@ const showRetryButton = ref(false);
 // 当前流式传输的页面索引（用于重试时删除）
 const currentStreamingPageIndex = ref(-1);
 
+// 最后一次生成创建的页面索引（用于重试时删除）
+const lastGeneratedPageIndex = ref(-1);
+
 // 暂存当前对话对，不立即保存到世界书
 const currentDialoguePair = ref<{
   userInput: string;
@@ -460,37 +463,38 @@ const generateAndHandleAIReply = async () => {
   try {
     isSending.value = true;
 
-    if (props.dialogueConfig.onAIGenerate) {
-      // 使用自定义AI生成函数
-      aiResponse = await props.dialogueConfig.onAIGenerate(buildUserPrompt());
-    } else {
-      // 流式传输相关变量
-      currentStreamingPageIndex.value = -1;
+    // 流式传输相关变量
+    currentStreamingPageIndex.value = -1;
+    lastGeneratedPageIndex.value = -1; // 重置最后生成的页面索引
 
-      // 监听流式传输事件
-      const handleStreamToken = (fullText: string) => {
-        // 应用酒馆正则处理
-        const formatted = formatAsTavernRegexedString(fullText, 'ai_output', 'display');
+    // 监听流式传输事件
+    const handleStreamToken = (fullText: string) => {
+      // 应用酒馆正则处理
+      const formatted = formatAsTavernRegexedString(fullText, 'ai_output', 'display');
 
-        // 如果有临时页面，更新它；否则创建新页面
-        if (currentStreamingPageIndex.value >= 0) {
-          pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formatted);
-        } else {
-          currentStreamingPageIndex.value = pages.value.length;
-          pages.value.push({ html: safeFormatMessage(formatted) });
-          currentPageIndex.value = currentStreamingPageIndex.value;
-        }
+      // 如果有临时页面，更新它；否则创建新页面
+      if (currentStreamingPageIndex.value >= 0) {
+        pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formatted);
+      } else {
+        currentStreamingPageIndex.value = pages.value.length;
+        pages.value.push({ html: safeFormatMessage(formatted) });
+        currentPageIndex.value = currentStreamingPageIndex.value;
+      }
 
-        // 滚动到底部
-        MessageService.scrollToBottom(dialogueContent.value);
+      // 滚动到底部
+      MessageService.scrollToBottom(dialogueContent.value);
 
-        // console.log('📝 流式传输更新:', formatted.substring(0, 50) + '...');
-      };
+      // console.log('📝 流式传输更新:', formatted.substring(0, 50) + '...');
+    };
 
-      // 注册流式传输事件监听
-      eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+    // 注册流式传输事件监听
+    eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
 
-      try {
+    try {
+      if (props.dialogueConfig.onAIGenerate) {
+        // 使用自定义AI生成函数（流式传输会在后台执行，通过事件监听实时更新UI）
+        aiResponse = await props.dialogueConfig.onAIGenerate(buildUserPrompt());
+      } else {
         // 读取全局流式传输设置
         const globalVars = getVariables({ type: 'global' });
         const enableStreamOutput =
@@ -502,23 +506,23 @@ const generateAndHandleAIReply = async () => {
           should_stream: enableStreamOutput, // 根据设置启用流式传输
         });
         aiResponse = response;
-
-        // 移除事件监听
-        eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
-
-        // 注意：保留 currentStreamingPageIndex，在生成完成后检查是否需更新页面
-      } catch (error) {
-        // 移除事件监听
-        eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
-
-        // 生成失败时删除流式创建的页面并重置索引
-        if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
-          pages.value.splice(currentStreamingPageIndex.value, 1);
-        }
-        currentStreamingPageIndex.value = -1;
-
-        throw error;
       }
+
+      // 移除事件监听
+      eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+      // 注意：保留 currentStreamingPageIndex，在生成完成后检查是否需更新页面
+    } catch (error) {
+      // 移除事件监听
+      eventRemoveListener(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, handleStreamToken);
+
+      // 生成失败时删除流式创建的页面并重置索引
+      if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
+        pages.value.splice(currentStreamingPageIndex.value, 1);
+      }
+      currentStreamingPageIndex.value = -1;
+
+      throw error;
     }
 
     // 检查AI回复是否为空或无效
@@ -526,6 +530,12 @@ const generateAndHandleAIReply = async () => {
       console.warn('⚠️ AI回复为空，跳过处理');
       const { toast } = await import('../哥布林巢穴-简版/服务/弹窗提示服务');
       toast.warning('AI回复为空，请重试');
+
+      // 生成失败时删除流式创建的页面并重置索引
+      if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
+        pages.value.splice(currentStreamingPageIndex.value, 1);
+      }
+      currentStreamingPageIndex.value = -1;
 
       // AI回复为空时，显示重试按钮而不是清空用户输入
       if (lastUserInput.value) {
@@ -566,6 +576,7 @@ const generateAndHandleAIReply = async () => {
       // 更新流式传输创建的页面
       pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formattedResponse);
       currentPageIndex.value = currentStreamingPageIndex.value;
+      lastGeneratedPageIndex.value = currentStreamingPageIndex.value; // 记录创建的页面索引
       console.log('✅ 更新流式传输创建的页面:', currentStreamingPageIndex.value);
     } else {
       // 追加新书页
@@ -573,6 +584,7 @@ const generateAndHandleAIReply = async () => {
       pushAIPageWithoutScroll(formattedResponse);
       // 自动切换到最新页
       currentPageIndex.value = pages.value.length - 1;
+      lastGeneratedPageIndex.value = currentPageIndex.value; // 记录创建的页面索引
     }
 
     // 重置流式页面索引（在更新/创建完成后）
@@ -705,7 +717,27 @@ const retryAIGeneration = async () => {
   // 清除暂存的AI回复
   currentDialoguePair.value = null;
 
-  // 删除流式传输创建的页面
+  // 清空上次生成的选项
+  options.value = [];
+  saveCurrentOptions(); // 清除保存的选项
+
+  // 删除最后一次生成创建的页面（如果存在）
+  if (lastGeneratedPageIndex.value >= 0 && lastGeneratedPageIndex.value < pages.value.length) {
+    console.log('🗑️ 删除最后生成的页面:', lastGeneratedPageIndex.value);
+    pages.value.splice(lastGeneratedPageIndex.value, 1);
+
+    // 调整当前页面索引
+    if (currentPageIndex.value >= pages.value.length) {
+      currentPageIndex.value = Math.max(0, pages.value.length - 1);
+    }
+
+    // 调整流式页面索引（如果有的话）
+    if (currentStreamingPageIndex.value >= lastGeneratedPageIndex.value) {
+      currentStreamingPageIndex.value = -1;
+    }
+  }
+
+  // 删除流式传输创建的页面（如果流式失败但已创建页面）
   if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
     console.log('🗑️ 删除流式传输创建的页面:', currentStreamingPageIndex.value);
     pages.value.splice(currentStreamingPageIndex.value, 1);
@@ -716,18 +748,9 @@ const retryAIGeneration = async () => {
     }
   }
 
-  // 如果没有流式传输页面，尝试删除当前页面（向后兼容）
-  else if (pages.value.length > 0 && currentPageIndex.value < pages.value.length) {
-    console.log('🗑️ 删除当前页面的AI回复显示（向后兼容）');
-    pages.value.splice(currentPageIndex.value, 1);
-    // 调整页面索引
-    if (currentPageIndex.value >= pages.value.length) {
-      currentPageIndex.value = Math.max(0, pages.value.length - 1);
-    }
-  }
-
-  // 重置流式页面索引
+  // 重置所有页面索引
   currentStreamingPageIndex.value = -1;
+  lastGeneratedPageIndex.value = -1;
 
   // 删除最后一条AI消息
   const lastAIIndex = messages.value.findLastIndex(msg => msg.role === 'assistant');
