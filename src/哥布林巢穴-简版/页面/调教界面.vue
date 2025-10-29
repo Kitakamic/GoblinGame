@@ -373,7 +373,13 @@ const loadTrainingData = async (forceReload = true) => {
     // 添加非未捕获状态的人物数据（包括英雄和普通人物，但排除玩家角色）
     if (trainingData && trainingData.characters && trainingData.characters.length > 0) {
       const availableCharacters = trainingData.characters
-        .filter((char: any) => char.status !== 'uncaptured' && char.status !== 'enemy' && char.name !== '哥布林之王') // 只显示非未捕获状态、非敌方状态且非哥布林之王的人物
+        .filter(
+          (char: any) =>
+            char.status !== 'uncaptured' &&
+            char.status !== 'enemy' &&
+            char.id !== 'player-1' &&
+            char.status !== 'player',
+        ) // 只显示非未捕获状态、非敌方状态且非玩家角色的人物（通过ID和status双重检查，避免改名后误判）
         .map((char: any) => {
           // 保持capturedAt的原始格式（字符串或Date对象）
           return {
@@ -479,7 +485,7 @@ const syncCharacterStatuses = () => {
 
     // 保留玩家角色和其他不在调教界面中的人物
     const nonTrainingCharacters = existingCharacters.filter(
-      (char: any) => char.status === 'player' || char.name === '哥布林之王',
+      (char: any) => char.status === 'player' || char.id === 'player-1',
     );
 
     // 合并调教界面人物和其他重要人物
@@ -580,7 +586,7 @@ const manageWorldbookEntries = async (characters: Character[]) => {
 
     for (const character of characters) {
       // 跳过player角色
-      if (character.status === 'player' || character.id === 'player-1' || character.name === '哥布林之王') {
+      if (character.status === 'player' || character.id === 'player-1') {
         playerSkippedCount++;
         console.log(`跳过player角色 ${character.name} (ID: ${character.id}, 状态: ${character.status})`);
         continue;

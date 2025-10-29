@@ -88,7 +88,7 @@ const confirmButtonClass = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 11000; // 确保在所有界面之上（游戏设置面板是10000）
 
   .custom-confirm-modal {
     background: linear-gradient(180deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));

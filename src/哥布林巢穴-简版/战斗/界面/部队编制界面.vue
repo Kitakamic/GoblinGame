@@ -19,7 +19,7 @@
               'captain-physical': captain?.unitType === 'physical',
               'captain-magical': captain?.unitType === 'magical',
             }"
-            @click="selectCaptain(index)"
+            @click="captain ? selectCaptain(index) : openCaptainSelection()"
           >
             <div v-if="captain" class="captain-card">
               <!-- 队长肖像图片区域 - 占满整个卡片 -->
@@ -105,7 +105,7 @@
                 }}</span>
               </div>
             </div>
-            <div v-else class="empty-slot" @click="openCaptainSelection">
+            <div v-else class="empty-slot">
               <div class="empty-icon">+</div>
               <div class="empty-text">选择队长</div>
             </div>

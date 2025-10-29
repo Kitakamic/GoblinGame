@@ -754,13 +754,18 @@ const generateAndHandleAIReply = async () => {
 
     // 在生成新的AI回复之前，保存当前的人物状态作为基准
     // 这样重试时可以恢复到正确的状态
-    if (pendingAttributeChanges.value) {
-      originalCharacter.value = { ...pendingAttributeChanges.value.character };
-      console.log('💾 保存当前人物状态作为重试基准:', originalCharacter.value);
-    } else if (!originalCharacter.value) {
-      originalCharacter.value = { ...props.character };
-      console.log('💾 保存原始人物状态:', originalCharacter.value);
-    }
+    // 使用 displayCharacter 作为基准，因为它反映了当前实际应该使用的状态
+    // （如果有 pendingAttributeChanges，它会包含最新的属性；否则使用 props.character）
+    // 但注意：由于在 chooseOption 中已经调用了 applyPendingAttributeChanges，
+    // 所以此时 displayCharacter 应该已经反映了应用后的最新状态
+    const currentCharacterState = displayCharacter.value;
+    originalCharacter.value = { ...currentCharacterState };
+    console.log(
+      '💾 保存当前人物状态作为重试基准（堕落值:',
+      currentCharacterState.loyalty,
+      '）:',
+      originalCharacter.value,
+    );
 
     // 流式传输相关变量
     currentStreamingPageIndex.value = -1;
@@ -1031,6 +1036,10 @@ const applyPendingAttributeChanges = async () => {
       stamina: finalCharacter.stamina,
     });
 
+    // 更新 originalCharacter 为最新状态，确保重试时使用正确的基准
+    originalCharacter.value = { ...finalCharacter };
+    console.log('💾 已更新 originalCharacter 为最新状态（堕落值:', finalCharacter.loyalty, '）');
+
     // 清除暂存的属性变化
     pendingAttributeChanges.value = null;
   }
@@ -1042,20 +1051,28 @@ const retryAIGeneration = async () => {
 
   // 清除暂存的AI回复和属性变化
   currentDialoguePair.value = null;
+
+  // 如果有暂存的属性变化，先清除它（但不应用到存档），因为我们只是重试最后一次生成
+  // 优先使用 originalCharacter（保存了生成前的正确状态），如果没有则使用当前显示状态
+  const characterToRestore = originalCharacter.value || displayCharacter.value;
+
+  console.log('🔄 恢复到上一次生成前的状态:', {
+    loyalty: characterToRestore.loyalty,
+    stamina: characterToRestore.stamina,
+    usingOriginal: !!originalCharacter.value,
+  });
+
+  // 如果暂存的属性变化还未应用，清除它
   pendingAttributeChanges.value = null;
 
   // 清空上次生成的选项
   options.value = [];
   saveCurrentOptions(); // 清除保存的选项
 
-  // 恢复到上一次生成前的状态（originalCharacter 在每次生成开始时会更新）
-  if (originalCharacter.value) {
-    console.log('🔄 恢复到上一次生成前的状态:', originalCharacter.value);
-    // 通知父组件恢复到上一次生成前的状态（不触发自动调教）
-    emit('update-character', originalCharacter.value, false);
-    // 等待一帧，确保父组件已更新 props.character
-    await nextTick();
-  }
+  // 通知父组件恢复到上一次生成前的状态（不触发自动调教）
+  emit('update-character', characterToRestore, false);
+  // 等待一帧，确保父组件已更新 props.character
+  await nextTick();
 
   // 删除最后一次生成创建的页面（如果存在）
   if (lastGeneratedPageIndex.value >= 0 && lastGeneratedPageIndex.value < pages.value.length) {

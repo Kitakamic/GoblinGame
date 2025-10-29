@@ -1,5 +1,5 @@
 <template>
-  <div v-if="show" class="settings-overlay" @click="handleOverlayClick">
+  <div v-if="show" class="settings-overlay">
     <div class="settings-panel" @click.stop>
       <div class="panel-header">
         <h3>⚙️ 游戏设置</h3>
@@ -69,13 +69,7 @@
               <span class="label-text">角色名称</span>
               <span class="label-desc">您的角色在游戏中的显示名称</span>
             </label>
-            <input
-              v-model="playerName"
-              type="text"
-              class="text-input"
-              placeholder="输入角色名称"
-              @blur="updatePlayerInfo"
-            />
+            <input v-model="playerName" type="text" class="text-input" placeholder="输入角色名称" />
           </div>
 
           <div class="setting-item">
@@ -83,13 +77,7 @@
               <span class="label-text">角色头衔</span>
               <span class="label-desc">您的角色称号或职位</span>
             </label>
-            <input
-              v-model="playerTitle"
-              type="text"
-              class="text-input"
-              placeholder="输入角色头衔"
-              @blur="updatePlayerInfo"
-            />
+            <input v-model="playerTitle" type="text" class="text-input" placeholder="输入角色头衔" />
           </div>
 
           <div class="setting-item">
@@ -103,7 +91,6 @@
                 type="text"
                 class="text-input"
                 placeholder="输入图片URL或点击右侧按钮上传本地图片"
-                @blur="updatePlayerInfo"
               />
               <button class="upload-button" @click="triggerFileUpload">📁 选择本地图片</button>
               <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="handleFileUpload" />
@@ -117,7 +104,9 @@
           </div>
 
           <div class="setting-item">
-            <button class="save-button" @click="savePlayerInfo">💾 保存角色信息</button>
+            <button class="save-button" :disabled="isSaving" @click="savePlayerInfo">
+              {{ isSaving ? '⏳ 保存中...' : '💾 保存角色信息' }}
+            </button>
           </div>
         </div>
 
@@ -181,6 +170,9 @@ const playerAvatar = ref('https://files.catbox.moe/x4g8t7.jpg');
 
 // 文件上传相关
 const fileInput = ref<HTMLInputElement | null>(null);
+
+// 保存状态，防止重复点击
+const isSaving = ref(false);
 
 // 加载保存的设置
 const loadSettings = () => {
@@ -280,45 +272,62 @@ const updateCharacterFormat = () => {
   }
 };
 
-// 更新玩家角色信息（失去焦点时自动保存）
-const updatePlayerInfo = async () => {
-  // 自动保存
-  await savePlayerInfo();
-};
-
 // 保存玩家角色信息
 const savePlayerInfo = async () => {
+  // 防止重复点击
+  if (isSaving.value) {
+    console.log('⏸️ 正在保存中，跳过重复请求');
+    return;
+  }
+
   try {
+    isSaving.value = true;
+
     const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
-    if (trainingData && trainingData.characters) {
-      const playerIndex = trainingData.characters.findIndex((char: any) => char.id === 'player-1');
 
-      if (playerIndex !== -1) {
-        // 更新玩家角色信息
-        trainingData.characters[playerIndex].name = playerName.value.trim() || '哥布林之王';
-        trainingData.characters[playerIndex].title = playerTitle.value.trim() || '哥布林巢穴之主';
-        trainingData.characters[playerIndex].avatar =
-          playerAvatar.value.trim() || 'https://files.catbox.moe/x4g8t7.jpg';
-
-        // 保存到模块化存档
-        modularSaveManager.updateModuleData({
-          moduleName: 'training',
-          data: trainingData,
-        });
-
-        console.log('💾 玩家角色信息已保存:', {
-          name: trainingData.characters[playerIndex].name,
-          title: trainingData.characters[playerIndex].title,
-          avatar: trainingData.characters[playerIndex].avatar,
-        });
-
-        // 显示成功提示
-        await ConfirmService.showSuccess('角色信息已保存', '保存成功', '您的角色名称、头衔和肖像已更新');
-      }
+    // 检查存档数据是否存在
+    if (!trainingData || !trainingData.characters || !Array.isArray(trainingData.characters)) {
+      await ConfirmService.showWarning('存档数据异常', '保存失败', '存档中没有找到人物数据，请先开始游戏');
+      return;
     }
+
+    const playerIndex = trainingData.characters.findIndex((char: any) => char.id === 'player-1');
+
+    // 检查是否找到玩家角色
+    if (playerIndex === -1) {
+      await ConfirmService.showWarning('未找到玩家角色', '保存失败', '存档中没有找到玩家角色，无法更新');
+      return;
+    }
+
+    // 更新玩家角色信息（保持ID和status不变）
+    trainingData.characters[playerIndex].name = playerName.value.trim() || '哥布林之王';
+    trainingData.characters[playerIndex].title = playerTitle.value.trim() || '哥布林巢穴之主';
+    trainingData.characters[playerIndex].avatar = playerAvatar.value.trim() || 'https://files.catbox.moe/x4g8t7.jpg';
+
+    // 确保玩家角色的关键属性不被修改
+    trainingData.characters[playerIndex].id = 'player-1';
+    trainingData.characters[playerIndex].status = 'player';
+
+    // 保存到模块化存档
+    modularSaveManager.updateModuleData({
+      moduleName: 'training',
+      data: trainingData,
+    });
+
+    console.log('💾 玩家角色信息已保存:', {
+      name: trainingData.characters[playerIndex].name,
+      title: trainingData.characters[playerIndex].title,
+      avatar: trainingData.characters[playerIndex].avatar,
+    });
+
+    // 显示成功提示
+    await ConfirmService.showSuccess('角色信息已保存', '保存成功', '您的角色名称、头衔和肖像已更新');
   } catch (error) {
     console.error('保存玩家角色信息失败:', error);
-    await ConfirmService.showDanger(`保存失败：${error}`, '保存失败', '请重试或检查存档是否正常');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await ConfirmService.showDanger(`保存失败：${errorMessage}`, '保存失败', '请重试或检查存档是否正常');
+  } finally {
+    isSaving.value = false;
   }
 };
 
@@ -397,11 +406,6 @@ const openTutorial = () => {
 // 关闭面板
 const close = () => {
   emit('close');
-};
-
-// 点击遮罩关闭
-const handleOverlayClick = () => {
-  close();
 };
 
 // 监听显示状态
@@ -815,14 +819,21 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.3s ease;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: linear-gradient(135deg, #20c991, #169679);
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
   }
 
-  &:active {
+  &:active:not(:disabled) {
     transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    border-color: rgba(107, 114, 128, 0.5);
   }
 }
 </style>
