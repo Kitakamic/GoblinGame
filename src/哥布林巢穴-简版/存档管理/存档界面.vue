@@ -3,7 +3,14 @@
     <div class="modal-overlay" @click="closeModal"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <h3 class="modal-title">存档管理</h3>
+        <div class="header-left">
+          <h3 class="modal-title">存档管理</h3>
+          <div class="version-info">
+            <span class="version-label">版本号：</span>
+            <span class="version-value">{{ FRONTEND_VERSION }}</span>
+            <span class="version-date">更新时间：{{ FRONTEND_UPDATE_DATE }}</span>
+          </div>
+        </div>
         <button class="close-btn" @click="closeModal">×</button>
       </div>
 
@@ -90,6 +97,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { toast } from '../服务/弹窗提示服务';
+import { FRONTEND_UPDATE_DATE, FRONTEND_VERSION } from '../服务/版本信息';
 import { modularSaveManager } from './模块化存档服务';
 import type { BaseResources, ModularSaveSlot } from './模块化存档类型';
 
@@ -471,16 +479,61 @@ const handleImportFile = async (event: Event) => {
     .modal-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       margin-bottom: 20px;
       padding-bottom: 12px;
       border-bottom: 1px solid rgba(205, 133, 63, 0.3);
+
+      .header-left {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
 
       .modal-title {
         color: #ffd7a1;
         margin: 0;
         font-size: 20px;
         font-weight: 700;
+      }
+
+      .version-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        color: #f0e6d2;
+        font-size: 12px;
+
+        .version-label {
+          color: #cd853f;
+          font-weight: 600;
+        }
+
+        .version-value {
+          color: #f0e6d2;
+          font-weight: 600;
+        }
+
+        .version-date {
+          color: #9ca3af;
+          font-size: 11px;
+          margin-left: 4px;
+        }
+
+        @media (max-width: 768px) {
+          font-size: 11px;
+          gap: 6px;
+
+          .version-date {
+            font-size: 10px;
+            display: block;
+            width: 100%;
+            margin-left: 0;
+            margin-top: 2px;
+          }
+        }
       }
 
       .close-btn {

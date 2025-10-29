@@ -10,9 +10,9 @@
           <p>
             感谢您游玩本前端界面卡！本前端界面是免费开源项目，严禁任何形式的商业化或盗用行为。如发现侵权行为，请通过Discord联系原作者：北上。
             <br />
-            版本号：1.0.1
+            版本号：{{ FRONTEND_VERSION }}
             <br />
-            更新时间：2025-10-30
+            更新时间：{{ FRONTEND_UPDATE_DATE }}
           </p>
         </div>
 
@@ -66,6 +66,8 @@
 </template>
 
 <script setup lang="ts">
+import { FRONTEND_UPDATE_DATE, FRONTEND_VERSION } from '../服务/版本信息';
+
 interface Props {
   show: boolean;
 }
