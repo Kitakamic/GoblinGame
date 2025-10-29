@@ -8,7 +8,7 @@
       <div class="modal-content">
         <div class="welcome-message">
           <p>
-            感谢您游玩本前端界面卡！本前端界面是免费开源项目，严禁任何形式的商业化或盗用行为。如发现侵权行为，请通过Discord联系原作者。
+            感谢您游玩本前端界面卡！本前端界面是免费开源项目，严禁任何形式的商业化或盗用行为。如发现侵权行为，请通过Discord联系原作者：北上。
           </p>
         </div>
 
@@ -28,7 +28,13 @@
           <div class="link-item">
             <span class="link-icon">💬</span>
             <span class="link-label">Discord帖子:</span>
-            <a href="" target="_blank" class="link-button"> 查看帖子 </a>
+            <a
+              href="https://discordapp.com/channels/1134557553011998840/1433109877873442876"
+              target="_blank"
+              class="link-button"
+            >
+              查看帖子
+            </a>
           </div>
         </div>
 
