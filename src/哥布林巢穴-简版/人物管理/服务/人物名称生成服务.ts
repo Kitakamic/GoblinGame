@@ -20,6 +20,105 @@ export class CharacterNameGenerationService {
   // 已使用的名称记录（用于避免重复）
   private usedNames: Set<string> = new Set();
 
+  // 日式名字词根池（用于狐族）
+  private readonly JAPANESE_NAME_ROOTS = {
+    // 日式花卉植物
+    flowers: [
+      'Sakura',
+      'Tsuki',
+      'Yuki',
+      'Hana',
+      'Momo',
+      'Sumire',
+      'Ayame',
+      'Ume',
+      'Kiku',
+      'Tsubaki',
+      'Fuji',
+      'Tachibana',
+      'Botan',
+      'Ran',
+      'Kiri',
+    ],
+    // 日式自然意象
+    nature: [
+      'Aka',
+      'Ao',
+      'Kuro',
+      'Shiro',
+      'Midori',
+      'Kumo',
+      'Kaze',
+      'Mizu',
+      'Kawa',
+      'Yama',
+      'Mine',
+      'Oka',
+      'Numa',
+      'Ike',
+      'Mori',
+      'Take',
+      'Iwa',
+      'Ishi',
+      'Suna',
+      'Tsuchi',
+    ],
+    // 日式季节时间
+    seasons: [
+      'Haru',
+      'Natsu',
+      'Aki',
+      'Fuyu',
+      'Asa',
+      'Yuu',
+      'Tsuki',
+      'Hiru',
+      'Yoru',
+      'Kaze',
+      'Fubuki',
+      'Ame',
+      'Sora',
+      'Tsuki',
+      'Hoshi',
+    ],
+    // 日式美德寓意
+    virtue: [
+      'Akira',
+      'Akari',
+      'Sakura',
+      'Yuki',
+      'Hikari',
+      'Megumi',
+      'Haruka',
+      'Yuzuki',
+      'Hotaru',
+      'Asuka',
+      'Aoi',
+      'Natsumi',
+      'Miyuki',
+      'Yumi',
+      'Kaori',
+    ],
+    // 日式颜色
+    colors: [
+      'Akane',
+      'Murasaki',
+      'Sakura',
+      'Yuki',
+      'Sumire',
+      'Ayame',
+      'Botan',
+      'Kuri',
+      'Enji',
+      'Shouyou',
+      'Fuji',
+      'Hanada',
+      'Koki',
+      'Sango',
+      'Tsutsuji',
+    ],
+  };
+
   // 词根池
   private readonly NAME_ROOTS = {
     // 古典神话
@@ -259,26 +358,26 @@ export class CharacterNameGenerationService {
     ],
     // 狐人女性后缀（日式）
     fox: [
+      'mi',
+      'ka',
       'ko',
+      'na',
+      'ri',
+      'ru',
+      'na',
+      'sa',
+      'mi',
+      'ko',
+      'ka',
+      'ri',
+      'na',
+      'ru',
+      'ya',
+      'sa',
       'mi',
       'na',
-      'maru',
-      'chan',
-      'sama',
-      'hime',
-      'sama',
       'ko',
-      'mi',
-      'na',
-      'hime',
-      'ko',
-      'mi',
-      'na',
-      'hime',
-      'ko',
-      'mi',
-      'na',
-      'hime',
+      'ri',
     ],
   };
 
@@ -590,8 +689,15 @@ export class CharacterNameGenerationService {
    * 生成姓氏
    */
   private generateLastName(options: NameGenerationOptions): string {
+    const raceLower = options.race.toLowerCase();
+
+    // 狐族特殊处理：生成日式风格姓氏
+    if (raceLower.includes('狐族') || raceLower.includes('fox')) {
+      return this.generateJapaneseLastName();
+    }
+
     // 对于人类，10%概率生成贵族风格姓氏，90%概率生成普通风格姓氏
-    const isNobleStyle = options.race.toLowerCase().includes('人类') && Math.random() < 0.1;
+    const isNobleStyle = raceLower.includes('人类') && Math.random() < 0.1;
 
     if (isNobleStyle) {
       // 贵族风格：使用前缀 + 核心 + 后缀
@@ -641,6 +747,79 @@ export class CharacterNameGenerationService {
   }
 
   /**
+   * 生成日式姓氏
+   */
+  private generateJapaneseLastName(): string {
+    // 日式姓氏常见前缀和后缀
+    const familyPrefixes = [
+      'Tanaka',
+      'Suzuki',
+      'Takahashi',
+      'Watanabe',
+      'Ito',
+      'Kobayashi',
+      'Yamamoto',
+      'Nakamura',
+      'Inoue',
+      'Kato',
+      'Kimura',
+      'Yoshida',
+      'Yamada',
+      'Shimizu',
+      'Hayashi',
+      'Saito',
+      'Yamaguchi',
+      'Matsumoto',
+      'Inoue',
+      'Kimura',
+    ];
+    const familySuffixes = [
+      'mura',
+      'hara',
+      'kawa',
+      'shima',
+      'naka',
+      'dani',
+      'yama',
+      'tani',
+      'saka',
+      'machi',
+      'gaoka',
+      'hiro',
+      'ki',
+      'shi',
+      'ta',
+      'ro',
+      'ko',
+      'no',
+      'ya',
+      'to',
+    ];
+    const placeElements = ['saka', 'shima', 'hama', 'kawa', 'yama', 'mori', 'no', 'machi', 'da', 'gi'];
+    const directionElements = ['kita', 'minami', 'nishi', 'higashi'];
+    const colorElements = ['aka', 'ao', 'kuro', 'shiro'];
+    const natureElements = ['taka', 'hiro', 'naga', 'oka', 'hara', 'naka'];
+
+    // 组合方式1：直接姓氏前缀（40%）
+    if (Math.random() < 0.4) {
+      return familyPrefixes[Math.floor(Math.random() * familyPrefixes.length)];
+    }
+
+    // 组合方式2：地名 + 后缀（30%）
+    if (Math.random() < 0.5) {
+      const element = placeElements[Math.floor(Math.random() * placeElements.length)];
+      const suffix = familySuffixes[Math.floor(Math.random() * familySuffixes.length)];
+      return `${element}${suffix}`;
+    }
+
+    // 组合方式3：方向/颜色/自然 + 后缀（30%）
+    const allElements = [...directionElements, ...colorElements, ...natureElements];
+    const element = allElements[Math.floor(Math.random() * allElements.length)];
+    const suffix = familySuffixes[Math.floor(Math.random() * familySuffixes.length)];
+    return `${element}${suffix}`;
+  }
+
+  /**
    * 根据种族选择词根池
    */
   private selectRootPool(race: string): string[] {
@@ -667,12 +846,13 @@ export class CharacterNameGenerationService {
         ),
       ];
     } else if (raceLower.includes('狐族') || raceLower.includes('fox')) {
-      // 狐族：花卉植物 + 自然意象 + 天体星辰 + 季节时间
+      // 狐族：使用日式词根
       return [
-        ...this.NAME_ROOTS.floral,
-        ...this.NAME_ROOTS.nature,
-        ...this.NAME_ROOTS.celestial,
-        ...this.NAME_ROOTS.temporal,
+        ...this.JAPANESE_NAME_ROOTS.flowers,
+        ...this.JAPANESE_NAME_ROOTS.nature,
+        ...this.JAPANESE_NAME_ROOTS.seasons,
+        ...this.JAPANESE_NAME_ROOTS.virtue,
+        ...this.JAPANESE_NAME_ROOTS.colors,
       ];
     } else {
       // 人类：古典神话 + 圣经人物 + 美德寓意 + 花卉植物 + 音乐艺术

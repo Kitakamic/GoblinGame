@@ -341,7 +341,7 @@
 
             <!-- 敏感点详细信息（30%） -->
             <div
-              v-if="character.sensitivePointsDetail && character.sensitivePointsDetail.length > 0"
+              v-if="getSensitivePoint(character)"
               class="detail-section"
               :class="{ locked: !getUnlockStatus(character.loyalty).sensitivePoints }"
             >
@@ -351,14 +351,14 @@
                 <span v-if="!getUnlockStatus(character.loyalty).sensitivePoints" class="lock-icon">🔒</span>
               </h4>
               <div v-if="getUnlockStatus(character.loyalty).sensitivePoints" class="sensitive-details">
-                <div v-for="detail in character.sensitivePointsDetail" :key="detail.part" class="sensitive-detail-item">
+                <div class="sensitive-detail-item">
                   <div class="sensitive-detail-header">
-                    <span class="sensitive-part">{{ detail.part }}</span>
-                    <span class="sensitive-status" :class="{ active: detail.isSensitive }">
-                      {{ detail.isSensitive ? '敏感' : '不敏感' }}
-                    </span>
+                    <span class="sensitive-part">{{ getSensitivePoint(character)?.part }}</span>
+                    <span class="sensitive-status active">敏感</span>
                   </div>
-                  <p v-if="detail.description" class="sensitive-description">{{ detail.description }}</p>
+                  <p v-if="getSensitivePoint(character)?.description" class="sensitive-description">
+                    {{ getSensitivePoint(character)?.description }}
+                  </p>
                 </div>
               </div>
               <div v-else class="locked-content">
@@ -508,6 +508,12 @@ const getFertilityClass = (fertility: number, maxFertility: number) => {
 // 获取生育统计
 const getBreedingStats = (breedingRecords: any[]) => {
   return BreedingService.getBreedingStats(breedingRecords);
+};
+
+// 获取敏感点（只返回敏感的那个部位）
+const getSensitivePoint = (character: Character | null) => {
+  if (!character?.sensitivePointsDetail) return null;
+  return character.sensitivePointsDetail.find(p => p.isSensitive) || null;
 };
 
 // 基于堕落值的解锁系统

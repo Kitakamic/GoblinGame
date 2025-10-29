@@ -176,7 +176,7 @@ const BASE_TRAINING_CHARACTERS: Character[] = [
     status: 'imprisoned',
     canCombat: true,
     unitType: 'magical',
-    loyalty: 0,
+    loyalty: 60,
     stamina: 140,
     maxStamina: 140,
     fertility: 140,
@@ -197,37 +197,13 @@ const BASE_TRAINING_CHARACTERS: Character[] = [
     country: '赛菲亚帝国',
     background: '平民',
     sexExperience: '雫是一名纯洁的神官，从未有过性经验。她在神殿中长大，从小接受严格的宗教教育，对于情欲之事一无所知。',
-    sensitivePoints: ['乳头'],
+    sensitivePoints: ['胸部'],
     sensitivePointsDetail: [
       {
-        part: '嘴巴',
-        isSensitive: false,
-        description:
-          '唇瓣小巧柔软，呈现天然的粉色。唇形完美，上唇略微翘起，下唇饱满圆润。舌头灵活而湿润，口腔内部温暖紧致。她的嘴巴用来祈祷和歌唱，神圣而纯洁，从未被玷污过。',
-      },
-      {
-        part: '胸部',
+        part: '乳头',
         isSensitive: true,
         description:
-          'B罩杯的乳房娇小而挺拔，乳晕呈现淡淡的粉红色，直径约两厘米。乳头小巧，在未受刺激时呈现稚嫩的粉红色。十五岁的身体还在发育中，触感柔软而富有弹性。受到刺激时，乳头会迅速充血变硬，敏感度极高。',
-      },
-      {
-        part: '阴道',
-        isSensitive: false,
-        description:
-          '从未有过性经验的处女之身。外阴唇饱满而富有弹性，内阴唇小巧粉嫩，阴蒂隐藏在包皮之下。阴道内壁布满细密的褶皱，收缩力极强，从未被异物侵入。保持着原始的紧致状态，初次进入需要充分的润滑和扩张。',
-      },
-      {
-        part: '子宫',
-        isSensitive: false,
-        description:
-          '年轻的子宫从未经历过怀孕。子宫口紧闭着，对异物本能地抗拒。还没有完全发育成熟，子宫和生殖系统都处于青春期状态。身体还未准备好承受生育的负担。',
-      },
-      {
-        part: '后庭',
-        isSensitive: false,
-        description:
-          '紧致而从未被开发过，臀部小巧圆润，臀肉紧实而富有弹性。肛门呈现健康的粉色，周围皮肤细腻光滑。从未有过这方面的经验，保持着完全的紧闭状态，即使是手指也难以轻易进入。',
+          '她的乳房娇小而挺拔，乳晕呈现淡淡的粉红色，直径约两厘米。乳头小巧，在未受刺激时呈现稚嫩的粉红色。十五岁的身体还在发育中，触感柔软而富有弹性。受到刺激时，乳头会迅速充血变硬，敏感度极高。',
       },
     ],
     lifeStory: {

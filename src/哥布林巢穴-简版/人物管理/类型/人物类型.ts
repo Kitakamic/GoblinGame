@@ -128,7 +128,7 @@ export interface SensitivePoint {
 }
 
 /** 敏感点类型 */
-export type SensitivePart = '嘴巴' | '胸部' | '阴道' | '子宫' | '后庭';
+export type SensitivePart = '嘴巴' | '胸部' | '乳头' | '阴道' | '子宫' | '后庭' | '阴蒂' | 'G点';
 
 // ==================== 人生经历类型 ====================
 

@@ -251,15 +251,31 @@ export class ExploreService {
           // 导入英雄生成服务
           const { HeroDeterminationService } = await import('../../人物管理/服务/人物生成服务');
 
-          // 生成英雄提示词
-          const heroPrompt = HeroDeterminationService.generateHeroPrompt(
-            location.type,
-            location.difficulty,
-            location.description,
-            location.continent,
-            location.region,
-            location.pictureResource,
-          );
+          // 获取人物生成格式设置
+          const globalVars = getVariables({ type: 'global' });
+          const format = globalVars['character_generation_format'] || 'json';
+
+          console.log('📋 使用人物生成格式:', format);
+
+          // 根据设置生成不同格式的英雄提示词
+          const heroPrompt =
+            format === 'yaml'
+              ? HeroDeterminationService.generateHeroPromptYaml(
+                  location.type,
+                  location.difficulty,
+                  location.description,
+                  location.continent,
+                  location.region,
+                  location.pictureResource,
+                )
+              : HeroDeterminationService.generateHeroPrompt(
+                  location.type,
+                  location.difficulty,
+                  location.description,
+                  location.continent,
+                  location.region,
+                  location.pictureResource,
+                );
 
           console.log('AI英雄生成提示词:', heroPrompt);
 

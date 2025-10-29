@@ -74,9 +74,9 @@ export class CharacterWorldbookManager {
         };
 
         await WorldbookHelper.replace(worldbookName, worldbook);
-        toast.success(`已更新人物 ${character.name} 的世界书条目`);
+        // toast.success(`已更新人物 ${character.name} 的世界书条目`);
       } else {
-        toast.warning(`未找到人物 ${character.name} 的世界书条目`);
+        console.log(`未找到人物 ${character.name} 的世界书条目，跳过更新`);
       }
     } catch (error) {
       toast.error(`更新人物世界书条目失败: ${error}`);

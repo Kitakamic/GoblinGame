@@ -23,6 +23,40 @@
           </div>
         </div>
 
+        <!-- 游戏机制设置 -->
+        <div class="settings-section">
+          <h4 class="section-title">游戏机制设置</h4>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">据点人物生成概率修正</span>
+              <span class="label-desc">额外增加的据点生成人物概率（0-100%）</span>
+            </label>
+            <div class="slider-container">
+              <input
+                v-model="heroGenerationModifier"
+                type="range"
+                min="0"
+                max="100"
+                class="slider-input"
+                @input="updateHeroModifier"
+              />
+              <span class="slider-value">{{ heroGenerationModifier }}%</span>
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">人物生成格式</span>
+              <span class="label-desc">如果频繁截断，可以尝试换一种格式</span>
+            </label>
+            <select v-model="characterFormat" class="format-select" @change="updateCharacterFormat">
+              <option value="json">JSON</option>
+              <option value="yaml">YAML</option>
+            </select>
+          </div>
+        </div>
+
         <!-- 分隔线 -->
         <div class="divider"></div>
 
@@ -68,6 +102,12 @@ const emit = defineEmits<{
 // 流式传输设置
 const enableStream = ref(true);
 
+// 据点人物生成概率修正（0-100）
+const heroGenerationModifier = ref(0);
+
+// 人物生成格式
+const characterFormat = ref('json');
+
 // 加载保存的设置
 const loadSettings = () => {
   try {
@@ -80,7 +120,25 @@ const loadSettings = () => {
       enableStream.value = true; // 默认开启
     }
 
-    console.log('📋 已加载游戏设置:', { enableStream: enableStream.value });
+    // 加载据点人物生成概率修正
+    if (typeof globalVars['hero_generation_modifier'] === 'number') {
+      heroGenerationModifier.value = Math.round(globalVars['hero_generation_modifier'] * 100); // 转换为百分比显示
+    } else {
+      heroGenerationModifier.value = 0; // 默认为 0
+    }
+
+    // 加载人物生成格式
+    if (typeof globalVars['character_generation_format'] === 'string') {
+      characterFormat.value = globalVars['character_generation_format'];
+    } else {
+      characterFormat.value = 'json'; // 默认为 JSON
+    }
+
+    console.log('📋 已加载游戏设置:', {
+      enableStream: enableStream.value,
+      heroModifier: heroGenerationModifier.value,
+      characterFormat: characterFormat.value,
+    });
   } catch (error) {
     console.error('加载游戏设置失败:', error);
   }
@@ -95,6 +153,30 @@ const updateStreamingSetting = () => {
     console.log('💾 流式传输设置已保存:', enableStream.value);
   } catch (error) {
     console.error('保存流式传输设置失败:', error);
+  }
+};
+
+// 保存据点人物生成概率修正
+const updateHeroModifier = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    globalVars['hero_generation_modifier'] = heroGenerationModifier.value / 100; // 转换为 0-1 范围保存
+    replaceVariables(globalVars, { type: 'global' });
+    console.log('💾 据点人物生成概率修正已保存:', `${heroGenerationModifier.value}%`);
+  } catch (error) {
+    console.error('保存据点人物生成概率修正失败:', error);
+  }
+};
+
+// 保存人物生成格式
+const updateCharacterFormat = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    globalVars['character_generation_format'] = characterFormat.value;
+    replaceVariables(globalVars, { type: 'global' });
+    console.log('💾 人物生成格式已保存:', characterFormat.value);
+  } catch (error) {
+    console.error('保存人物生成格式失败:', error);
   }
 };
 
@@ -315,6 +397,89 @@ onMounted(() => {
     background-color: white;
     transition: 0.3s;
     border-radius: 50%;
+  }
+}
+
+.slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slider-input {
+  flex: 1;
+  height: 6px;
+  background: #4b5563;
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #3b82f6;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  &::-webkit-slider-thumb:hover {
+    background: #4b8ef6;
+    transform: scale(1.1);
+  }
+
+  &::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #3b82f6;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+  }
+
+  &::-moz-range-thumb:hover {
+    background: #4b8ef6;
+    transform: scale(1.1);
+  }
+}
+
+.slider-value {
+  min-width: 50px;
+  color: #ffd7a1;
+  font-weight: 700;
+  font-size: 16px;
+  text-align: right;
+}
+
+.format-select {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(40, 40, 40, 0.8);
+  border: 2px solid rgba(205, 133, 63, 0.4);
+  border-radius: 8px;
+  color: #ffd7a1;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: rgba(205, 133, 63, 0.6);
+    background: rgba(40, 40, 40, 0.95);
+  }
+
+  &:focus {
+    border-color: rgba(255, 120, 60, 0.6);
+  }
+
+  option {
+    background: rgba(40, 40, 40, 0.95);
+    color: #ffd7a1;
   }
 }
 
