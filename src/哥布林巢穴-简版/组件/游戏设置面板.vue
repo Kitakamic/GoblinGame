@@ -60,6 +60,70 @@
         <!-- 分隔线 -->
         <div class="divider"></div>
 
+        <!-- 玩家角色设置 -->
+        <div class="settings-section">
+          <h4 class="section-title">玩家角色设置</h4>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">角色名称</span>
+              <span class="label-desc">您的角色在游戏中的显示名称</span>
+            </label>
+            <input
+              v-model="playerName"
+              type="text"
+              class="text-input"
+              placeholder="输入角色名称"
+              @blur="updatePlayerInfo"
+            />
+          </div>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">角色头衔</span>
+              <span class="label-desc">您的角色称号或职位</span>
+            </label>
+            <input
+              v-model="playerTitle"
+              type="text"
+              class="text-input"
+              placeholder="输入角色头衔"
+              @blur="updatePlayerInfo"
+            />
+          </div>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">肖像图</span>
+              <span class="label-desc">可以输入图片URL或上传本地图片</span>
+            </label>
+            <div class="avatar-input-container">
+              <input
+                v-model="playerAvatar"
+                type="text"
+                class="text-input"
+                placeholder="输入图片URL或点击右侧按钮上传本地图片"
+                @blur="updatePlayerInfo"
+              />
+              <button class="upload-button" @click="triggerFileUpload">📁 选择本地图片</button>
+              <input ref="fileInput" type="file" accept="image/*" style="display: none" @change="handleFileUpload" />
+            </div>
+          </div>
+
+          <div v-if="playerAvatar" class="setting-item">
+            <div class="avatar-preview">
+              <img :src="playerAvatar" alt="玩家头像预览" @error="handleImageError" />
+            </div>
+          </div>
+
+          <div class="setting-item">
+            <button class="save-button" @click="savePlayerInfo">💾 保存角色信息</button>
+          </div>
+        </div>
+
+        <!-- 分隔线 -->
+        <div class="divider"></div>
+
         <!-- 文字样式设置按钮 -->
         <div class="settings-section">
           <h4 class="section-title">界面设置</h4>
@@ -87,6 +151,8 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
+import { modularSaveManager } from '../存档管理/模块化存档服务';
+import { ConfirmService } from '../服务/确认框服务';
 
 interface Props {
   show: boolean;
@@ -107,6 +173,14 @@ const heroGenerationModifier = ref(0);
 
 // 人物生成格式
 const characterFormat = ref('json');
+
+// 玩家角色信息
+const playerName = ref('哥布林之王');
+const playerTitle = ref('哥布林巢穴之主');
+const playerAvatar = ref('https://files.catbox.moe/x4g8t7.jpg');
+
+// 文件上传相关
+const fileInput = ref<HTMLInputElement | null>(null);
 
 // 加载保存的设置
 const loadSettings = () => {
@@ -134,6 +208,9 @@ const loadSettings = () => {
       characterFormat.value = 'json'; // 默认为 JSON
     }
 
+    // 加载玩家角色信息
+    loadPlayerInfo();
+
     console.log('📋 已加载游戏设置:', {
       enableStream: enableStream.value,
       heroModifier: heroGenerationModifier.value,
@@ -141,6 +218,29 @@ const loadSettings = () => {
     });
   } catch (error) {
     console.error('加载游戏设置失败:', error);
+  }
+};
+
+// 加载玩家角色信息
+const loadPlayerInfo = () => {
+  try {
+    const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
+    if (trainingData && trainingData.characters) {
+      const playerCharacter = trainingData.characters.find((char: any) => char.id === 'player-1');
+      if (playerCharacter) {
+        playerName.value = playerCharacter.name || '哥布林之王';
+        playerTitle.value = playerCharacter.title || '哥布林巢穴之主';
+        playerAvatar.value = playerCharacter.avatar || 'https://files.catbox.moe/x4g8t7.jpg';
+
+        console.log('📋 已加载玩家角色信息:', {
+          name: playerName.value,
+          title: playerTitle.value,
+          avatar: playerAvatar.value,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('加载玩家角色信息失败:', error);
   }
 };
 
@@ -178,6 +278,110 @@ const updateCharacterFormat = () => {
   } catch (error) {
     console.error('保存人物生成格式失败:', error);
   }
+};
+
+// 更新玩家角色信息（失去焦点时自动保存）
+const updatePlayerInfo = async () => {
+  // 自动保存
+  await savePlayerInfo();
+};
+
+// 保存玩家角色信息
+const savePlayerInfo = async () => {
+  try {
+    const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
+    if (trainingData && trainingData.characters) {
+      const playerIndex = trainingData.characters.findIndex((char: any) => char.id === 'player-1');
+
+      if (playerIndex !== -1) {
+        // 更新玩家角色信息
+        trainingData.characters[playerIndex].name = playerName.value.trim() || '哥布林之王';
+        trainingData.characters[playerIndex].title = playerTitle.value.trim() || '哥布林巢穴之主';
+        trainingData.characters[playerIndex].avatar =
+          playerAvatar.value.trim() || 'https://files.catbox.moe/x4g8t7.jpg';
+
+        // 保存到模块化存档
+        modularSaveManager.updateModuleData({
+          moduleName: 'training',
+          data: trainingData,
+        });
+
+        console.log('💾 玩家角色信息已保存:', {
+          name: trainingData.characters[playerIndex].name,
+          title: trainingData.characters[playerIndex].title,
+          avatar: trainingData.characters[playerIndex].avatar,
+        });
+
+        // 显示成功提示
+        await ConfirmService.showSuccess('角色信息已保存', '保存成功', '您的角色名称、头衔和肖像已更新');
+      }
+    }
+  } catch (error) {
+    console.error('保存玩家角色信息失败:', error);
+    await ConfirmService.showDanger(`保存失败：${error}`, '保存失败', '请重试或检查存档是否正常');
+  }
+};
+
+// 触发文件选择
+const triggerFileUpload = () => {
+  fileInput.value?.click();
+};
+
+// 处理文件上传
+const handleFileUpload = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) return;
+
+  // 检查文件类型
+  if (!file.type.startsWith('image/')) {
+    await ConfirmService.showWarning('请选择图片文件', '文件类型错误', '支持的格式：JPG, PNG, GIF, WEBP等');
+    return;
+  }
+
+  // 检查文件大小（限制为5MB）
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  if (file.size > maxSize) {
+    await ConfirmService.showWarning(
+      '图片文件过大，请选择小于5MB的图片',
+      '文件过大',
+      `当前文件大小：${(file.size / 1024 / 1024).toFixed(2)}MB`,
+    );
+    return;
+  }
+
+  try {
+    // 将图片转换为Base64
+    const reader = new FileReader();
+
+    reader.onload = e => {
+      const base64String = e.target?.result as string;
+      playerAvatar.value = base64String;
+      console.log('✅ 本地图片已加载，大小:', (base64String.length / 1024).toFixed(2), 'KB');
+    };
+
+    reader.onerror = () => {
+      ConfirmService.showDanger('图片读取失败', '上传失败', '请重试或选择其他图片');
+    };
+
+    reader.readAsDataURL(file);
+  } catch (error) {
+    console.error('处理图片失败:', error);
+    await ConfirmService.showDanger(`处理失败：${error}`, '上传失败');
+  } finally {
+    // 清空input，允许重复选择同一文件
+    if (target) {
+      target.value = '';
+    }
+  }
+};
+
+// 处理图片加载错误
+const handleImageError = (event: Event) => {
+  const target = event.target as HTMLImageElement;
+  target.src = 'https://via.placeholder.com/150?text=Invalid+Image';
+  console.warn('图片加载失败，请检查URL是否正确');
 };
 
 // 打开文字样式设置
@@ -509,6 +713,116 @@ onMounted(() => {
 
   &:hover {
     background: linear-gradient(135deg, #4b8ef6, #3575eb);
+  }
+}
+
+.text-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(40, 40, 40, 0.8);
+  border: 2px solid rgba(205, 133, 63, 0.4);
+  border-radius: 8px;
+  color: #f0e6d2;
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.2s ease;
+
+  &::placeholder {
+    color: #6b7280;
+  }
+
+  &:hover {
+    border-color: rgba(205, 133, 63, 0.6);
+    background: rgba(40, 40, 40, 0.95);
+  }
+
+  &:focus {
+    border-color: rgba(255, 120, 60, 0.6);
+    box-shadow: 0 0 0 3px rgba(255, 120, 60, 0.1);
+  }
+}
+
+.avatar-input-container {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+
+  .text-input {
+    flex: 1;
+  }
+
+  .upload-button {
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    border: 2px solid rgba(99, 102, 241, 0.5);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+
+    &:hover {
+      background: linear-gradient(135deg, #7578f6, #5f56e5);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    }
+
+    &:active {
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+
+    .upload-button {
+      width: 100%;
+    }
+  }
+}
+
+.avatar-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  background: rgba(40, 40, 40, 0.5);
+  border: 2px solid rgba(205, 133, 63, 0.3);
+  border-radius: 12px;
+
+  img {
+    max-width: 200px;
+    max-height: 200px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    object-fit: cover;
+    border: 2px solid rgba(205, 133, 63, 0.4);
+  }
+}
+
+.save-button {
+  width: 100%;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: 2px solid rgba(16, 185, 129, 0.5);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: linear-gradient(135deg, #20c991, #169679);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 }
 </style>

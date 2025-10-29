@@ -176,7 +176,7 @@ const BASE_TRAINING_CHARACTERS: Character[] = [
     status: 'imprisoned',
     canCombat: true,
     unitType: 'magical',
-    loyalty: 60,
+    loyalty: 0,
     stamina: 140,
     maxStamina: 140,
     fertility: 140,

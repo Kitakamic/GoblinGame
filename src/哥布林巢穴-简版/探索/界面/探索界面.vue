@@ -300,21 +300,45 @@
       </div>
     </div>
 
-    <!-- AI生成失败确认框 -->
-    <CustomConfirm
-      :show="showAIFailureConfirm"
-      :title="aiFailureConfirmState.title"
-      :message="aiFailureConfirmState.message"
-      :details="aiFailureConfirmState.details"
-      :confirm-text="aiFailureConfirmState.confirmText"
-      :cancel-text="aiFailureConfirmState.cancelText"
-      :show-cancel="aiFailureConfirmState.showCancel"
-      :show-close="aiFailureConfirmState.showClose"
-      :type="aiFailureConfirmState.type"
-      @confirm="handleAIFailureConfirm"
-      @cancel="handleAIFailureCancel"
-      @close="handleAIFailureCancel"
-    />
+    <!-- 统一的侦察状态弹窗 -->
+    <div v-if="showScoutingModal" class="scouting-modal-overlay">
+      <div class="scouting-modal" @click.stop>
+        <!-- 加载中状态 -->
+        <template v-if="scoutingModalState === 'loading'">
+          <div class="modal-header">
+            <h3>🔍 侦察中</h3>
+          </div>
+          <div class="modal-content">
+            <div class="loading-icon">
+              <div class="spinner"></div>
+            </div>
+            <div class="loading-message">{{ scoutingLoadingMessage }}</div>
+            <div class="loading-hint">请稍候，正在生成英雄信息...</div>
+          </div>
+        </template>
+
+        <!-- 生成失败状态 -->
+        <template v-else-if="scoutingModalState === 'failure' && scoutingFailureData">
+          <div class="modal-header">
+            <h3>⚠️ AI英雄生成失败</h3>
+          </div>
+          <div class="modal-content">
+            <div class="message">据点 "{{ scoutingFailureData.location.name }}" 的AI英雄生成失败。</div>
+            <div class="details">
+              您可以选择：<br />
+              1. 放弃英雄，直接进攻该据点（无英雄奖励）<br />
+              2. 重新侦察，尝试再次生成英雄（退还 {{ scoutingFailureData.originalCost.gold }} 金币和
+              {{ scoutingFailureData.originalCost.food }}
+              食物）
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="retry-button" @click="handleScoutingModalRetry">🔄 重新侦察</button>
+            <button class="abandon-button" @click="handleScoutingModalAbandon">⚔️ 放弃英雄，直接进攻</button>
+          </div>
+        </template>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -327,7 +351,6 @@ import { toastService } from '../../服务/弹窗提示服务';
 import { TimeParseService } from '../../服务/时间解析服务';
 import { ConfirmService } from '../../服务/确认框服务';
 import { actionPointsService } from '../../服务/行动力服务';
-import CustomConfirm from '../../组件/自定义确认框.vue';
 import { AILocationGenerationService } from '../服务/AI据点生成服务';
 import { continentExploreService } from '../服务/大陆探索服务';
 import { exploreService } from '../服务/探索服务';
@@ -354,19 +377,11 @@ const scoutResult = ref<any>(null);
 const scoutingLocations = ref<Set<string>>(new Set());
 const scoutingAnimation = ref<Set<string>>(new Set());
 
-// AI生成失败确认框状态
-const showAIFailureConfirm = ref(false);
-const aiFailureConfirmState = ref({
-  title: 'AI英雄生成失败',
-  message: '',
-  details: '',
-  confirmText: '放弃英雄，直接进攻',
-  cancelText: '重新侦察',
-  showCancel: true,
-  showClose: false,
-  type: 'warning' as const,
-});
-const currentAIFailureData = ref<{ location: Location; originalCost: { gold: number; food: number } } | null>(null);
+// 统一的侦察状态弹窗
+const showScoutingModal = ref(false);
+const scoutingModalState = ref<'loading' | 'failure'>('loading');
+const scoutingLoadingMessage = ref('正在侦察中...');
+const scoutingFailureData = ref<{ location: Location; originalCost: { gold: number; food: number } } | null>(null);
 
 // 据点状态筛选
 const selectedStatusFilter = ref('all');
@@ -646,6 +661,16 @@ const scoutLocation = async (location: Location) => {
     scoutingLocations.value.add(location.id);
     scoutingAnimation.value.add(location.id);
 
+    // 检查据点是否需要AI生成英雄
+    const needsAIHero = (location as any).needsAIHero || location.description.includes('[AI_HERO_GENERATE]');
+
+    // 如果需要生成英雄，显示加载弹窗
+    if (needsAIHero) {
+      scoutingLoadingMessage.value = `发现英雄！正在生成 "${location.name}" 的英雄信息...`;
+      scoutingModalState.value = 'loading';
+      showScoutingModal.value = true;
+    }
+
     const result = await exploreService.scoutLocation(location.id);
 
     // 检查是否需要用户决策（AI生成失败）
@@ -657,10 +682,18 @@ const scoutLocation = async (location: Location) => {
       // 返还行动力（AI生成失败）
       actionPointsService.refundActionPoints('scoutLocation');
 
-      // 显示AI生成失败的确认框
-      await handleAIGenerationFailure(result.aiFailureData.location, result.aiFailureData.originalCost);
+      // 切换弹窗状态为失败模式
+      scoutingModalState.value = 'failure';
+      scoutingFailureData.value = {
+        location: result.aiFailureData.location,
+        originalCost: result.aiFailureData.originalCost,
+      };
+      // 弹窗继续显示，不关闭
       return;
     }
+
+    // 隐藏加载弹窗
+    showScoutingModal.value = false;
 
     // 等待一小段时间确保UI更新，然后移除侦察状态
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -683,6 +716,9 @@ const scoutLocation = async (location: Location) => {
       );
     }
   } catch (error) {
+    // 隐藏加载弹窗
+    showScoutingModal.value = false;
+
     // 侦察失败，移除侦察状态并显示错误信息
     scoutingLocations.value.delete(location.id);
     scoutingAnimation.value.delete(location.id);
@@ -694,32 +730,18 @@ const scoutLocation = async (location: Location) => {
   }
 };
 
-// AI生成失败处理方法
-const handleAIGenerationFailure = async (location: Location, originalCost: { gold: number; food: number }) => {
-  console.log('处理AI生成失败:', location.name, originalCost);
+// 处理侦察弹窗 - 放弃英雄并进攻
+const handleScoutingModalAbandon = async () => {
+  if (!scoutingFailureData.value) return;
 
-  // 设置确认框内容
-  aiFailureConfirmState.value.message = `据点 "${location.name}" 的AI英雄生成失败。`;
-  aiFailureConfirmState.value.details = `您可以选择：
-1. 放弃英雄，直接进攻该据点（无英雄奖励）
-2. 重新侦察，尝试再次生成英雄（退还 ${originalCost.gold} 金币和 ${originalCost.food} 食物）`;
-
-  // 保存当前失败数据
-  currentAIFailureData.value = { location, originalCost };
-
-  // 显示确认框
-  showAIFailureConfirm.value = true;
-};
-
-const handleAIFailureConfirm = async () => {
-  // 用户选择放弃英雄，直接进攻
-  if (!currentAIFailureData.value) return;
-
-  const { location, originalCost } = currentAIFailureData.value;
+  const { location, originalCost } = scoutingFailureData.value;
 
   try {
     const success = await exploreService.handleAbandonHeroAndAttack(location.id, originalCost);
     if (success) {
+      showScoutingModal.value = false;
+      scoutingFailureData.value = null;
+
       await ConfirmService.showSuccess(
         `据点 "${location.name}" 已设置为可直接进攻状态`,
         '设置成功',
@@ -732,21 +754,20 @@ const handleAIFailureConfirm = async () => {
     console.error('处理放弃英雄失败:', error);
     await ConfirmService.showDanger(`错误信息: ${error}`, '操作失败');
   }
-
-  // 关闭确认框
-  showAIFailureConfirm.value = false;
-  currentAIFailureData.value = null;
 };
 
-const handleAIFailureCancel = async () => {
-  // 用户选择重新侦察
-  if (!currentAIFailureData.value) return;
+// 处理侦察弹窗 - 重新侦察
+const handleScoutingModalRetry = async () => {
+  if (!scoutingFailureData.value) return;
 
-  const { location, originalCost } = currentAIFailureData.value;
+  const { location, originalCost } = scoutingFailureData.value;
 
   try {
     const success = await exploreService.handleRetryScout(location.id, originalCost);
     if (success) {
+      showScoutingModal.value = false;
+      scoutingFailureData.value = null;
+
       await ConfirmService.showInfo(
         `已退还侦察成本：${originalCost.gold} 金币和 ${originalCost.food} 食物`,
         '重新侦察',
@@ -759,10 +780,6 @@ const handleAIFailureCancel = async () => {
     console.error('处理重新侦察失败:', error);
     await ConfirmService.showDanger(`错误信息: ${error}`, '操作失败');
   }
-
-  // 关闭确认框
-  showAIFailureConfirm.value = false;
-  currentAIFailureData.value = null;
 };
 
 const startBattle = async (location: Location) => {
@@ -3073,6 +3090,175 @@ onMounted(async () => {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+// 统一的侦察状态弹窗样式（与自定义确认框保持一致）
+.scouting-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+
+  .scouting-modal {
+    background: linear-gradient(180deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));
+    border: 2px solid rgba(205, 133, 63, 0.4);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    animation: modalSlideIn 0.3s ease-out;
+
+    @media (max-width: 768px) {
+      width: 95%;
+      max-height: 90vh;
+      border-radius: 12px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(205, 133, 63, 0.2);
+
+      h3 {
+        margin: 0;
+        color: #ffd7a1;
+        font-size: 20px;
+        font-weight: 700;
+      }
+    }
+
+    .modal-content {
+      padding: 24px;
+
+      @media (max-width: 768px) {
+        padding: 16px;
+      }
+
+      // 加载状态样式
+      .loading-icon {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 24px;
+
+        .spinner {
+          width: 60px;
+          height: 60px;
+          border: 4px solid rgba(205, 133, 63, 0.2);
+          border-top-color: #cd853f;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+      }
+
+      .loading-message {
+        font-size: 18px;
+        font-weight: 600;
+        color: #ffd7a1;
+        text-align: center;
+        margin-bottom: 12px;
+        line-height: 1.5;
+      }
+
+      .loading-hint {
+        font-size: 14px;
+        color: #9ca3af;
+        text-align: center;
+        font-style: italic;
+      }
+
+      // 失败状态样式
+      .message {
+        color: #f0e6d2;
+        font-size: 16px;
+        line-height: 1.5;
+        margin-bottom: 12px;
+      }
+
+      .details {
+        color: #9ca3af;
+        font-size: 14px;
+        line-height: 1.6;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 12px;
+        border-radius: 8px;
+        border-left: 3px solid rgba(245, 158, 11, 0.5);
+      }
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 20px;
+      padding: 16px 24px;
+      border-top: 1px solid rgba(205, 133, 63, 0.2);
+
+      @media (max-width: 768px) {
+        padding: 12px 16px;
+        gap: 8px;
+        flex-direction: column;
+      }
+
+      button {
+        padding: 10px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-weight: 600;
+        font-size: 14px;
+        border: none;
+
+        @media (max-width: 768px) {
+          padding: 10px 16px;
+          font-size: 13px;
+          width: 100%;
+        }
+      }
+
+      .retry-button {
+        background: linear-gradient(180deg, #3b82f6, #2563eb);
+        border: 1px solid rgba(59, 130, 246, 0.6);
+        color: #ffffff;
+
+        &:hover {
+          background: linear-gradient(180deg, #2563eb, #1d4ed8);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+      }
+
+      .abandon-button {
+        background: linear-gradient(180deg, #f59e0b, #d97706);
+        border: 1px solid rgba(245, 158, 11, 0.6);
+        color: #ffffff;
+
+        &:hover {
+          background: linear-gradient(180deg, #d97706, #b45309);
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+      }
+    }
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>
