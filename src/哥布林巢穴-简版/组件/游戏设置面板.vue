@@ -132,6 +132,14 @@
           <div class="setting-item">
             <button class="tutorial-button" @click="openTutorial">📖 查看教程（强烈建议先看教程）</button>
           </div>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">更新与刷新</span>
+              <span class="label-desc">如果遇到缓存问题，可以强制清除缓存并刷新页面以获取最新版本</span>
+            </label>
+            <button class="update-button" @click="forceRefresh">🔄 清除缓存并刷新</button>
+          </div>
         </div>
       </div>
     </div>
@@ -401,6 +409,39 @@ const openTextStyleSettings = () => {
 // 打开教程
 const openTutorial = () => {
   emit('open-tutorial');
+};
+
+// 强制刷新页面（清除缓存）
+const forceRefresh = async () => {
+  const confirmed = await ConfirmService.showConfirm({
+    title: '确认刷新',
+    message: '清除缓存并刷新',
+    details: '此操作将清除页面缓存并重新加载最新版本。未保存的数据可能会丢失，请确认是否继续？',
+    type: 'warning',
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    // 获取当前 iframe 的 URL
+    const currentUrl = window.location.href;
+
+    // 如果当前 URL 中已经有查询参数，先解析
+    const url = new URL(currentUrl);
+
+    // 添加时间戳参数来绕过缓存
+    url.searchParams.set('_t', Date.now().toString());
+
+    // 重新加载页面（使用 replace 避免产生历史记录）
+    window.location.replace(url.toString());
+  } catch (error) {
+    console.error('强制刷新失败:', error);
+    // 如果解析 URL 失败，直接使用 location.reload(true) 的方式
+    // 注意：现代浏览器可能不支持 reload 的强制刷新参数，所以添加时间戳更可靠
+    window.location.href = window.location.href.split('?')[0] + '?_t=' + Date.now();
+  }
 };
 
 // 关闭面板
@@ -717,6 +758,29 @@ onMounted(() => {
 
   &:hover {
     background: linear-gradient(135deg, #4b8ef6, #3575eb);
+  }
+}
+
+.update-button {
+  width: 100%;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: 2px solid rgba(245, 158, 11, 0.5);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: linear-gradient(135deg, #fbbf24, #f59e06);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 }
 

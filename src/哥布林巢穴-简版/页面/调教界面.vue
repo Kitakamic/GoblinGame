@@ -1598,13 +1598,13 @@ const handleFileUpload = (event: Event) => {
   }
 };
 
-// 设置预设头像
-const setPresetAvatar = (preset: string) => {
-  if (editingCharacter.value) {
-    editingCharacter.value.avatar = preset;
-    forceRefreshCharacterAvatar(editingCharacter.value.id, preset);
-    closeAvatarModal();
-  }
+// 设置预设头像（开发中）
+const setPresetAvatar = async (_preset: string) => {
+  await ConfirmService.showInfo(
+    '预设头像功能正在开发中',
+    '开发中',
+    '抱歉，预设头像功能尚未完成，请使用网络图片URL或本地图片上传。',
+  );
 };
 
 // 处理图片加载错误
