@@ -5,17 +5,21 @@
     :class="{
       collapsed: isCollapsed,
       dragging: isDragging,
-      'on-left': position.left !== 'auto' && position.left < 0,
-      'on-right': position.right !== 'auto' && position.right < 0,
-      'on-top': position.top !== 'auto' && position.top < 0,
-      'on-bottom': position.bottom !== 'auto' && position.bottom < 0,
+      'on-left': !position.isCenter && position.left !== 'auto' && position.left < 0,
+      'on-right': !position.isCenter && position.right !== 'auto' && position.right < 0,
+      'on-top': !position.isCenter && position.top !== 'auto' && position.top < 0,
+      'on-bottom': !position.isCenter && position.bottom !== 'auto' && position.bottom < 0,
     }"
     :style="{
-      left: position.left === 'auto' ? 'auto' : `${position.left}px`,
-      right: position.right === 'auto' ? 'auto' : `${position.right}px`,
-      top: position.top === 'auto' ? 'auto' : `${position.top}px`,
-      bottom: position.bottom === 'auto' ? 'auto' : `${position.bottom}px`,
-      transform: position.top === 'auto' && position.bottom === 'auto' ? 'translateY(-50%)' : 'none',
+      left: position.isCenter ? '50%' : position.left === 'auto' ? 'auto' : `${position.left}px`,
+      right: position.isCenter ? 'auto' : position.right === 'auto' ? 'auto' : `${position.right}px`,
+      top: position.isCenter ? '50%' : position.top === 'auto' ? 'auto' : `${position.top}px`,
+      bottom: position.isCenter ? 'auto' : position.bottom === 'auto' ? 'auto' : `${position.bottom}px`,
+      transform: position.isCenter
+        ? 'translate(-50%, -50%)'
+        : position.top === 'auto' && position.bottom === 'auto'
+          ? 'translateY(-50%)'
+          : 'none',
     }"
   >
     <!-- 悬浮球按钮 -->
@@ -45,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue';
+import { onMounted, onUnmounted, reactive, ref } from 'vue';
 
 const isCollapsed = ref(true);
 const fabRef = ref<HTMLElement | null>(null);
@@ -60,11 +64,13 @@ const position = reactive<{
   right: number | 'auto';
   top: number | 'auto';
   bottom: number | 'auto';
+  isCenter?: boolean; // 标记是否居中
 }>({
   left: 'auto',
-  right: -28, // 初始在右侧边缘只显示一半
+  right: 'auto',
   top: 'auto',
   bottom: 'auto',
+  isCenter: true, // 初始位置居中
 });
 
 // 拖动相关状态
@@ -73,6 +79,99 @@ const hasMoved = ref(false);
 const dragStartPos = ref({ x: 0, y: 0 });
 const elementStartPos = ref({ left: 0, top: 0 });
 
+// 约束位置到视口范围内
+function constrainPosition() {
+  if (!fabRef.value) return;
+
+  // 如果处于居中状态，不需要约束（百分比定位会自动适应）
+  if (position.isCenter) return;
+
+  const rect = fabRef.value.getBoundingClientRect();
+  const screenWidth = window.innerWidth;
+  const screenHeight = window.innerHeight;
+  const elementWidth = rect.width || 56;
+  const elementHeight = rect.height || 56;
+  const halfWidth = window.innerWidth <= 768 ? 24 : 28;
+
+  // 如果使用 left 定位
+  if (position.left !== 'auto' && typeof position.left === 'number') {
+    const maxLeft = screenWidth - elementWidth;
+    if (position.left < 0) {
+      // 如果吸附在左侧边缘（负值），确保至少能显示一半
+      position.left = Math.max(-halfWidth, position.left);
+    } else if (position.left > maxLeft) {
+      // 如果超出右边界，吸附到右侧
+      position.left = 'auto';
+      position.right = -halfWidth;
+    }
+  }
+
+  // 如果使用 right 定位
+  if (position.right !== 'auto' && typeof position.right === 'number') {
+    if (position.right < 0) {
+      // 如果吸附在右侧边缘（负值），确保至少能显示一半
+      position.right = Math.max(-halfWidth, position.right);
+    } else {
+      // 如果超出边界，重新计算
+      const maxRight = screenWidth - elementWidth;
+      if (position.right > maxRight) {
+        position.right = -halfWidth;
+      }
+    }
+  }
+
+  // 如果使用 top 定位
+  if (position.top !== 'auto' && typeof position.top === 'number') {
+    const maxTop = screenHeight - elementHeight;
+    if (position.top < 0) {
+      // 如果吸附在顶部边缘（负值），确保至少能显示一半
+      position.top = Math.max(-halfWidth, position.top);
+    } else if (position.top > maxTop) {
+      // 如果超出下边界，吸附到底部
+      position.top = 'auto';
+      position.bottom = -halfWidth;
+    }
+  }
+
+  // 如果使用 bottom 定位
+  if (position.bottom !== 'auto' && typeof position.bottom === 'number') {
+    if (position.bottom < 0) {
+      // 如果吸附在底部边缘（负值），确保至少能显示一半
+      position.bottom = Math.max(-halfWidth, position.bottom);
+    } else {
+      // 如果超出边界，重新计算
+      const maxBottom = screenHeight - elementHeight;
+      if (position.bottom > maxBottom) {
+        position.bottom = -halfWidth;
+      }
+    }
+  }
+
+  // 如果元素完全超出视口（不在边缘吸附状态下），重置到默认位置
+  const currentRect = fabRef.value.getBoundingClientRect();
+  if (
+    currentRect.right < 0 ||
+    currentRect.left > screenWidth ||
+    currentRect.bottom < 0 ||
+    currentRect.top > screenHeight
+  ) {
+    // 检查是否在边缘吸附状态
+    const isSnappedToEdge =
+      (position.left !== 'auto' && position.left < 0) ||
+      (position.right !== 'auto' && position.right < 0) ||
+      (position.top !== 'auto' && position.top < 0) ||
+      (position.bottom !== 'auto' && position.bottom < 0);
+
+    if (!isSnappedToEdge) {
+      // 不在边缘吸附状态，但超出视口，重置到右侧边缘
+      position.left = 'auto';
+      position.top = 'auto';
+      position.bottom = 'auto';
+      position.right = -halfWidth;
+    }
+  }
+}
+
 // 从本地存储加载位置
 function loadPosition() {
   try {
@@ -80,7 +179,16 @@ function loadPosition() {
     if (saved) {
       const pos = JSON.parse(saved);
       Object.assign(position, pos);
+
+      // 加载后立即约束位置，确保在视口内（如果不是居中状态）
+      if (!position.isCenter) {
+        // 使用 setTimeout 确保 DOM 已渲染
+        setTimeout(() => {
+          constrainPosition();
+        }, 0);
+      }
     }
+    // 如果没有保存的位置，保持默认的居中状态
   } catch (e) {
     console.error('加载悬浮球位置失败', e);
   }
@@ -140,6 +248,9 @@ function handleDrag(e: MouseEvent | TouchEvent) {
     if (!isDragging.value) {
       isDragging.value = true;
 
+      // 清除居中标记
+      position.isCenter = false;
+
       // 获取当前元素位置
       if (fabRef.value) {
         const rect = fabRef.value.getBoundingClientRect();
@@ -186,6 +297,9 @@ function stopDrag() {
 
     // 吸附到边缘
     snapToEdge();
+
+    // 约束位置，确保在视口内
+    constrainPosition();
 
     // 保存位置
     savePosition();
@@ -319,9 +433,37 @@ function toggleFullscreen() {
   }, 300);
 }
 
+// 窗口大小改变时约束位置（使用防抖避免频繁调用）
+let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+function handleResize() {
+  if (resizeTimer) {
+    clearTimeout(resizeTimer);
+  }
+  resizeTimer = setTimeout(() => {
+    constrainPosition();
+    resizeTimer = null;
+  }, 100); // 延迟100ms执行，避免频繁调用
+}
+
 // 组件加载时恢复位置
 onMounted(() => {
   loadPosition();
+  // 监听窗口大小改变
+  window.addEventListener('resize', handleResize);
+  // 监听全屏状态改变
+  document.addEventListener('fullscreenchange', handleResize);
+  document.addEventListener('webkitfullscreenchange', handleResize);
+  document.addEventListener('mozfullscreenchange', handleResize);
+  document.addEventListener('MSFullscreenChange', handleResize);
+});
+
+// 组件卸载时清理
+onUnmounted(() => {
+  window.removeEventListener('resize', handleResize);
+  document.removeEventListener('fullscreenchange', handleResize);
+  document.removeEventListener('webkitfullscreenchange', handleResize);
+  document.removeEventListener('mozfullscreenchange', handleResize);
+  document.removeEventListener('MSFullscreenChange', handleResize);
 });
 </script>
 
