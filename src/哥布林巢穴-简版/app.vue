@@ -110,7 +110,7 @@
             <button
               class="action-btn story-summary-btn"
               :class="{ 'needs-summary': needsSummary }"
-              :title="needsSummary ? '⚠️ 建议总结剧情（部分条目超过3万tokens）' : '剧情总结'"
+              :title="needsSummary ? '⚠️ 建议总结剧情（部分条目超过5万tokens）' : '剧情总结'"
               @click="openStorySummaryModal"
             >
               <span class="icon">📚</span>
@@ -277,10 +277,13 @@
     />
 
     <!-- 全局悬浮球 -->
-    <GlobalFAB @open-settings="openSettings" />
+    <GlobalFAB @open-settings="openSettings" @open-debug="openDebug" />
 
     <!-- 欢迎提示弹窗 -->
     <WelcomeModal :show="showWelcomeModal" @confirm="handleWelcomeConfirm" @close="handleWelcomeClose" />
+
+    <!-- 调试面板 -->
+    <DebugPanel :show="showDebugPanel" @close="closeDebug" />
   </div>
 </template>
 
@@ -305,6 +308,7 @@ import TextStyleSettings from './组件/文字样式设置.vue';
 import WelcomeModal from './组件/欢迎提示弹窗.vue';
 import GameSettingsPanel from './组件/游戏设置面板.vue';
 import CustomConfirm from './组件/自定义确认框.vue';
+import DebugPanel from './组件/调试界面.vue';
 
 const route = useRoute();
 
@@ -412,6 +416,7 @@ const triggerDateUpdateAnimation = () => {
 // 设置面板状态
 const showSettings = ref(false);
 const showTextStyleSettings = ref(false);
+const showDebugPanel = ref(false);
 
 // 设置相关函数
 function openSettings() {
@@ -434,6 +439,15 @@ function closeTextStyleSettings() {
 function handleSettingsTutorial() {
   closeSettings(); // 关闭设置面板
   openTutorial(); // 打开教程确认框
+}
+
+// 调试面板相关函数
+function openDebug() {
+  showDebugPanel.value = true;
+}
+
+function closeDebug() {
+  showDebugPanel.value = false;
 }
 
 // 教程确认框状态

@@ -12,7 +12,7 @@
           <div class="section info-section">
             <p class="info-text">📚 将总结和压缩人物剧情、据点征服、冒头事件等记录，减少数据量</p>
             <template v-if="summaryCheckResult?.needsSummary">
-              <p class="info-text warning-text">⚠️ 检测到以下条目超过3万tokens，建议优先总结：</p>
+              <p class="info-text warning-text">⚠️ 检测到以下条目超过5万tokens，建议优先总结：</p>
               <ul class="over-threshold-list">
                 <li
                   v-for="detail in summaryCheckResult.entryDetails.filter(d => d.exceedsThreshold)"
@@ -301,7 +301,7 @@ async function loadEntriesStats() {
 
         // 找出超过阈值的角色
         overThresholdCharacters.value = Array.from(characterTokensByPerson.entries())
-          .filter(([, data]) => data.tokens > 30000)
+          .filter(([, data]) => data.tokens > 50000)
           .map(([id, data]) => ({ id, name: data.name, tokens: data.tokens }));
       }
     }

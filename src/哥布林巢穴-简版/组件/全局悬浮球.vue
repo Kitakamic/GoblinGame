@@ -40,6 +40,10 @@
         <span class="icon">⚙️</span>
         <span class="label">设置</span>
       </button>
+      <button class="fab-menu-item" title="调试工具" @click="openDebug">
+        <span class="icon">🐛</span>
+        <span class="label">调试</span>
+      </button>
       <button class="fab-menu-item" title="全屏" @click="toggleFullscreen">
         <span class="icon">⛶</span>
         <span class="label">全屏</span>
@@ -56,7 +60,7 @@ const fabRef = ref<HTMLElement | null>(null);
 const buttonRef = ref<HTMLElement | null>(null);
 
 // 通过自定义事件向上传递
-const emit = defineEmits(['open-settings']);
+const emit = defineEmits(['open-settings', 'open-debug']);
 
 // 位置状态
 const position = reactive<{
@@ -412,6 +416,14 @@ function handleClick() {
 
 function openSettings() {
   emit('open-settings');
+  // 延迟关闭菜单，让用户看到反馈
+  setTimeout(() => {
+    isCollapsed.value = true;
+  }, 300);
+}
+
+function openDebug() {
+  emit('open-debug');
   // 延迟关闭菜单，让用户看到反馈
   setTimeout(() => {
     isCollapsed.value = true;

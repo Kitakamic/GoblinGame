@@ -1402,8 +1402,43 @@ const filterXmlTags = (content: string) => {
 };
 
 const removeJsonFromResponse = (response: string): string => {
-  // 移除 [OPTIONS_JSON] 标签及其内容
-  return response.replace(/\[OPTIONS_JSON\][\s\S]*?\[\/OPTIONS_JSON\]/gi, '').trim();
+  let cleaned = response;
+
+  // 1. 移除 [OPTIONS_JSON] 标签格式
+  cleaned = cleaned.replace(/\[OPTIONS_JSON\][\s\S]*?\[\/OPTIONS_JSON\]/gi, '');
+
+  // 2. 移除 ```json 代码块格式（包括嵌套在标签中的）
+  cleaned = cleaned.replace(/```json\s*[\s\S]*?```/gi, '');
+
+  // 3. 移除独立的 JSON 对象（包含 options 或 morale_changes 字段的）
+  // 匹配模式：可能的 "json" 文本 + JSON 对象
+  cleaned = cleaned.replace(/\bjson\s*\n?\s*\{[\s\S]*?"(?:options|morale_changes)"[\s\S]*?\}/gi, '');
+
+  // 4. 移除独立的 JSON 对象（即使没有 "json" 前缀，但包含 options 或 morale_changes）
+  // 先找到所有匹配的 JSON 对象，然后一次性移除
+  const jsonPattern = /\{[\s\S]*?"(?:options|morale_changes)"[\s\S]*?\}/g;
+  const matches: string[] = [];
+  let match;
+
+  // 先收集所有匹配的 JSON 字符串
+  while ((match = jsonPattern.exec(cleaned)) !== null) {
+    try {
+      const jsonStr = match[0];
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.options || parsed.morale_changes) {
+        matches.push(jsonStr);
+      }
+    } catch {
+      // 如果解析失败，说明不是有效的 JSON，跳过
+    }
+  }
+
+  // 移除所有匹配的 JSON 字符串
+  for (const jsonStr of matches) {
+    cleaned = cleaned.replace(jsonStr, '');
+  }
+
+  return cleaned.trim();
 };
 
 const safeFormatMessage = (content: string) => {

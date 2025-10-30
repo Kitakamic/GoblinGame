@@ -1,6 +1,6 @@
 import { StorySummaryManager } from '../世界书管理/剧情总结管理器';
 
-const TOKEN_THRESHOLD = 30000; // 3万tokens阈值
+const TOKEN_THRESHOLD = 50000; // 5万tokens阈值
 const WORLDBOOK_NAME = '哥布林巢穴-人物档案';
 
 export interface SummaryCheckResult {

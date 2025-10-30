@@ -389,21 +389,32 @@ const loadTrainingData = async (forceReload = true) => {
 
       allCharacters.push(...availableCharacters);
       console.log('可用人物数据已加载:', availableCharacters);
+      console.log(
+        `📊 存档中人物总数: ${trainingData.characters.length}, 过滤后可用人物数: ${availableCharacters.length}`,
+      );
     }
 
     // 在进入视图层之前先对合并后的数据去重
     allCharacters = uniqueById(allCharacters);
 
     // 生成此次加载的签名（基于 id 和状态，确保状态变化时能重新加载）
-    const signature = allCharacters
+    // 注意：签名的生成应该包含人物数量，确保新人物添加时能触发重新加载
+    const signature = `${allCharacters.length}|${allCharacters
       .map(c => `${c.id}:${c.status}:${c.formationPosition || 'none'}`)
       .filter(Boolean)
       .sort()
-      .join('|');
-    if (lastLoadedSignature && lastLoadedSignature === signature) {
+      .join('|')}`;
+    if (lastLoadedSignature && lastLoadedSignature === signature && !forceReload) {
       console.log('检测到相同签名的加载，跳过');
       isLoadingTrainingData = false;
       return;
+    }
+
+    // 如果人物数量发生变化，强制重新加载
+    const currentCount = characters.value.length;
+    const newCount = allCharacters.length;
+    if (currentCount !== newCount) {
+      console.log(`人物数量变化: ${currentCount} -> ${newCount}，强制重新加载`);
     }
 
     // 同步清理存档中的重复人物，避免重复传播
@@ -433,6 +444,9 @@ const loadTrainingData = async (forceReload = true) => {
     characters.value = processedCharacters;
     lastLoadedSignature = signature;
     console.log('全量重载人物数据（已应用头像切换）:', processedCharacters);
+    console.log(
+      `✅ 加载完成: 存档中人物总数 ${trainingData?.characters?.length || 0}, 显示的人物总数 ${processedCharacters.length}`,
+    );
 
     isDataLoaded.value = true; // 标记数据已加载
     console.log('当前总人物数量:', characters.value.length);
@@ -648,29 +662,34 @@ const closeCharacterModal = () => {
 };
 
 // 开始调教
-const startTraining = async (character: Character) => {
+const startTraining = async (character: Character, skipActionPointCheck = false) => {
   if (character.status === 'training') return;
 
-  // 检查行动力
-  if (!actionPointsService.hasEnoughActionPoints('singleTraining')) {
-    await ConfirmService.showWarning(
-      actionPointsService.getInsufficientActionPointsMessage('singleTraining'),
-      '行动力不足',
-      '请等待下回合恢复行动力或征服更多区域增加上限',
-    );
-    return;
-  }
+  // 如果不跳过行动力检查，则检查并消耗行动力
+  if (!skipActionPointCheck) {
+    // 检查行动力
+    if (!actionPointsService.hasEnoughActionPoints('singleTraining')) {
+      await ConfirmService.showWarning(
+        actionPointsService.getInsufficientActionPointsMessage('singleTraining'),
+        '行动力不足',
+        '请等待下回合恢复行动力或征服更多区域增加上限',
+      );
+      return;
+    }
 
-  // 消耗行动力
-  if (!actionPointsService.consumeActionPoints('singleTraining')) {
-    await ConfirmService.showDanger('行动力消耗失败', '操作失败');
-    return;
+    // 消耗行动力
+    if (!actionPointsService.consumeActionPoints('singleTraining')) {
+      await ConfirmService.showDanger('行动力消耗失败', '操作失败');
+      return;
+    }
   }
 
   // 检查是否已编制
   if (character.status === 'deployed') {
-    // 返还行动力（已编制无法调教）
-    actionPointsService.refundActionPoints('singleTraining');
+    // 如果不跳过行动力检查，则返还行动力（已编制无法调教）
+    if (!skipActionPointCheck) {
+      actionPointsService.refundActionPoints('singleTraining');
+    }
     toastRef.value?.warning(`${character.name} 已编制，无法进行调教！`, { title: '无法调教', duration: 3000 });
     showCharacterMenu.value = false;
     return;
@@ -678,8 +697,10 @@ const startTraining = async (character: Character) => {
 
   // 检查体力是否过低（基于实际数值，20是体力下限）
   if (character.stamina < 20) {
-    // 返还行动力（体力不足）
-    actionPointsService.refundActionPoints('singleTraining');
+    // 如果不跳过行动力检查，则返还行动力（体力不足）
+    if (!skipActionPointCheck) {
+      actionPointsService.refundActionPoints('singleTraining');
+    }
     toastRef.value?.warning(`${character.name} 体力过低，无法开始调教！`, { title: '体力不足', duration: 3000 });
     showCharacterMenu.value = false;
     return;
@@ -1667,8 +1688,17 @@ const batchTraining = async () => {
 
   // 只对关押中且未堕落的人物进行批量调教
   const imprisonedCharacters = characters.value.filter(c => c.status === 'imprisoned' && c.stamina >= 20);
+
+  if (imprisonedCharacters.length === 0) {
+    // 返还行动力（没有符合条件的人物）
+    actionPointsService.refundActionPoints('batchTraining');
+    toastRef.value?.warning('没有符合调教条件的人物！', { title: '无法调教', duration: 3000 });
+    return;
+  }
+
+  // 批量调教时，跳过单次调教的行动力检查（因为已经统一消耗了批量调教的行动力）
   imprisonedCharacters.forEach(character => {
-    startTraining(character);
+    startTraining(character, true);
   });
 };
 
@@ -2360,13 +2390,16 @@ watch(
   font-weight: 700;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   text-align: center;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
   background: rgba(0, 0, 0, 0.6);
   padding: 6px 4px;
   max-width: 100%;
   min-width: 0;
+  line-height: 1.3;
   @media (min-width: 769px) {
     font-size: 16px;
     padding: 8px 6px;

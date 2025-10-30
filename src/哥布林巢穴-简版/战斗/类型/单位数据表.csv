@@ -1,6 +1,6 @@
 ﻿name,avatar,race,country,unitType,level,attack,defense,intelligence,speed,health,canLeadRaces
 普通哥布林,🟢,哥布林,哥布林巢穴,physical,1,1,1,0,1,5,哥布林
-哥布林战士,⚔️,哥布林,哥布林巢穴,physical,2,4,3,1,3,12,哥布林
+哥布林战士,⚔️,哥布林,哥布林巢穴,physical,2,5,4,1,4,15,哥布林
 哥布林圣骑士,✨,哥布林,哥布林巢穴,physical,6,6,5,4,4,18,哥布林
 哥布林萨满,🔮,哥布林,哥布林巢穴,magical,5,2,2,8,3,10,哥布林
 黑暗精灵战士,https://kitakamis.online/uiit_portaits/黑暗精灵_黑暗精灵战士_00001_.png,黑暗精灵,暗影密会,physical,3,5,3,2,4,7,黑暗精灵
