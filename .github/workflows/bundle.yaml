@@ -69,10 +69,11 @@ jobs:
           fi
 
           # 使用环境变量直接上传，不需要 aws configure
+          # 添加必要的元数据以确保 HTML 正确显示
           aws s3 cp dist/哥布林巢穴-简版/index.html "s3://${R2_BUCKET}/index.html" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-            --cache-control "no-cache, must-revalidate" \
-            --content-type "text/html"
+            --content-type "text/html; charset=utf-8" \
+            --cache-control "no-cache, must-revalidate"
 
       # 🔹 新增：清理 Cloudflare Edge 缓存
       - name: Purge Cloudflare Cache
