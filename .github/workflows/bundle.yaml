@@ -70,7 +70,7 @@ jobs:
 
       # 🔹 新增：清理 Cloudflare Edge 缓存
       - name: Purge Cloudflare Cache
-        uses: cloudflare/wrangler-action@2.1.0
+        uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           command: 'purge'
