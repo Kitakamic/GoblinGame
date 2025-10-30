@@ -63,7 +63,16 @@ jobs:
           aws configure set aws_secret_access_key "$R2_SECRET_ACCESS_KEY"
           aws configure set default.region auto
 
-          aws s3 cp dist/index.html s3://$R2_BUCKET/index.html \
+          # 检查文件是否存在
+          if [ ! -f "dist/哥布林巢穴-简版/index.html" ]; then
+            echo "错误: dist/哥布林巢穴-简版/index.html 不存在"
+            echo "构建输出目录内容:"
+            ls -la dist/ || echo "dist 目录不存在"
+            ls -la dist/哥布林巢穴-简版/ || echo "dist/哥布林巢穴-简版/ 目录不存在"
+            exit 1
+          fi
+
+          aws s3 cp dist/哥布林巢穴-简版/index.html s3://$R2_BUCKET/index.html \
             --endpoint-url https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com \
             --cache-control "no-cache, must-revalidate" \
             --content-type "text/html"
