@@ -139,9 +139,9 @@ const BASE_TRAINING_CHARACTERS: Character[] = [
     attributes: {
       attack: 40,
       defense: 50,
-      intelligence: 700,
+      intelligence: 70,
       speed: 20,
-      health: 15000,
+      health: 150,
     },
     race: '人类',
     age: 25,
