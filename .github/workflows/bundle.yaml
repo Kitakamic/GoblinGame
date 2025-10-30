@@ -72,7 +72,7 @@ jobs:
           # 添加必要的元数据以确保 HTML 正确显示
           aws s3 cp dist/哥布林巢穴-简版/index.html "s3://${R2_BUCKET}/index.html" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
-            --content-type "text/html; charset=utf-8" \
+            --content-type "text/html" \
             --cache-control "no-cache, must-revalidate"
 
       # 🔹 新增：清理 Cloudflare Edge 缓存
