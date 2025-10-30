@@ -50,3 +50,28 @@ jobs:
           with-v: true
       - if: ${{ steps.autotag.outputs.tag != '0.0.0' }}
         run: git push --delete origin ${{ steps.autotag.outputs.tag }}
+
+      # 上传 index.html 到 Cloudflare R2
+      - name: Upload index.html to Cloudflare R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: gobgame-pic
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          aws configure set aws_access_key_id "$R2_ACCESS_KEY_ID"
+          aws configure set aws_secret_access_key "$R2_SECRET_ACCESS_KEY"
+          aws configure set default.region auto
+
+          aws s3 cp dist/index.html s3://$R2_BUCKET/index.html \
+            --endpoint-url https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com \
+            --cache-control "no-cache, must-revalidate" \
+            --content-type "text/html"
+
+      # 🔹 新增：清理 Cloudflare Edge 缓存
+      - name: Purge Cloudflare Cache
+        uses: cloudflare/wrangler-action@2.1.0
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: 'purge'
+          args: '{"files":["https://kitakamis.online/index.html"]}'

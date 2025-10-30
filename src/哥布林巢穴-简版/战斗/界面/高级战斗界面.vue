@@ -816,10 +816,17 @@ const updateHeroStatus = async (hero: any) => {
       characters: [],
     };
 
-    // 查找对应的英雄并更新状态（支持 uncaptured 和 enemy 状态）
-    const heroIndex = trainingData.characters.findIndex(
-      (char: any) => char.name === hero.name && (char.status === 'uncaptured' || char.status === 'enemy'),
-    );
+    // 优先通过ID查找英雄，如果找不到则通过名字和状态查找
+    let heroIndex = trainingData.characters.findIndex((char: any) => char.id === hero.id);
+
+    // 如果通过ID找不到，再尝试通过名字和状态查找（支持 uncaptured 和 enemy 状态）
+    if (heroIndex === -1) {
+      heroIndex = trainingData.characters.findIndex(
+        (char: any) => char.name === hero.name && (char.status === 'uncaptured' || char.status === 'enemy'),
+      );
+    }
+
+    let updatedCharacter: any;
 
     if (heroIndex !== -1) {
       // 获取当前游戏时间作为捕获时间
@@ -827,7 +834,7 @@ const updateHeroStatus = async (hero: any) => {
       const captureTime = TimeParseService.getTimeInfo(currentRounds).formattedDate;
 
       // 更新英雄状态为已捕获，保留AI生成的属性
-      const updatedCharacter = {
+      updatedCharacter = {
         ...trainingData.characters[heroIndex],
         status: 'imprisoned',
         capturedAt: captureTime, // 使用游戏内时间而不是真实时间
@@ -840,19 +847,38 @@ const updateHeroStatus = async (hero: any) => {
 
       trainingData.characters[heroIndex] = updatedCharacter;
       console.log('英雄状态已更新为已捕获:', updatedCharacter.name);
-
-      // 更新世界书
-      try {
-        console.log('📚 [战斗界面] 开始更新英雄世界书...');
-        const { WorldbookService } = await import('../../世界书管理/世界书服务');
-        await WorldbookService.updateCharacterEntry(updatedCharacter);
-        console.log('✅ [战斗界面] 英雄世界书已更新');
-      } catch (worldbookError) {
-        console.error('❌ [战斗界面] 更新英雄世界书失败:', worldbookError);
-        // 不影响主要流程，继续执行
-      }
     } else {
-      console.warn('未找到对应的未捕获或敌方英雄:', hero.name);
+      // 如果英雄不存在，添加新英雄（确保传奇人物也能被添加）
+      console.log('英雄不存在于调教数据中，添加新英雄:', hero.name);
+
+      // 获取当前游戏时间作为捕获时间
+      const currentRounds = modularSaveManager.resources.value.rounds || 0;
+      const captureTime = TimeParseService.getTimeInfo(currentRounds).formattedDate;
+
+      // 创建新英雄，使用传入的英雄数据，并设置状态为已捕获
+      updatedCharacter = {
+        ...hero,
+        status: 'imprisoned',
+        capturedAt: captureTime, // 使用游戏内时间而不是真实时间
+        loyalty: hero.loyalty || 0,
+        offspring: hero.offspring || 0,
+        lastTraining: undefined,
+        favorite: hero.favorite || false,
+      };
+
+      trainingData.characters.push(updatedCharacter);
+      console.log('新英雄已添加到调教数据:', updatedCharacter.name);
+    }
+
+    // 更新世界书
+    try {
+      console.log('📚 [战斗界面] 开始更新英雄世界书...');
+      const { WorldbookService } = await import('../../世界书管理/世界书服务');
+      await WorldbookService.updateCharacterEntry(updatedCharacter);
+      console.log('✅ [战斗界面] 英雄世界书已更新');
+    } catch (worldbookError) {
+      console.error('❌ [战斗界面] 更新英雄世界书失败:', worldbookError);
+      // 不影响主要流程，继续执行
     }
 
     // 更新模块化存档系统
