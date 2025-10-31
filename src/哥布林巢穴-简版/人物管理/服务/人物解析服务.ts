@@ -302,6 +302,35 @@ export class CharacterParser {
     };
   }
 
+  /**
+   * 读取恐惧/害怕字段（优先恐惧，如果没有再读取害怕）
+   * 支持从父级对象和顶级字段读取，优先使用"恐惧"，如果没有再使用"害怕"
+   * @param data 数据对象
+   * @param parentKey 父级键名（如"隐藏特质"），如果提供则优先从此处读取
+   * @returns 字段值和来源
+   */
+  private static getFearsField(data: any, parentKey?: string): { value: any; source: string; allKeys?: string[] } {
+    // 优先尝试读取"恐惧"字段（支持父级对象和顶级字段）
+    const fearsField = this.robustGetField(data, '恐惧', parentKey);
+    if (fearsField.value !== undefined && fearsField.value !== null && fearsField.value !== '') {
+      return fearsField;
+    }
+
+    // 如果"恐惧"字段不存在或为空，尝试读取"害怕"字段（支持父级对象和顶级字段）
+    const fearField = this.robustGetField(data, '害怕', parentKey);
+    if (fearField.value !== undefined && fearField.value !== null && fearField.value !== '') {
+      console.log('ℹ️ [人物解析] "恐惧"字段不存在，使用"害怕"字段作为替代');
+      return fearField;
+    }
+
+    // 如果两个字段都不存在，返回undefined
+    return {
+      value: undefined,
+      source: '未找到（恐惧和害怕都未找到）',
+      allKeys: fearsField.allKeys || fearField.allKeys,
+    };
+  }
+
   // ==================== 主要解析方法 ====================
 
   /**
@@ -381,7 +410,7 @@ export class CharacterParser {
 
       // 使用健壮的字段读取方法
       const sexExperienceField = this.robustGetField(data, '性经历', '隐藏特质');
-      const fearsField = this.robustGetField(data, '恐惧', '隐藏特质');
+      const fearsField = this.getFearsField(data, '隐藏特质'); // 优先恐惧，其次害怕
       const secretsField = this.robustGetField(data, '秘密', '隐藏特质');
 
       console.log('📊 [人物解析] 隐藏特质原始数据:', {
@@ -565,7 +594,7 @@ export class CharacterParser {
             '隐藏特质',
           ),
           fears: this.validateOptionalString(
-            this.robustGetField(data, '恐惧', '隐藏特质').value,
+            this.getFearsField(data, '隐藏特质').value, // 优先恐惧，其次害怕
             '恐惧',
             '隐藏特质',
             '未知',
@@ -1107,7 +1136,7 @@ export class CharacterParser {
 
       // 使用健壮的字段读取方法
       const sexExperienceField = this.robustGetField(data, '性经历', '隐藏特质');
-      const fearsField = this.robustGetField(data, '恐惧', '隐藏特质');
+      const fearsField = this.getFearsField(data, '隐藏特质'); // 优先恐惧，其次害怕
       const secretsField = this.robustGetField(data, '秘密', '隐藏特质');
 
       console.log('📊 [人物解析] 隐藏特质原始数据:', {
@@ -1289,7 +1318,7 @@ export class CharacterParser {
             '隐藏特质',
           ),
           fears: this.validateOptionalString(
-            this.robustGetField(data, '恐惧', '隐藏特质').value,
+            this.getFearsField(data, '隐藏特质').value, // 优先恐惧，其次害怕
             '恐惧',
             '隐藏特质',
             '未知',

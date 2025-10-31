@@ -335,12 +335,10 @@ export class HeroDeterminationService {
   },
   "敏感点": "例如：嘴巴/胸部/乳头/阴道/子宫/后庭/阴蒂/G点，选择一个部位",
   "描述": "详细描述此敏感点的物理特征和细节，最少30字",
-  "性经历": "性经验描述，最少10字${personalityStyle ? `，需要符合"${personalityStyle}"的特征` : ''}",
-  "恐惧": "恐惧内容，最少10字${personalityStyle ? `，与"${personalityStyle}"相关的内心恐惧` : ''}",
-  "秘密": "秘密内容，最少10字${personalityStyle ? `，体现"${personalityStyle}"的隐藏面` : ''}",
   "隐藏特质": {
     "性经历": "性经验描述，最少10字${personalityStyle ? `，需要符合"${personalityStyle}"的特征` : ''}",
     "恐惧": "恐惧内容，最少10字${personalityStyle ? `，与"${personalityStyle}"相关的内心恐惧` : ''}",
+    "害怕": "害怕内容，必须与恐惧字段内容完全一致${personalityStyle ? `，与"${personalityStyle}"相关的内心恐惧` : ''}",
     "秘密": "秘密内容，最少10字${personalityStyle ? `，体现"${personalityStyle}"的隐藏面` : ''}"
   },
   "成长经历": {
@@ -481,13 +479,10 @@ ${pictureResourcePrompt}
 敏感点: "例如：嘴巴/胸部/乳头/阴道/子宫/后庭/阴蒂/G点，选择一个部位"
 描述: "详细描述此敏感点的物理特征和细节，最少50字"
 
-性经历: "性经验描述，最少10字${personalityStyle ? `，需要符合"${personalityStyle}"的特征` : ''}"
-恐惧: "恐惧内容，最少10字${personalityStyle ? `，与"${personalityStyle}"相关的内心恐惧` : ''}"
-秘密: "秘密内容，最少10字${personalityStyle ? `，体现"${personalityStyle}"的隐藏面` : ''}"
-
 隐藏特质:
   性经历: "性经验描述，最少10字${personalityStyle ? `，需要符合"${personalityStyle}"的特征` : ''}"
   恐惧: "恐惧内容，最少10字${personalityStyle ? `，与"${personalityStyle}"相关的内心恐惧` : ''}"
+  害怕: "害怕内容，必须与恐惧字段内容完全一致${personalityStyle ? `，与"${personalityStyle}"相关的内心恐惧` : ''}"
   秘密: "秘密内容，最少10字${personalityStyle ? `，体现"${personalityStyle}"的隐藏面` : ''}"
 
 成长经历:
