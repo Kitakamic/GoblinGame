@@ -315,12 +315,18 @@ export class CharacterParser {
         隐藏特质存在: !!data.隐藏特质,
         隐藏特质类型: typeof data.隐藏特质,
         隐藏特质内容: JSON.stringify(data.隐藏特质, null, 2),
-        性经历: data.隐藏特质?.性经历,
-        性经历类型: typeof data.隐藏特质?.性经历,
-        恐惧: data.隐藏特质?.恐惧,
-        恐惧类型: typeof data.隐藏特质?.恐惧,
-        秘密: data.隐藏特质?.秘密,
-        秘密类型: typeof data.隐藏特质?.秘密,
+        性经历_隐藏特质: data.隐藏特质?.性经历,
+        性经历_顶级: data.性经历,
+        性经历_最终值: data.隐藏特质?.性经历 ?? data.性经历,
+        性经历类型: typeof (data.隐藏特质?.性经历 ?? data.性经历),
+        恐惧_隐藏特质: data.隐藏特质?.恐惧,
+        恐惧_顶级: data.恐惧,
+        恐惧_最终值: data.隐藏特质?.恐惧 ?? data.恐惧,
+        恐惧类型: typeof (data.隐藏特质?.恐惧 ?? data.恐惧),
+        秘密_隐藏特质: data.隐藏特质?.秘密,
+        秘密_顶级: data.秘密,
+        秘密_最终值: data.隐藏特质?.秘密 ?? data.秘密,
+        秘密类型: typeof (data.隐藏特质?.秘密 ?? data.秘密),
       });
 
       // 处理图片资源信息
@@ -479,10 +485,11 @@ export class CharacterParser {
         lifeStory,
 
         // 隐藏特质（性经历必须，恐惧和秘密改为可选）
+        // 兼容AI可能将"性经历"、"恐惧"和"秘密"放在顶级字段的情况
         hiddenTraits: {
-          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历, '性经历', '隐藏特质'),
-          fears: this.validateOptionalString(data.隐藏特质?.恐惧, '恐惧', '隐藏特质', '未知'),
-          secrets: this.validateOptionalString(data.隐藏特质?.秘密, '秘密', '隐藏特质', '未知'),
+          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历 ?? data.性经历, '性经历', '隐藏特质'),
+          fears: this.validateOptionalString(data.隐藏特质?.恐惧 ?? data.恐惧, '恐惧', '隐藏特质', '未知'),
+          secrets: this.validateOptionalString(data.隐藏特质?.秘密 ?? data.秘密, '秘密', '隐藏特质', '未知'),
         },
 
         // 头像信息（来自据点图片资源）
@@ -1015,12 +1022,18 @@ export class CharacterParser {
         隐藏特质存在: !!data.隐藏特质,
         隐藏特质类型: typeof data.隐藏特质,
         隐藏特质内容: JSON.stringify(data.隐藏特质, null, 2),
-        性经历: data.隐藏特质?.性经历,
-        性经历类型: typeof data.隐藏特质?.性经历,
-        恐惧: data.隐藏特质?.恐惧,
-        恐惧类型: typeof data.隐藏特质?.恐惧,
-        秘密: data.隐藏特质?.秘密,
-        秘密类型: typeof data.隐藏特质?.秘密,
+        性经历_隐藏特质: data.隐藏特质?.性经历,
+        性经历_顶级: data.性经历,
+        性经历_最终值: data.隐藏特质?.性经历 ?? data.性经历,
+        性经历类型: typeof (data.隐藏特质?.性经历 ?? data.性经历),
+        恐惧_隐藏特质: data.隐藏特质?.恐惧,
+        恐惧_顶级: data.恐惧,
+        恐惧_最终值: data.隐藏特质?.恐惧 ?? data.恐惧,
+        恐惧类型: typeof (data.隐藏特质?.恐惧 ?? data.恐惧),
+        秘密_隐藏特质: data.隐藏特质?.秘密,
+        秘密_顶级: data.秘密,
+        秘密_最终值: data.隐藏特质?.秘密 ?? data.秘密,
+        秘密类型: typeof (data.隐藏特质?.秘密 ?? data.秘密),
       });
 
       // 处理图片资源信息
@@ -1177,10 +1190,11 @@ export class CharacterParser {
         lifeStory,
 
         // 隐藏特质（性经历必须，恐惧和秘密改为可选）
+        // 兼容AI可能将"性经历"、"恐惧"和"秘密"放在顶级字段的情况
         hiddenTraits: {
-          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历, '性经历', '隐藏特质'),
-          fears: this.validateOptionalString(data.隐藏特质?.恐惧, '恐惧', '隐藏特质', '未知'),
-          secrets: this.validateOptionalString(data.隐藏特质?.秘密, '秘密', '隐藏特质', '未知'),
+          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历 ?? data.性经历, '性经历', '隐藏特质'),
+          fears: this.validateOptionalString(data.隐藏特质?.恐惧 ?? data.恐惧, '恐惧', '隐藏特质', '未知'),
+          secrets: this.validateOptionalString(data.隐藏特质?.秘密 ?? data.秘密, '秘密', '隐藏特质', '未知'),
         },
 
         // 头像信息（来自据点图片资源）
