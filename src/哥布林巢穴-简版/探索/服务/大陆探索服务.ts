@@ -245,6 +245,9 @@ export class ContinentExploreService {
           );
           fixedCount++;
           unlockedCount++;
+
+          // 大陆解锁后，检查并解锁符合条件的区域
+          this.checkAndUnlockRegionsForContinent(continent.name);
         } else if (!shouldBeUnlocked && wasUnlocked) {
           // 不应该解锁但已解锁 - 锁定
           continent.isUnlocked = false;
@@ -270,6 +273,14 @@ export class ContinentExploreService {
     });
 
     console.log(`✅ [解锁验证] 验证完成: 共修复 ${fixedCount} 个大陆状态, 当前解锁 ${unlockedCount} 个大陆`);
+
+    // 验证完成后，对所有已解锁的大陆检查区域解锁（确保区域也正确解锁）
+    console.log('🔍 [解锁验证] 开始检查已解锁大陆的区域解锁状态...');
+    this.continents.value.forEach(continent => {
+      if (continent.isUnlocked) {
+        this.checkAndUnlockRegionsForContinent(continent.name);
+      }
+    });
 
     // 如果有修复，保存数据
     if (fixedCount > 0) {
@@ -336,6 +347,10 @@ export class ContinentExploreService {
       }
 
       console.log(`大陆 ${continent.name} 已解锁`);
+
+      // 解锁大陆后，检查并解锁符合条件的区域
+      this.checkAndUnlockRegionsForContinent(continentName);
+
       this.saveExploreData();
 
       return true;
@@ -719,13 +734,55 @@ export class ContinentExploreService {
     if (!continent) return;
 
     // 检查该大陆的其他区域是否可以解锁
-    continent.regions.forEach(region => {
-      if (!region.isUnlocked && region.unlockStars > 0) {
-        if (this.checkRegionUnlockConditions(region)) {
-          this.unlockRegion(region.name);
-        }
+    this.checkAndUnlockRegionsForContinent(continent.name);
+  }
+
+  // 检查并解锁大陆下符合条件的区域
+  private checkAndUnlockRegionsForContinent(continentName: string): void {
+    try {
+      const continent = this.continents.value.find(c => c.name === continentName);
+      if (!continent || !continent.isUnlocked) {
+        return;
       }
-    });
+
+      console.log(`🔍 [区域解锁检查] 开始检查大陆 ${continent.name} 的区域解锁条件...`);
+
+      // 计算大陆上所有区域的据点征服总星级（用于区域解锁判断）
+      const totalConqueredStars = this.calculateContinentConqueredStars(continent.name);
+      console.log(`🔍 [区域解锁检查] 大陆 ${continent.name} 当前征服总星级: ${totalConqueredStars}`);
+
+      let unlockedCount = 0;
+
+      // 检查该大陆的所有区域是否可以解锁
+      continent.regions.forEach(region => {
+        if (region.isUnlocked) {
+          console.log(`🔍 [区域解锁检查] 区域 ${region.name} 已解锁，跳过`);
+          return;
+        }
+
+        // 检查区域解锁条件
+        if (this.checkRegionUnlockConditions(region)) {
+          console.log(
+            `✅ [区域解锁检查] 区域 ${region.name} 满足解锁条件 (解锁星级: ${region.unlockStars}, 当前总星级: ${totalConqueredStars})`,
+          );
+          if (this.unlockRegion(region.name)) {
+            unlockedCount++;
+          }
+        } else {
+          console.log(
+            `🔍 [区域解锁检查] 区域 ${region.name} 未满足解锁条件 (需要: ${region.unlockStars}星, 当前: ${totalConqueredStars}星)`,
+          );
+        }
+      });
+
+      if (unlockedCount > 0) {
+        console.log(`✅ [区域解锁检查] 大陆 ${continent.name} 解锁了 ${unlockedCount} 个区域`);
+      } else {
+        console.log(`🔍 [区域解锁检查] 大陆 ${continent.name} 没有可解锁的区域`);
+      }
+    } catch (error) {
+      console.error('检查并解锁区域失败:', error);
+    }
   }
 
   // 检查据点是否为区域首都

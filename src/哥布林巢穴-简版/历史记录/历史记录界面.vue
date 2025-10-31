@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { defineEmits, defineProps, onMounted, ref, watch } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { modularSaveManager } from '../存档管理/模块化存档服务';
 import type { HistoryModuleData } from '../存档管理/模块化存档类型';
 

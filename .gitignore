@@ -8,3 +8,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# 传奇人物图片Tags文档
+src/哥布林巢穴-简版/人物管理/类型/传奇人物图片Tags.md

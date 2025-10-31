@@ -410,7 +410,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineEmits, defineProps, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import GenericDialogueInterface from '../../../通用对话界面/通用对话界面.vue';
 import { WorldbookService } from '../../世界书管理/世界书服务';
 import type { Character } from '../../人物管理/类型/人物类型';
