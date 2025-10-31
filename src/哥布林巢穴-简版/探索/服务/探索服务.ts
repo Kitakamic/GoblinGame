@@ -716,12 +716,38 @@ export class ExploreService {
     try {
       const { continentExploreService } = await import('./大陆探索服务');
 
+      if (!location.region) {
+        console.log(`据点 ${location.name} 没有区域信息，跳过首都检查`);
+        return;
+      }
+
+      // 获取区域信息，检查是否有首都设置
+      const region = continentExploreService.continents.value
+        .flatMap(c => c.regions)
+        .find(r => r.name === location.region);
+
+      if (!region) {
+        console.warn(`区域 ${location.region} 不存在，无法检查首都`);
+        return;
+      }
+
+      if (!region.capital || region.capital.trim() === '') {
+        console.log(`区域 ${location.region} 没有设置首都，跳过首都检查`);
+        return;
+      }
+
       // 检查据点是否为区域首都
-      const isCapital = continentExploreService.isLocationCapital(location.name, location.region || '');
+      const isCapital = continentExploreService.isLocationCapital(location.name, location.region);
+
+      console.log(
+        `🔍 [首都检查] 据点: ${location.name}, 区域: ${location.region}, 区域首都: ${region.capital}, 是否匹配: ${isCapital}`,
+      );
 
       if (isCapital) {
-        console.log(`据点 ${location.name} 是区域 ${location.region} 的首都，更新首都征服状态`);
-        continentExploreService.updateCapitalConquestStatus(location.region || '', true);
+        console.log(`✅ 据点 ${location.name} 是区域 ${location.region} 的首都，更新首都征服状态`);
+        continentExploreService.updateCapitalConquestStatus(location.region, true);
+      } else {
+        console.log(`⚠️ 据点 ${location.name} 不是区域 ${location.region} 的首都 (区域首都应为: ${region.capital})`);
       }
     } catch (error) {
       console.error('检查首都征服状态失败:', error);

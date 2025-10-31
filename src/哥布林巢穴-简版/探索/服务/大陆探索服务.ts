@@ -762,9 +762,13 @@ export class ContinentExploreService {
 
         // 检查区域解锁条件
         if (this.checkRegionUnlockConditions(region)) {
-          console.log(
-            `✅ [区域解锁检查] 区域 ${region.name} 满足解锁条件 (解锁星级: ${region.unlockStars}, 当前总星级: ${totalConqueredStars})`,
-          );
+          if (region.unlockStars === 0) {
+            console.log(`✅ [区域解锁检查] 区域 ${region.name} 满足解锁条件 (默认解锁，解锁星级为0)`);
+          } else {
+            console.log(
+              `✅ [区域解锁检查] 区域 ${region.name} 满足解锁条件 (解锁星级: ${region.unlockStars}, 当前总星级: ${totalConqueredStars})`,
+            );
+          }
           if (this.unlockRegion(region.name)) {
             unlockedCount++;
           }
