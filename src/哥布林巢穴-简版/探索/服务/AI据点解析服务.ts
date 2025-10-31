@@ -915,7 +915,7 @@ export class LocationParser {
       const extracted = jsonObjectMatch[0].trim();
       console.log('✅ [JSON提取器] 通过正则匹配到JSON对象，长度:', extracted.length);
       console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
-      
+
       // 验证提取的文本是否为有效JSON
       try {
         JSON.parse(extracted);
@@ -933,7 +933,7 @@ export class LocationParser {
       const extracted = jsonArrayMatch[0].trim();
       console.log('✅ [JSON提取器] 通过正则匹配到JSON数组，长度:', extracted.length);
       console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
-      
+
       // 验证提取的文本是否为有效JSON
       try {
         JSON.parse(extracted);
