@@ -478,11 +478,11 @@ export class CharacterParser {
         // 成长经历
         lifeStory,
 
-        // 隐藏特质（严格验证）
+        // 隐藏特质（性经历必须，恐惧和秘密改为可选）
         hiddenTraits: {
           sexExperience: this.validateRequiredString(data.隐藏特质?.性经历, '性经历', '隐藏特质'),
-          fears: this.validateRequiredString(data.隐藏特质?.恐惧, '恐惧', '隐藏特质'),
-          secrets: this.validateRequiredString(data.隐藏特质?.秘密, '秘密', '隐藏特质'),
+          fears: this.validateOptionalString(data.隐藏特质?.恐惧, '恐惧', '隐藏特质', '未知'),
+          secrets: this.validateOptionalString(data.隐藏特质?.秘密, '秘密', '隐藏特质', '未知'),
         },
 
         // 头像信息（来自据点图片资源）
@@ -665,6 +665,63 @@ export class CharacterParser {
     }
 
     console.log(`✅ [人物解析] 字段 "${fieldName}" 验证通过，值: "${trimmedValue}"`);
+    return trimmedValue;
+  }
+
+  /**
+   * 验证可选的字符串字段（宽松验证，自动类型转换）
+   * 如果缺失则使用默认值，不抛出错误
+   * 不强制要求字符串类型，任何类型都会自动转换为字符串
+   * @param value 字段值（可以是任何类型）
+   * @param fieldName 字段名称
+   * @param category 错误分类
+   * @param defaultValue 默认值（如果字段缺失）
+   * @returns 验证后的字符串
+   */
+  private static validateOptionalString(
+    value: any,
+    fieldName: string,
+    _category: string = '基础信息',
+    defaultValue: string = '',
+  ): string {
+    // 添加详细的调试信息
+    console.log(`🔍 [人物解析] 验证可选字段 "${fieldName}":`, {
+      值: value,
+      类型: typeof value,
+      是否为null: value === null,
+      是否为undefined: value === undefined,
+      是否为空字符串: value === '',
+      是否为假值: !value,
+    });
+
+    // 如果值为 null 或 undefined，使用默认值（不报错）
+    if (value === null || value === undefined) {
+      console.warn(`⚠️ [人物解析] 可选字段 "${fieldName}" 缺失（null/undefined），使用默认值: "${defaultValue}"`);
+      return defaultValue;
+    }
+
+    // 直接将任何类型的值转换为字符串（不检查类型）
+    // 这样可以处理 number、boolean 等各种类型
+    const stringValue = String(value);
+    const trimmedValue = stringValue.trim();
+
+    // 检查去除空白后是否为空
+    if (trimmedValue === '' || trimmedValue === 'undefined' || trimmedValue === 'null') {
+      // 如果为空字符串或特殊值，使用默认值（不报错）
+      console.warn(
+        `⚠️ [人物解析] 可选字段 "${fieldName}" 转换为字符串后为空（原始值: ${JSON.stringify(value)}，类型: ${typeof value}），使用默认值: "${defaultValue}"`,
+      );
+      return defaultValue;
+    }
+
+    // 如果原始类型不是字符串，记录转换信息（但继续使用转换后的值）
+    if (typeof value !== 'string') {
+      console.log(
+        `ℹ️ [人物解析] 可选字段 "${fieldName}" 类型为 ${typeof value}，已自动转换为字符串: "${trimmedValue}"`,
+      );
+    }
+
+    console.log(`✅ [人物解析] 可选字段 "${fieldName}" 验证通过，值: "${trimmedValue}"`);
     return trimmedValue;
   }
 
@@ -1119,11 +1176,11 @@ export class CharacterParser {
         // 成长经历
         lifeStory,
 
-        // 隐藏特质（严格验证）
+        // 隐藏特质（性经历必须，恐惧和秘密改为可选）
         hiddenTraits: {
           sexExperience: this.validateRequiredString(data.隐藏特质?.性经历, '性经历', '隐藏特质'),
-          fears: this.validateRequiredString(data.隐藏特质?.恐惧, '恐惧', '隐藏特质'),
-          secrets: this.validateRequiredString(data.隐藏特质?.秘密, '秘密', '隐藏特质'),
+          fears: this.validateOptionalString(data.隐藏特质?.恐惧, '恐惧', '隐藏特质', '未知'),
+          secrets: this.validateOptionalString(data.隐藏特质?.秘密, '秘密', '隐藏特质', '未知'),
         },
 
         // 头像信息（来自据点图片资源）
