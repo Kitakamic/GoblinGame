@@ -445,11 +445,12 @@ export class ExploreService {
     const currentContinent = continentExploreService.getCurrentContinent();
     const baseCost = currentContinent?.explorationCost || { gold: 5, food: 3 };
 
-    // 根据星级计算倍数：1星=1倍，10星=50倍
-    const multiplier = Math.max(1, difficulty * 5);
+    // 根据星级计算倍数：使用平方根曲线，让高等级据点增长更平缓
+    // 1星≈1.5倍，5星≈4倍，7星≈4.7倍，10星≈5.7倍（相比之前的线性增长大幅降低）
+    const multiplier = Math.max(1, 1 + Math.sqrt(difficulty) * 0.5);
 
-    // 距离成本：每公里增加 5% 的成本
-    const distanceMultiplier = distance ? 1 + distance * 0.05 : 1;
+    // 距离成本：每公里增加 3% 的成本（从5%降低到3%）
+    const distanceMultiplier = distance ? 1 + distance * 0.03 : 1;
 
     // 移除随机因子，使用固定费用计算
     return {

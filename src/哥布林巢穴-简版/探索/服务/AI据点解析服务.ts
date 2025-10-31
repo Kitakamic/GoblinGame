@@ -780,78 +780,149 @@ export class LocationParser {
       console.log('❌ [JSON提取器] 未找到普通```标记');
     }
 
-    // 3. 查找JSON对象或数组 (无包裹格式) - 改进的正则表达式
-    console.log('🔧 [JSON提取器] 使用改进的正则表达式查找JSON对象...');
+    // 3. 查找JSON对象或数组 (无包裹格式) - 改进的大括号计数方法（考虑字符串中的大括号）
+    {
+      console.log('🔧 [JSON提取器] 使用改进的大括号计数方法查找JSON对象...');
 
-    // 尝试匹配完整的JSON对象，考虑嵌套的大括号
-    let braceCount = 0;
-    let jsonStart = -1;
-    let jsonEnd = -1;
+      // 尝试匹配完整的JSON对象，考虑嵌套的大括号和字符串中的大括号
+      let braceCount = 0;
+      let jsonStart = -1;
+      let jsonEnd = -1;
+      let inString = false;
+      let escapeNext = false;
 
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      if (char === '{') {
-        if (braceCount === 0) {
-          jsonStart = i;
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+
+        // 处理转义字符
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
         }
-        braceCount++;
-      } else if (char === '}') {
-        braceCount--;
-        if (braceCount === 0 && jsonStart !== -1) {
-          jsonEnd = i;
-          break;
+
+        if (char === '\\') {
+          escapeNext = true;
+          continue;
         }
+
+        // 处理字符串边界
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+
+        // 只在非字符串状态下计数大括号
+        if (!inString) {
+          if (char === '{') {
+            if (braceCount === 0) {
+              jsonStart = i;
+            }
+            braceCount++;
+          } else if (char === '}') {
+            braceCount--;
+            if (braceCount === 0 && jsonStart !== -1) {
+              jsonEnd = i;
+              break;
+            }
+          }
+        }
+      }
+
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        const extracted = text.substring(jsonStart, jsonEnd + 1).trim();
+        console.log('✅ [JSON提取器] 通过大括号计数匹配到JSON对象，长度:', extracted.length);
+        console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
+
+        // 验证提取的文本是否为有效JSON
+        try {
+          JSON.parse(extracted);
+          return extracted;
+        } catch (e) {
+          console.warn('⚠️ [JSON提取器] 大括号计数提取的文本不是有效JSON，继续尝试其他方法');
+        }
+      } else {
+        console.log('❌ [JSON提取器] 大括号计数未匹配到JSON对象');
       }
     }
 
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      const extracted = text.substring(jsonStart, jsonEnd + 1).trim();
-      console.log('✅ [JSON提取器] 通过大括号计数匹配到JSON对象，长度:', extracted.length);
-      console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
-      return extracted;
-    } else {
-      console.log('❌ [JSON提取器] 大括号计数未匹配到JSON对象');
-    }
+    // 4. 尝试匹配JSON数组（考虑字符串中的方括号）
+    {
+      console.log('🔧 [JSON提取器] 使用改进的方括号计数方法查找JSON数组...');
+      let bracketCount = 0;
+      let arrayStart = -1;
+      let arrayEnd = -1;
+      let inString = false;
+      let escapeNext = false;
 
-    // 4. 尝试匹配JSON数组
-    console.log('🔧 [JSON提取器] 使用大括号计数查找JSON数组...');
-    let bracketCount = 0;
-    let arrayStart = -1;
-    let arrayEnd = -1;
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
 
-    for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      if (char === '[') {
-        if (bracketCount === 0) {
-          arrayStart = i;
+        // 处理转义字符
+        if (escapeNext) {
+          escapeNext = false;
+          continue;
         }
-        bracketCount++;
-      } else if (char === ']') {
-        bracketCount--;
-        if (bracketCount === 0 && arrayStart !== -1) {
-          arrayEnd = i;
-          break;
+
+        if (char === '\\') {
+          escapeNext = true;
+          continue;
         }
+
+        // 处理字符串边界
+        if (char === '"') {
+          inString = !inString;
+          continue;
+        }
+
+        // 只在非字符串状态下计数方括号
+        if (!inString) {
+          if (char === '[') {
+            if (bracketCount === 0) {
+              arrayStart = i;
+            }
+            bracketCount++;
+          } else if (char === ']') {
+            bracketCount--;
+            if (bracketCount === 0 && arrayStart !== -1) {
+              arrayEnd = i;
+              break;
+            }
+          }
+        }
+      }
+
+      if (arrayStart !== -1 && arrayEnd !== -1) {
+        const extracted = text.substring(arrayStart, arrayEnd + 1).trim();
+        console.log('✅ [JSON提取器] 通过方括号计数匹配到JSON数组，长度:', extracted.length);
+        console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
+
+        // 验证提取的文本是否为有效JSON
+        try {
+          JSON.parse(extracted);
+          return extracted;
+        } catch (e) {
+          console.warn('⚠️ [JSON提取器] 方括号计数提取的文本不是有效JSON，继续尝试其他方法');
+        }
+      } else {
+        console.log('❌ [JSON提取器] 方括号计数未匹配到JSON数组');
       }
     }
 
-    if (arrayStart !== -1 && arrayEnd !== -1) {
-      const extracted = text.substring(arrayStart, arrayEnd + 1).trim();
-      console.log('✅ [JSON提取器] 通过方括号计数匹配到JSON数组，长度:', extracted.length);
-      console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
-      return extracted;
-    } else {
-      console.log('❌ [JSON提取器] 方括号计数未匹配到JSON数组');
-    }
-
-    // 5. 最后的正则表达式尝试
+    // 5. 最后的正则表达式尝试（作为后备方案）
     console.log('🔧 [JSON提取器] 使用正则表达式查找JSON对象...');
     const jsonObjectMatch = text.match(/\{[\s\S]*\}/);
     if (jsonObjectMatch) {
       const extracted = jsonObjectMatch[0].trim();
       console.log('✅ [JSON提取器] 通过正则匹配到JSON对象，长度:', extracted.length);
       console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
-      return extracted;
+      
+      // 验证提取的文本是否为有效JSON
+      try {
+        JSON.parse(extracted);
+        return extracted;
+      } catch (e) {
+        console.warn('⚠️ [JSON提取器] 正则匹配的文本不是有效JSON，继续尝试数组匹配');
+      }
     } else {
       console.log('❌ [JSON提取器] 正则未匹配到JSON对象');
     }
@@ -862,7 +933,14 @@ export class LocationParser {
       const extracted = jsonArrayMatch[0].trim();
       console.log('✅ [JSON提取器] 通过正则匹配到JSON数组，长度:', extracted.length);
       console.log('✅ [JSON提取器] 匹配的JSON开头:', extracted.substring(0, 100) + '...');
-      return extracted;
+      
+      // 验证提取的文本是否为有效JSON
+      try {
+        JSON.parse(extracted);
+        return extracted;
+      } catch (e) {
+        console.warn('⚠️ [JSON提取器] 正则匹配的数组文本不是有效JSON');
+      }
     } else {
       console.log('❌ [JSON提取器] 正则未匹配到JSON数组');
     }
