@@ -692,6 +692,9 @@ const scoutLocation = async (location: Location) => {
     const result = await exploreService.scoutLocation(location.id);
 
     // 检查是否需要用户决策（AI生成失败）
+    // 无论是因为解析错误还是其他错误，都会返回 needsUserDecision
+    // 解析错误时，用户会先看到 GenerationErrorService 的错误弹窗（可以编辑和重新解析）
+    // 关闭错误弹窗后，会统一显示 scoutingModal 的失败状态，让用户选择放弃或重新侦察
     if (result.needsUserDecision && result.aiFailureData) {
       // 移除侦察状态
       scoutingLocations.value.delete(location.id);
@@ -701,6 +704,8 @@ const scoutLocation = async (location: Location) => {
       actionPointsService.refundActionPoints('scoutLocation');
 
       // 切换弹窗状态为失败模式
+      // 注意：如果用户刚才在 GenerationErrorService 的错误弹窗中已经关闭了弹窗，
+      // 现在会显示 scoutingModal 的失败状态，让用户选择放弃英雄或重新侦察
       scoutingModalState.value = 'failure';
       scoutingFailureData.value = {
         location: result.aiFailureData.location,

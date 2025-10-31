@@ -150,6 +150,7 @@
       @start-training="startTraining"
       @edit-avatar="editAvatar"
       @execute="executeCharacter"
+      @character-updated="handleCharacterUpdated"
     />
 
     <!-- 头像编辑弹窗 -->
@@ -915,6 +916,36 @@ const saveOutfit = (character: Character) => {
   toastRef.value?.success(`${character.name} 的服装已保存`, {
     title: '保存成功',
     duration: 2000,
+  });
+};
+
+// 处理人物卡界面的人物更新事件
+const handleCharacterUpdated = (updatedCharacter: Character) => {
+  console.log('🔄 [调教界面] 接收到人物更新事件:', updatedCharacter.name);
+
+  // 更新本地人物数据
+  const index = characters.value.findIndex(c => c.id === updatedCharacter.id);
+  if (index > -1) {
+    characters.value[index] = updatedCharacter;
+    console.log('✅ [调教界面] 已更新人物列表中的数据');
+  }
+
+  // 更新选中的人物
+  if (selectedCharacter.value?.id === updatedCharacter.id) {
+    selectedCharacter.value = updatedCharacter;
+    console.log('✅ [调教界面] 更新选中的人物数据');
+  }
+
+  // 保存调教数据
+  saveTrainingData();
+
+  // 强制更新界面显示
+  applyFilters();
+
+  // 显示成功提示
+  toastRef.value?.success(`${updatedCharacter.name} 的数据已更新`, {
+    title: '更新成功',
+    duration: 3000,
   });
 };
 

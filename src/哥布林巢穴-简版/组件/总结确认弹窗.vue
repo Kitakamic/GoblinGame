@@ -130,7 +130,7 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100000;
+  z-index: 10500; // 在自定义确认框（11000）之后，但在生成错误提示（10200）之前
   padding: 20px;
 }
 

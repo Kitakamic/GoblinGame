@@ -423,6 +423,7 @@ import CustomConfirmBox from '../../组件/自定义确认框.vue';
 import { MoraleDialogueService } from '../服务/士气对话服务';
 import { BattleFactory } from '../服务/战斗工厂';
 import { NewBattleSystem } from '../服务/新战斗系统';
+import { calculateTroopBonusWithDecay } from '../服务/部队加成计算服务';
 import { FormationService } from '../服务/部队编制服务';
 import { ALL_UNIT_CHARACTERS, getUnitsByRace } from '../类型/单位数据表';
 import type { BattleResult, BattleTurn, BattleUnit } from '../类型/战斗属性';
@@ -1662,21 +1663,23 @@ const initializeEnemyUnits = () => {
         }
 
         if (matchingUnit) {
-          // 根据部队等级计算加成比例，最高等级10，加成比例 = level/10
+          // 使用带递减机制的部队加成计算（敌方单位）
           const troopLevel = Math.min(matchingUnit.level, 10);
-          const troopMultiplier = troopLevel / 10;
-          troopAttackBonus = Math.floor(troopCount * matchingUnit.attributes.attack * troopMultiplier);
-          troopDefenseBonus = Math.floor(troopCount * matchingUnit.attributes.defense * troopMultiplier);
-          troopIntelligenceBonus = Math.floor(troopCount * matchingUnit.attributes.intelligence * troopMultiplier);
-          troopSpeedBonus = Math.floor(troopCount * matchingUnit.attributes.speed * troopMultiplier);
-          troopHealthBonus = Math.floor(troopCount * matchingUnit.attributes.health * troopMultiplier);
+          troopAttackBonus = calculateTroopBonusWithDecay(troopCount, matchingUnit.attributes.attack, troopLevel);
+          troopDefenseBonus = calculateTroopBonusWithDecay(troopCount, matchingUnit.attributes.defense, troopLevel);
+          troopIntelligenceBonus = calculateTroopBonusWithDecay(
+            troopCount,
+            matchingUnit.attributes.intelligence,
+            troopLevel,
+          );
+          troopSpeedBonus = calculateTroopBonusWithDecay(troopCount, matchingUnit.attributes.speed, troopLevel);
+          troopHealthBonus = calculateTroopBonusWithDecay(troopCount, matchingUnit.attributes.health, troopLevel);
 
           console.log(`单位 ${unit.name} 的部队属性加成:`, {
             troopType,
             matchingUnit: matchingUnit.name,
             troopCount,
             troopLevel,
-            troopMultiplier,
             bonuses: {
               attack: troopAttackBonus,
               defense: troopDefenseBonus,

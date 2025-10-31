@@ -3,5 +3,5 @@
  * 统一管理版本号和更新时间，方便维护和更新
  */
 
-export const FRONTEND_VERSION = '1.0.4.0';
-export const FRONTEND_UPDATE_DATE = '2025-10-31';
+export const FRONTEND_VERSION = '1.4.0';
+export const FRONTEND_UPDATE_DATE = '2025-11-1';

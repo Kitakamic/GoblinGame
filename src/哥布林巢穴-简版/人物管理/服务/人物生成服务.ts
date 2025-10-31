@@ -528,6 +528,7 @@ ${pictureResourcePrompt}
     locationId: string,
     locationType: Location['type'],
     pictureResource?: Location['pictureResource'],
+    onCharacterUpdated?: (character: Character) => Promise<void>,
   ): Promise<Character | null> {
     console.log('🚀 [人物生成] 开始处理英雄人物信息...');
     console.log('📍 [人物生成] 据点信息:', {
@@ -541,20 +542,70 @@ ${pictureResourcePrompt}
     const processedText = formatAsTavernRegexedString(heroText, 'ai_output', 'prompt');
     console.log('✅ [人物生成] 酒馆正则处理完成，文本长度:', processedText.length);
 
-    // 1. 解析数据（支持JSON和YAML格式）
+    // 1. 根据设置解析数据
     console.log('🔍 [人物生成] 步骤1: 开始解析数据...');
-    let parsedData = CharacterParser.parseCharacterJson(processedText, pictureResource);
-    if (!parsedData) {
-      console.log('⚠️ [人物生成] JSON解析失败，尝试YAML格式...');
-      parsedData = CharacterParser.parseCharacterYaml(processedText, pictureResource);
-      if (!parsedData) {
-        console.error('❌ [人物生成] JSON和YAML解析都失败，无法继续处理');
-        return null;
+
+    // 获取人物生成格式设置
+    const globalVars = getVariables({ type: 'global' });
+    const format = (globalVars['character_generation_format'] as string) || 'json';
+
+    console.log('📋 [人物生成] 使用解析格式:', format);
+
+    // 创建重新解析回调函数
+    const onRetry = async (editedText: string): Promise<void> => {
+      console.log('🔄 [人物生成] 用户触发重新解析...');
+      console.log('📝 [人物生成] 编辑后的文本长度:', editedText.length);
+
+      // 重新应用酒馆正则处理
+      const retryProcessedText = formatAsTavernRegexedString(editedText, 'ai_output', 'prompt');
+
+      // 重新解析
+      const retryParsedData =
+        format === 'yaml'
+          ? await CharacterParser.parseCharacterYaml(retryProcessedText, pictureResource, editedText, onRetry)
+          : await CharacterParser.parseCharacterJson(retryProcessedText, pictureResource, editedText, onRetry);
+
+      if (!retryParsedData) {
+        console.error(`❌ [人物生成] ${format.toUpperCase()} 重新解析失败`);
+        throw new Error(`重新解析失败，请检查编辑后的内容是否正确`);
       }
-      console.log('✅ [人物生成] YAML解析成功，获得解析数据');
-    } else {
-      console.log('✅ [人物生成] JSON解析成功，获得解析数据');
+
+      console.log(`✅ [人物生成] ${format.toUpperCase()} 重新解析成功`);
+
+      // 计算属性并构建完整的人物对象
+      const retryCharacter = await CharacterAttributeCalculator.buildCharacter(
+        retryParsedData,
+        locationId,
+        locationType,
+      );
+
+      if (!retryCharacter) {
+        console.error('❌ [人物生成] 重新解析后的人物构建失败');
+        throw new Error('重新解析后的人物构建失败');
+      }
+
+      console.log('🎉 [人物生成] 重新解析并构建人物成功!');
+      console.log('👤 [人物生成] 重新生成的人物:', retryCharacter.name);
+
+      // 如果提供了回调函数，调用它来更新外部状态
+      if (onCharacterUpdated) {
+        await onCharacterUpdated(retryCharacter);
+        console.log('✅ [人物生成] 已通过回调更新外部状态');
+      }
+    };
+
+    // 根据设置选择解析方式
+    const parsedData =
+      format === 'yaml'
+        ? await CharacterParser.parseCharacterYaml(processedText, pictureResource, heroText, onRetry)
+        : await CharacterParser.parseCharacterJson(processedText, pictureResource, heroText, onRetry);
+
+    if (!parsedData) {
+      console.error(`❌ [人物生成] ${format.toUpperCase()} 解析失败，无法继续处理`);
+      return null;
     }
+
+    console.log(`✅ [人物生成] ${format.toUpperCase()} 解析成功，获得解析数据`);
 
     // 2. 计算属性并构建完整的人物对象
     console.log('🔧 [人物生成] 步骤2: 开始计算属性并构建人物对象...');

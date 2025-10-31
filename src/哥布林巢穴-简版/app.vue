@@ -284,6 +284,9 @@
 
     <!-- 调试面板 -->
     <DebugPanel :show="showDebugPanel" @close="closeDebug" />
+
+    <!-- 生成错误提示 -->
+    <GenerationErrorPanel />
   </div>
 </template>
 
@@ -307,6 +310,7 @@ import GlobalFAB from './组件/全局悬浮球.vue';
 import TextStyleSettings from './组件/文字样式设置.vue';
 import WelcomeModal from './组件/欢迎提示弹窗.vue';
 import GameSettingsPanel from './组件/游戏设置面板.vue';
+import GenerationErrorPanel from './组件/生成错误提示.vue';
 import CustomConfirm from './组件/自定义确认框.vue';
 import DebugPanel from './组件/调试界面.vue';
 

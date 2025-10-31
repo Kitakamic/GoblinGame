@@ -3,6 +3,7 @@
  * 专门负责解析AI输出的人物信息JSON文本，返回原始数据
  */
 import { parse as parseYaml } from 'yaml';
+import { GenerationErrorService } from '../../服务/生成错误服务';
 import type { BackgroundType, SensitivePart } from '../类型/人物类型';
 
 /** 图片资源信息 */
@@ -90,16 +91,169 @@ export interface ParsedCharacterData {
   avatar?: string;
 }
 
+/** 解析错误信息 */
+export interface ParseError {
+  field: string; // 字段名称
+  message: string; // 错误消息
+  category: '基础信息' | '外貌数据' | '隐藏特质' | '成长经历' | '敏感点' | '格式错误'; // 错误分类
+  actualValue?: any; // 实际值
+  expectedType?: string; // 期望类型
+}
+
+/** 错误收集器 */
+class ParseErrorCollector {
+  private errors: ParseError[] = [];
+
+  /**
+   * 添加错误
+   */
+  addError(error: ParseError): void {
+    this.errors.push(error);
+    console.error(`❌ [人物解析] 错误: [${error.category}] ${error.field} - ${error.message}`);
+  }
+
+  /**
+   * 是否有错误
+   */
+  hasErrors(): boolean {
+    return this.errors.length > 0;
+  }
+
+  /**
+   * 获取所有错误
+   */
+  getErrors(): ParseError[] {
+    return [...this.errors];
+  }
+
+  /**
+   * 获取错误摘要
+   */
+  getSummary(): string {
+    if (this.errors.length === 0) return '';
+
+    const categoryCount: Record<string, number> = {};
+    for (const error of this.errors) {
+      categoryCount[error.category] = (categoryCount[error.category] || 0) + 1;
+    }
+
+    const categoryList = Object.entries(categoryCount)
+      .map(([category, count]) => `${category}: ${count}个错误`)
+      .join('、');
+
+    return `共发现 ${this.errors.length} 个错误（${categoryList}）`;
+  }
+
+  /**
+   * 格式化错误详情
+   */
+  formatDetails(): string {
+    if (this.errors.length === 0) return '';
+
+    const details: string[] = [];
+    const categoryGroups: Record<string, ParseError[]> = {};
+
+    // 按分类分组
+    for (const error of this.errors) {
+      if (!categoryGroups[error.category]) {
+        categoryGroups[error.category] = [];
+      }
+      categoryGroups[error.category].push(error);
+    }
+
+    // 按分类输出
+    for (const [category, errors] of Object.entries(categoryGroups)) {
+      details.push(`\n【${category}】`);
+      for (const error of errors) {
+        let errorText = `  • ${error.field}: ${error.message}`;
+        if (error.actualValue !== undefined) {
+          const valueStr =
+            typeof error.actualValue === 'string' ? `"${error.actualValue}"` : JSON.stringify(error.actualValue);
+          errorText += `\n    实际值: ${valueStr}`;
+        }
+        if (error.expectedType) {
+          errorText += `\n    期望类型: ${error.expectedType}`;
+        }
+        details.push(errorText);
+      }
+    }
+
+    return details.join('\n');
+  }
+
+  /**
+   * 清空错误
+   */
+  clear(): void {
+    this.errors = [];
+  }
+}
+
 export class CharacterParser {
+  // 错误收集器实例
+  private static errorCollector = new ParseErrorCollector();
+
+  /**
+   * 显示解析错误弹窗
+   */
+  private static async showParseErrorDialog(
+    error: Error | null,
+    rawText?: string,
+    onRetry?: (editedText: string) => Promise<void>,
+  ): Promise<void> {
+    const hasErrors = this.errorCollector.hasErrors();
+
+    let title = '人物信息解析失败';
+    let message = '';
+    let details = '';
+
+    if (hasErrors) {
+      // 使用收集的错误信息
+      title = `人物信息解析失败 - ${this.errorCollector.getSummary()}`;
+      message = 'AI生成的人物信息存在以下错误，请检查并重新生成：';
+      details = this.errorCollector.formatDetails();
+    } else if (error) {
+      // 使用捕获的异常
+      title = '人物信息解析失败';
+      message = error.message || '解析过程中发生未知错误';
+      details = error.stack || '';
+    } else {
+      // 默认错误信息
+      title = '人物信息解析失败';
+      message = '解析过程中发生未知错误';
+      details = '请检查AI输出格式是否正确';
+    }
+
+    // 显示错误弹窗
+    await GenerationErrorService.showError({
+      title,
+      message,
+      summary: hasErrors ? this.errorCollector.getSummary() : undefined,
+      details,
+      rawText,
+      onRetry,
+    });
+  }
+
   // ==================== 主要解析方法 ====================
 
   /**
    * 解析AI输出的人物信息JSON
    * @param text AI输出的人物信息JSON文本
    * @param pictureResource 据点的图片资源信息（可选）
+   * @param rawText 原始AI输出文本（用于调试，可选）
+   * @param onRetry 重新解析回调函数（可选）
    * @returns 解析后的原始数据对象
    */
-  static parseCharacterJson(text: string, pictureResource?: PictureResource): ParsedCharacterData | null {
+  static async parseCharacterJson(
+    text: string,
+    pictureResource?: PictureResource,
+    rawText?: string,
+    onRetry?: (editedText: string) => Promise<void>,
+  ): Promise<ParsedCharacterData | null> {
+    // 清空错误收集器
+    this.errorCollector.clear();
+
     try {
       console.log('🔍 [人物解析] 开始解析AI输出的人物信息...');
       console.log('📝 [人物解析] 原始AI输出长度:', text.length);
@@ -112,6 +266,12 @@ export class CharacterParser {
       const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         console.error('❌ [人物解析] 未找到有效的JSON格式');
+        this.errorCollector.addError({
+          field: 'JSON格式',
+          message: '未找到有效的JSON格式',
+          category: '格式错误',
+        });
+        await this.showParseErrorDialog(null, rawText || text, onRetry);
         return null;
       }
 
@@ -138,11 +298,30 @@ export class CharacterParser {
       // 验证必要字段
       if (!data.基础信息 || !data.基础信息.姓名) {
         console.error('❌ [人物解析] JSON格式缺少必要字段');
+        this.errorCollector.addError({
+          field: '基础信息',
+          message: '缺少必要字段：基础信息.姓名',
+          category: '格式错误',
+        });
         throw new Error('JSON格式缺少必要字段');
       }
 
       console.log('✅ [人物解析] 基础信息验证通过');
       console.log('👤 [人物解析] 人物姓名:', data.基础信息.姓名);
+
+      // 提前检查隐藏特质数据
+      console.log('🔍 [人物解析] 提前检查隐藏特质数据（JSON）...');
+      console.log('📊 [人物解析] 隐藏特质原始数据:', {
+        隐藏特质存在: !!data.隐藏特质,
+        隐藏特质类型: typeof data.隐藏特质,
+        隐藏特质内容: JSON.stringify(data.隐藏特质, null, 2),
+        性经历: data.隐藏特质?.性经历,
+        性经历类型: typeof data.隐藏特质?.性经历,
+        恐惧: data.隐藏特质?.恐惧,
+        恐惧类型: typeof data.隐藏特质?.恐惧,
+        秘密: data.隐藏特质?.秘密,
+        秘密类型: typeof data.隐藏特质?.秘密,
+      });
 
       // 处理图片资源信息
       if (pictureResource?.imageUrl) {
@@ -272,23 +451,23 @@ export class CharacterParser {
 
       const parsedData: ParsedCharacterData = {
         // 基础信息（严格验证，不允许保底）
-        name: this.validateRequiredString(data.基础信息.姓名, '姓名'),
-        race: this.validateRequiredString(data.基础信息.种族, '种族'),
-        age: this.validateRequiredNumber(data.基础信息.年龄, '年龄'),
-        country: this.validateRequiredString(data.基础信息.国家, '国家'),
-        identity: this.validateRequiredString(data.基础信息.身份, '身份'),
-        background: this.validateBackground(data.基础信息.出身),
-        personality: this.validatePersonality(data.基础信息.性格),
-        canCombat: this.validateCanCombat(data.基础信息.可战斗),
+        name: this.validateRequiredString(data.基础信息.姓名, '姓名', '基础信息'),
+        race: this.validateRequiredString(data.基础信息.种族, '种族', '基础信息'),
+        age: this.validateRequiredNumber(data.基础信息.年龄, '年龄', '基础信息'),
+        country: this.validateRequiredString(data.基础信息.国家, '国家', '基础信息'),
+        identity: this.validateRequiredString(data.基础信息.身份, '身份', '基础信息'),
+        background: this.validateBackground(data.基础信息.出身, '基础信息'),
+        personality: this.validatePersonality(data.基础信息.性格, '基础信息'),
+        canCombat: this.validateCanCombat(data.基础信息.可战斗, '基础信息'),
         unitType: this.validateUnitType(data.基础信息.单位类型),
 
         // 外貌数据（严格验证）
         appearance: {
-          height: this.validateRequiredNumber(data.外貌数据?.身高, '身高'),
-          weight: this.validateRequiredNumber(data.外貌数据?.体重, '体重'),
-          measurements: this.validateRequiredString(data.外貌数据?.三围, '三围'),
-          cupSize: this.validateCupSize(data.外貌数据?.罩杯),
-          description: this.validateRequiredString(data.外貌数据?.描述, '外貌描述'),
+          height: this.validateRequiredNumber(data.外貌数据?.身高, '身高', '外貌数据'),
+          weight: this.validateRequiredNumber(data.外貌数据?.体重, '体重', '外貌数据'),
+          measurements: this.validateRequiredString(data.外貌数据?.三围, '三围', '外貌数据'),
+          cupSize: this.validateCupSize(data.外貌数据?.罩杯, '外貌数据'),
+          description: this.validateRequiredString(data.外貌数据?.描述, '外貌描述', '外貌数据'),
           clothing: Object.keys(clothing).length > 0 ? clothing : undefined,
           originalClothing: Object.keys(originalClothing).length > 0 ? originalClothing : undefined,
         },
@@ -301,9 +480,9 @@ export class CharacterParser {
 
         // 隐藏特质（严格验证）
         hiddenTraits: {
-          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历, '性经历'),
-          fears: this.validateRequiredString(data.隐藏特质?.恐惧, '恐惧'),
-          secrets: this.validateRequiredString(data.隐藏特质?.秘密, '秘密'),
+          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历, '性经历', '隐藏特质'),
+          fears: this.validateRequiredString(data.隐藏特质?.恐惧, '恐惧', '隐藏特质'),
+          secrets: this.validateRequiredString(data.隐藏特质?.秘密, '秘密', '隐藏特质'),
         },
 
         // 头像信息（来自据点图片资源）
@@ -329,6 +508,12 @@ export class CharacterParser {
       return parsedData;
     } catch (error) {
       console.error('解析人物信息失败:', error);
+      // 显示错误弹窗
+      await this.showParseErrorDialog(
+        error instanceof Error ? error : new Error(String(error)),
+        rawText || text,
+        onRetry,
+      );
       return null;
     }
   }
@@ -383,16 +568,33 @@ export class CharacterParser {
   /**
    * 严格验证出身等级（必须由AI明确输出）
    * @param background 出身等级
+   * @param category 错误分类
    * @returns 验证后的出身等级
    * @throws Error 如果出身等级缺失或无效
    */
-  private static validateBackground(background: any): BackgroundType {
+  private static validateBackground(background: any, category: string = '基础信息'): BackgroundType {
     if (!background || typeof background !== 'string') {
+      const error: ParseError = {
+        field: '出身',
+        message: '字段缺失，AI必须明确指定：平民/贵族/王族',
+        category: category as any,
+        actualValue: background,
+        expectedType: 'string (平民/贵族/王族)',
+      };
+      this.errorCollector.addError(error);
       throw new Error('出身等级字段缺失，AI必须明确指定：平民/贵族/王族');
     }
 
     const validBackgrounds: BackgroundType[] = ['平民', '贵族', '王族'];
     if (!validBackgrounds.includes(background as BackgroundType)) {
+      const error: ParseError = {
+        field: '出身',
+        message: `无效值，必须是：平民/贵族/王族`,
+        category: category as any,
+        actualValue: background,
+        expectedType: '平民/贵族/王族',
+      };
+      this.errorCollector.addError(error);
       throw new Error(`出身等级无效：${background}，必须是：平民/贵族/王族`);
     }
 
@@ -403,25 +605,87 @@ export class CharacterParser {
    * 验证必需的字符串字段
    * @param value 字段值
    * @param fieldName 字段名称
+   * @param category 错误分类
    * @returns 验证后的字符串
    * @throws Error 如果字段缺失或无效
    */
-  private static validateRequiredString(value: any, fieldName: string): string {
-    if (!value || typeof value !== 'string' || value.trim() === '') {
-      throw new Error(`${fieldName}字段缺失或为空，AI必须提供有效的${fieldName}`);
+  private static validateRequiredString(value: any, fieldName: string, category: string = '基础信息'): string {
+    // 添加详细的调试信息
+    console.log(`🔍 [人物解析] 验证字段 "${fieldName}":`, {
+      值: value,
+      类型: typeof value,
+      是否为null: value === null,
+      是否为undefined: value === undefined,
+      是否为空字符串: value === '',
+      是否为假值: !value,
+      去除空白后: typeof value === 'string' ? `"${value.trim()}"` : 'N/A',
+      去除空白后长度: typeof value === 'string' ? value.trim().length : 'N/A',
+    });
+
+    // 检查是否为 null 或 undefined
+    if (value === null || value === undefined) {
+      const error: ParseError = {
+        field: fieldName,
+        message: `字段缺失（值为 ${value}），AI必须提供有效的${fieldName}`,
+        category: category as any,
+        actualValue: value,
+        expectedType: 'string',
+      };
+      this.errorCollector.addError(error);
+      throw new Error(`${fieldName}字段缺失（值为 ${value}），AI必须提供有效的${fieldName}`);
     }
-    return value.trim();
+
+    // 检查是否为字符串类型
+    if (typeof value !== 'string') {
+      const error: ParseError = {
+        field: fieldName,
+        message: `字段类型错误（期望字符串，实际为 ${typeof value}）`,
+        category: category as any,
+        actualValue: value,
+        expectedType: 'string',
+      };
+      this.errorCollector.addError(error);
+      throw new Error(
+        `${fieldName}字段类型错误（期望字符串，实际为 ${typeof value}），AI必须提供有效的字符串类型的${fieldName}`,
+      );
+    }
+
+    // 检查去除空白后是否为空
+    const trimmedValue = value.trim();
+    if (trimmedValue === '') {
+      const error: ParseError = {
+        field: fieldName,
+        message: `字段为空（原始值: "${value}"），AI必须提供有效的非空${fieldName}`,
+        category: category as any,
+        actualValue: value,
+        expectedType: 'string (非空)',
+      };
+      this.errorCollector.addError(error);
+      throw new Error(`${fieldName}字段为空（原始值: "${value}"），AI必须提供有效的非空${fieldName}`);
+    }
+
+    console.log(`✅ [人物解析] 字段 "${fieldName}" 验证通过，值: "${trimmedValue}"`);
+    return trimmedValue;
   }
 
   /**
    * 验证必需的数字字段
    * @param value 字段值
    * @param fieldName 字段名称
+   * @param category 错误分类
    * @returns 验证后的数字
    * @throws Error 如果字段缺失或无效
    */
-  private static validateRequiredNumber(value: any, fieldName: string): number {
+  private static validateRequiredNumber(value: any, fieldName: string, category: string = '基础信息'): number {
     if (value === undefined || value === null || typeof value !== 'number' || isNaN(value)) {
+      const error: ParseError = {
+        field: fieldName,
+        message: '字段缺失或无效，AI必须提供有效的数字',
+        category: category as any,
+        actualValue: value,
+        expectedType: 'number',
+      };
+      this.errorCollector.addError(error);
       throw new Error(`${fieldName}字段缺失或无效，AI必须提供有效的数字`);
     }
     return value;
@@ -430,11 +694,20 @@ export class CharacterParser {
   /**
    * 验证性格数组
    * @param personality 性格数组
+   * @param category 错误分类
    * @returns 验证后的性格数组
    * @throws Error 如果性格字段无效
    */
-  private static validatePersonality(personality: any): string[] {
+  private static validatePersonality(personality: any, category: string = '基础信息'): string[] {
     if (!Array.isArray(personality)) {
+      const error: ParseError = {
+        field: '性格',
+        message: '字段必须是数组格式',
+        category: category as any,
+        actualValue: personality,
+        expectedType: 'array<string>',
+      };
+      this.errorCollector.addError(error);
       throw new Error('性格字段必须是数组格式');
     }
     return personality.filter(item => typeof item === 'string' && item.trim() !== '');
@@ -443,17 +716,34 @@ export class CharacterParser {
   /**
    * 验证罩杯大小
    * @param cupSize 罩杯大小
+   * @param category 错误分类
    * @returns 验证后的罩杯大小
    * @throws Error 如果罩杯大小无效
    */
-  private static validateCupSize(cupSize: any): string {
+  private static validateCupSize(cupSize: any, category: string = '外貌数据'): string {
     if (!cupSize || typeof cupSize !== 'string') {
+      const error: ParseError = {
+        field: '罩杯',
+        message: '字段缺失或无效，AI必须提供有效的罩杯大小',
+        category: category as any,
+        actualValue: cupSize,
+        expectedType: 'string (A/B/C/D/E/F/G)',
+      };
+      this.errorCollector.addError(error);
       throw new Error('罩杯字段缺失或无效，AI必须提供有效的罩杯大小');
     }
 
     const validCupSizes = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
     const upperCupSize = cupSize.toUpperCase();
     if (!validCupSizes.includes(upperCupSize)) {
+      const error: ParseError = {
+        field: '罩杯',
+        message: `无效值，必须是：A/B/C/D/E/F/G`,
+        category: category as any,
+        actualValue: cupSize,
+        expectedType: 'A/B/C/D/E/F/G',
+      };
+      this.errorCollector.addError(error);
       throw new Error(`罩杯大小无效：${cupSize}，必须是：A/B/C/D/E/F/G`);
     }
 
@@ -463,15 +753,32 @@ export class CharacterParser {
   /**
    * 验证可战斗属性
    * @param canCombat 可战斗属性
+   * @param category 错误分类
    * @returns 验证后的可战斗属性
    * @throws Error 如果可战斗属性无效
    */
-  private static validateCanCombat(canCombat: any): boolean {
+  private static validateCanCombat(canCombat: any, category: string = '基础信息'): boolean {
     if (canCombat === undefined || canCombat === null) {
+      const error: ParseError = {
+        field: '可战斗',
+        message: '字段缺失，AI必须明确指定：true/false',
+        category: category as any,
+        actualValue: canCombat,
+        expectedType: 'boolean',
+      };
+      this.errorCollector.addError(error);
       throw new Error('可战斗字段缺失，AI必须明确指定：true/false');
     }
 
     if (typeof canCombat !== 'boolean') {
+      const error: ParseError = {
+        field: '可战斗',
+        message: `字段无效，必须是：true/false`,
+        category: category as any,
+        actualValue: canCombat,
+        expectedType: 'boolean',
+      };
+      this.errorCollector.addError(error);
       throw new Error(`可战斗字段无效：${canCombat}，必须是：true/false`);
     }
 
@@ -560,9 +867,19 @@ export class CharacterParser {
    * 解析AI输出的人物信息YAML
    * @param text AI输出的人物信息YAML文本
    * @param pictureResource 据点的图片资源信息（可选）
+   * @param rawText 原始AI输出文本（用于调试，可选）
+   * @param onRetry 重新解析回调函数（可选）
    * @returns 解析后的原始数据对象
    */
-  static parseCharacterYaml(text: string, pictureResource?: PictureResource): ParsedCharacterData | null {
+  static async parseCharacterYaml(
+    text: string,
+    pictureResource?: PictureResource,
+    rawText?: string,
+    onRetry?: (editedText: string) => Promise<void>,
+  ): Promise<ParsedCharacterData | null> {
+    // 清空错误收集器
+    this.errorCollector.clear();
+
     try {
       console.log('🔍 [人物解析] 开始解析AI输出的人物信息（YAML格式）...');
       console.log('📝 [人物解析] 原始AI输出长度:', text.length);
@@ -595,6 +912,12 @@ export class CharacterParser {
 
       if (!yamlText) {
         console.error('❌ [人物解析] 未找到有效的YAML格式内容');
+        this.errorCollector.addError({
+          field: 'YAML格式',
+          message: '未找到有效的YAML格式内容',
+          category: '格式错误',
+        });
+        await this.showParseErrorDialog(null, rawText || text, onRetry);
         return null;
       }
 
@@ -618,11 +941,30 @@ export class CharacterParser {
       // 验证必要字段
       if (!data.基础信息 || !data.基础信息.姓名) {
         console.error('❌ [人物解析] YAML格式缺少必要字段');
+        this.errorCollector.addError({
+          field: '基础信息',
+          message: '缺少必要字段：基础信息.姓名',
+          category: '格式错误',
+        });
         throw new Error('YAML格式缺少必要字段');
       }
 
       console.log('✅ [人物解析] 基础信息验证通过');
       console.log('👤 [人物解析] 人物姓名:', data.基础信息.姓名);
+
+      // 提前检查隐藏特质数据
+      console.log('🔍 [人物解析] 提前检查隐藏特质数据（YAML）...');
+      console.log('📊 [人物解析] 隐藏特质原始数据:', {
+        隐藏特质存在: !!data.隐藏特质,
+        隐藏特质类型: typeof data.隐藏特质,
+        隐藏特质内容: JSON.stringify(data.隐藏特质, null, 2),
+        性经历: data.隐藏特质?.性经历,
+        性经历类型: typeof data.隐藏特质?.性经历,
+        恐惧: data.隐藏特质?.恐惧,
+        恐惧类型: typeof data.隐藏特质?.恐惧,
+        秘密: data.隐藏特质?.秘密,
+        秘密类型: typeof data.隐藏特质?.秘密,
+      });
 
       // 处理图片资源信息
       if (pictureResource?.imageUrl) {
@@ -750,23 +1092,23 @@ export class CharacterParser {
 
       const parsedData: ParsedCharacterData = {
         // 基础信息（严格验证，不允许保底）
-        name: this.validateRequiredString(data.基础信息.姓名, '姓名'),
-        race: this.validateRequiredString(data.基础信息.种族, '种族'),
-        age: this.validateRequiredNumber(data.基础信息.年龄, '年龄'),
-        country: this.validateRequiredString(data.基础信息.国家, '国家'),
-        identity: this.validateRequiredString(data.基础信息.身份, '身份'),
-        background: this.validateBackground(data.基础信息.出身),
-        personality: this.validatePersonality(data.基础信息.性格),
-        canCombat: this.validateCanCombat(data.基础信息.可战斗),
+        name: this.validateRequiredString(data.基础信息.姓名, '姓名', '基础信息'),
+        race: this.validateRequiredString(data.基础信息.种族, '种族', '基础信息'),
+        age: this.validateRequiredNumber(data.基础信息.年龄, '年龄', '基础信息'),
+        country: this.validateRequiredString(data.基础信息.国家, '国家', '基础信息'),
+        identity: this.validateRequiredString(data.基础信息.身份, '身份', '基础信息'),
+        background: this.validateBackground(data.基础信息.出身, '基础信息'),
+        personality: this.validatePersonality(data.基础信息.性格, '基础信息'),
+        canCombat: this.validateCanCombat(data.基础信息.可战斗, '基础信息'),
         unitType: this.validateUnitType(data.基础信息.单位类型),
 
         // 外貌数据（严格验证）
         appearance: {
-          height: this.validateRequiredNumber(data.外貌数据?.身高, '身高'),
-          weight: this.validateRequiredNumber(data.外貌数据?.体重, '体重'),
-          measurements: this.validateRequiredString(data.外貌数据?.三围, '三围'),
-          cupSize: this.validateCupSize(data.外貌数据?.罩杯),
-          description: this.validateRequiredString(data.外貌数据?.描述, '外貌描述'),
+          height: this.validateRequiredNumber(data.外貌数据?.身高, '身高', '外貌数据'),
+          weight: this.validateRequiredNumber(data.外貌数据?.体重, '体重', '外貌数据'),
+          measurements: this.validateRequiredString(data.外貌数据?.三围, '三围', '外貌数据'),
+          cupSize: this.validateCupSize(data.外貌数据?.罩杯, '外貌数据'),
+          description: this.validateRequiredString(data.外貌数据?.描述, '外貌描述', '外貌数据'),
           clothing: Object.keys(clothing).length > 0 ? clothing : undefined,
           originalClothing: Object.keys(originalClothing).length > 0 ? originalClothing : undefined,
         },
@@ -779,9 +1121,9 @@ export class CharacterParser {
 
         // 隐藏特质（严格验证）
         hiddenTraits: {
-          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历, '性经历'),
-          fears: this.validateRequiredString(data.隐藏特质?.恐惧, '恐惧'),
-          secrets: this.validateRequiredString(data.隐藏特质?.秘密, '秘密'),
+          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历, '性经历', '隐藏特质'),
+          fears: this.validateRequiredString(data.隐藏特质?.恐惧, '恐惧', '隐藏特质'),
+          secrets: this.validateRequiredString(data.隐藏特质?.秘密, '秘密', '隐藏特质'),
         },
 
         // 头像信息（来自据点图片资源）
@@ -807,6 +1149,12 @@ export class CharacterParser {
       return parsedData;
     } catch (error) {
       console.error('解析人物信息失败（YAML）:', error);
+      // 显示错误弹窗
+      await this.showParseErrorDialog(
+        error instanceof Error ? error : new Error(String(error)),
+        rawText || text,
+        onRetry,
+      );
       return null;
     }
   }

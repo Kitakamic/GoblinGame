@@ -1,11 +1,79 @@
+import { GenerationErrorService } from '../../服务/生成错误服务';
 import type { Location } from '../类型/探索类型';
 import { pictureResourceMappingService } from './图片资源映射服务';
+
+/**
+ * 解析错误信息接口
+ */
+interface ParseError {
+  field: string;
+  message: string;
+  category: string;
+}
+
+/**
+ * 解析错误收集器
+ */
+class ParseErrorCollector {
+  private errors: ParseError[] = [];
+  private errorsByCategory: Map<string, ParseError[]> = new Map();
+
+  addError(error: ParseError): void {
+    this.errors.push(error);
+
+    if (!this.errorsByCategory.has(error.category)) {
+      this.errorsByCategory.set(error.category, []);
+    }
+    this.errorsByCategory.get(error.category)!.push(error);
+  }
+
+  hasErrors(): boolean {
+    return this.errors.length > 0;
+  }
+
+  getSummary(): string {
+    if (this.errors.length === 0) return '';
+
+    const categoryCount = new Map<string, number>();
+    this.errors.forEach(error => {
+      categoryCount.set(error.category, (categoryCount.get(error.category) || 0) + 1);
+    });
+
+    const parts: string[] = [];
+    categoryCount.forEach((count, category) => {
+      parts.push(`${category}: ${count}个错误`);
+    });
+
+    return `共发现 ${this.errors.length} 个错误（${parts.join('、')}）`;
+  }
+
+  formatDetails(): string {
+    if (this.errors.length === 0) return '';
+
+    const lines: string[] = [];
+    this.errorsByCategory.forEach((errors, category) => {
+      lines.push(`【${category}】`);
+      errors.forEach(error => {
+        lines.push(`  • ${error.field}: ${error.message}`);
+      });
+      lines.push('');
+    });
+
+    return lines.join('\n').trim();
+  }
+
+  clear(): void {
+    this.errors = [];
+    this.errorsByCategory.clear();
+  }
+}
 
 /**
  * 据点信息解析器
  * 用于解析AI输出的据点信息文本，转换为Location对象
  */
 export class LocationParser {
+  private static errorCollector = new ParseErrorCollector();
   /**
    * 中文类型到英文类型的映射
    */
@@ -67,9 +135,16 @@ export class LocationParser {
   /**
    * 统一据点解析方法（支持单个和多个据点）
    * @param text AI输出的据点信息文本
+   * @param rawText 原始AI输出（用于错误提示）
+   * @param onRetry 重新解析回调（用于错误提示）
    * @returns 解析后的Location对象或数组
    */
-  static parseLocations(text: string): Location | Location[] | null {
+  static async parseLocations(
+    text: string,
+    rawText?: string,
+    onRetry?: (editedText: string) => Promise<void>,
+  ): Promise<Location | Location[] | null> {
+    this.errorCollector.clear();
     console.log('🔍 [据点解析器] 开始解析据点信息');
     console.log('📝 [据点解析器] 原始文本长度:', text.length);
     console.log('📝 [据点解析器] 原始文本开头:', text.substring(0, 100) + '...');
@@ -111,6 +186,12 @@ export class LocationParser {
       if (!cleanText.startsWith('{') && !cleanText.startsWith('[')) {
         console.error('❌ [据点解析器] 无法找到有效的JSON数据');
         console.error('❌ [据点解析器] 清理后的文本:', cleanText.substring(0, 200) + '...');
+        this.errorCollector.addError({
+          field: 'JSON格式',
+          message: '未找到有效的JSON格式',
+          category: '格式错误',
+        });
+        await this.showParseErrorDialog(null, rawText || text, onRetry);
         return null;
       }
 
@@ -119,14 +200,19 @@ export class LocationParser {
       // 判断是单个对象还是数组
       if (cleanText.startsWith('[')) {
         // 数组格式，解析多个据点
-        return this.parseMultipleJsonLocations(cleanText);
+        return await this.parseMultipleJsonLocations(cleanText, rawText || text, onRetry);
       } else {
         // 对象格式，解析单个据点
-        return this.parseJsonLocation(cleanText);
+        return await this.parseJsonLocation(cleanText, rawText || text, onRetry);
       }
     } catch (error) {
       console.error('❌ [据点解析器] 解析据点信息失败:', error);
       console.error('❌ [据点解析器] 错误堆栈:', (error as Error).stack);
+      await this.showParseErrorDialog(
+        error instanceof Error ? error : new Error(String(error)),
+        rawText || text,
+        onRetry,
+      );
       return null;
     }
   }
@@ -134,9 +220,15 @@ export class LocationParser {
   /**
    * 解析JSON格式的据点信息
    * @param jsonText JSON格式的据点信息
+   * @param rawText 原始AI输出
+   * @param onRetry 重新解析回调
    * @returns 解析后的Location对象
    */
-  private static parseJsonLocation(jsonText: string): Location | null {
+  private static async parseJsonLocation(
+    jsonText: string,
+    rawText: string,
+    onRetry?: (editedText: string) => Promise<void>,
+  ): Promise<Location | null> {
     console.log('🔍 [JSON解析器] 开始解析JSON数据');
     console.log('📝 [JSON解析器] JSON文本长度:', jsonText.length);
     console.log('📝 [JSON解析器] JSON文本开头:', jsonText.substring(0, 100) + '...');
@@ -154,6 +246,11 @@ export class LocationParser {
 
       if (!locationData) {
         console.error('❌ [JSON解析器] JSON数据为空');
+        this.errorCollector.addError({
+          field: 'JSON数据',
+          message: 'JSON数据为空',
+          category: '数据错误',
+        });
         throw new Error('JSON数据为空');
       }
 
@@ -179,10 +276,34 @@ export class LocationParser {
 
       if (!locationData.name || !locationData.type || !locationData.description || !locationData.difficulty) {
         console.error('❌ [JSON解析器] 缺少必要字段');
-        console.error('❌ [JSON解析器] name存在:', !!locationData.name);
-        console.error('❌ [JSON解析器] type存在:', !!locationData.type);
-        console.error('❌ [JSON解析器] description存在:', !!locationData.description);
-        console.error('❌ [JSON解析器] difficulty存在:', !!locationData.difficulty);
+        if (!locationData.name) {
+          this.errorCollector.addError({
+            field: 'name',
+            message: '据点名称缺失，AI必须提供有效的据点名称',
+            category: '必要字段',
+          });
+        }
+        if (!locationData.type) {
+          this.errorCollector.addError({
+            field: 'type',
+            message: '据点类型缺失，AI必须提供有效的据点类型',
+            category: '必要字段',
+          });
+        }
+        if (!locationData.description) {
+          this.errorCollector.addError({
+            field: 'description',
+            message: '据点描述缺失，AI必须提供有效的据点描述',
+            category: '必要字段',
+          });
+        }
+        if (!locationData.difficulty) {
+          this.errorCollector.addError({
+            field: 'difficulty',
+            message: '据点难度缺失，AI必须提供有效的据点难度',
+            category: '必要字段',
+          });
+        }
         throw new Error('缺少必要字段');
       }
 
@@ -281,6 +402,7 @@ export class LocationParser {
       console.error('❌ [JSON解析器] 错误类型:', (error as Error).constructor.name);
       console.error('❌ [JSON解析器] 错误消息:', (error as Error).message);
       console.error('❌ [JSON解析器] 错误堆栈:', (error as Error).stack);
+      await this.showParseErrorDialog(error instanceof Error ? error : new Error(String(error)), rawText, onRetry);
       return null;
     }
   }
@@ -368,9 +490,15 @@ export class LocationParser {
   /**
    * 解析JSON格式的多个据点（内部方法）
    * @param jsonText JSON格式的据点数组
+   * @param rawText 原始AI输出
+   * @param onRetry 重新解析回调
    * @returns 解析后的Location对象数组
    */
-  private static parseMultipleJsonLocations(jsonText: string): Location[] {
+  private static async parseMultipleJsonLocations(
+    jsonText: string,
+    rawText: string,
+    onRetry?: (editedText: string) => Promise<void>,
+  ): Promise<Location[]> {
     try {
       const cleanText = jsonText.trim();
       console.log('🔍 [批量解析器] 开始解析多个据点');
@@ -387,6 +515,12 @@ export class LocationParser {
         console.error('❌ [批量解析器] 无法找到有效的JSON数组数据');
         console.error('❌ [批量解析器] 原始文本:', jsonText.substring(0, 200) + '...');
         console.error('❌ [批量解析器] 清理后文本:', cleanText.substring(0, 200) + '...');
+        this.errorCollector.addError({
+          field: 'JSON数组格式',
+          message: '未找到有效的JSON数组格式（应以"["开头）',
+          category: '格式错误',
+        });
+        await this.showParseErrorDialog(null, rawText, onRetry);
         return [];
       }
 
@@ -396,6 +530,12 @@ export class LocationParser {
 
       if (!Array.isArray(locationsData)) {
         console.error('❌ [批量解析器] JSON数据不是数组格式');
+        this.errorCollector.addError({
+          field: 'JSON数据类型',
+          message: 'JSON数据不是数组格式',
+          category: '格式错误',
+        });
+        await this.showParseErrorDialog(null, rawText, onRetry);
         return [];
       }
 
@@ -404,17 +544,29 @@ export class LocationParser {
 
       for (let i = 0; i < locationsData.length; i++) {
         const locationData = locationsData[i];
-        console.log(`🔍 [批量解析器] 解析第${i + 1}个据点:`, locationData.name);
+        console.log(`🔍 [批量解析器] 解析第${i + 1}个据点:`, locationData?.name || '未知');
         try {
           // 转换中文类型为英文，难度为星级数字
-          const englishType = this.TYPE_MAPPING[locationData.type] || locationData.type;
+          const englishType = this.TYPE_MAPPING[locationData?.type] || locationData?.type;
           const starDifficulty =
-            this.DIFFICULTY_MAPPING[locationData.difficulty] ||
-            (typeof locationData.difficulty === 'number' ? locationData.difficulty : 1);
+            this.DIFFICULTY_MAPPING[locationData?.difficulty] ||
+            (typeof locationData?.difficulty === 'number' ? locationData.difficulty : 1);
 
-          // 验证必要字段
-          if (!locationData.name || !locationData.type || !locationData.description || !locationData.difficulty) {
-            console.warn('据点缺少必要字段:', locationData);
+          // 验证必要字段，收集所有缺失的字段错误
+          const missingFields: string[] = [];
+          if (!locationData?.name) missingFields.push('name（据点名称）');
+          if (!locationData?.type) missingFields.push('type（据点类型）');
+          if (!locationData?.description) missingFields.push('description（据点描述）');
+          if (!locationData?.difficulty) missingFields.push('difficulty（据点难度）');
+
+          if (missingFields.length > 0) {
+            const locationName = locationData?.name || `第${i + 1}个据点`;
+            this.errorCollector.addError({
+              field: locationName,
+              message: `缺少必要字段: ${missingFields.join('、')}`,
+              category: '必要字段',
+            });
+            console.warn(`据点 ${locationName} 缺少必要字段:`, missingFields);
             continue;
           }
 
@@ -504,17 +656,73 @@ export class LocationParser {
           locations.push(location);
           console.log(`✅ [批量解析器] 第${i + 1}个据点解析成功:`, location.name);
         } catch (error) {
-          console.error(`❌ [批量解析器] 第${i + 1}个据点解析失败:`, error, locationData);
+          const locationName = locationData?.name || `第${i + 1}个据点`;
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(`❌ [批量解析器] 据点 ${locationName} 解析失败:`, error, locationData);
+          this.errorCollector.addError({
+            field: locationName,
+            message: errorMessage || '解析过程中发生未知错误',
+            category: '解析错误',
+          });
         }
       }
 
-      console.log('🎉 [批量解析器] 批量解析完成，成功解析', locations.length, '个据点');
+      console.log('🎉 [批量解析器] 批量解析完成，成功解析', locations.length, '/', locationsData.length, '个据点');
+
+      // 如果有错误，统一显示错误弹窗（包含所有据点的所有错误）
+      if (this.errorCollector.hasErrors()) {
+        await this.showParseErrorDialog(null, rawText, onRetry);
+        // 如果有错误，返回空数组，等待用户重新解析
+        return [];
+      }
 
       return locations;
     } catch (error) {
       console.error('解析JSON多个据点失败:', error);
+      await this.showParseErrorDialog(error instanceof Error ? error : new Error(String(error)), rawText, onRetry);
       return [];
     }
+  }
+
+  /**
+   * 显示解析错误弹窗
+   * @param error 错误对象
+   * @param rawText 原始AI输出
+   * @param onRetry 重新解析回调
+   */
+  private static async showParseErrorDialog(
+    error: Error | null,
+    rawText?: string,
+    onRetry?: (editedText: string) => Promise<void>,
+  ): Promise<void> {
+    const hasErrors = this.errorCollector.hasErrors();
+
+    let title = '据点信息解析失败';
+    let message = '';
+    let details = '';
+
+    if (hasErrors) {
+      title = `据点信息解析失败 - ${this.errorCollector.getSummary()}`;
+      message = 'AI生成的据点信息存在以下错误，请检查并重新生成：';
+      details = this.errorCollector.formatDetails();
+    } else if (error) {
+      title = '据点信息解析失败';
+      message = error.message || '解析过程中发生未知错误';
+      details = error.stack || '';
+    } else {
+      title = '据点信息解析失败';
+      message = '解析过程中发生未知错误';
+      details = '请检查AI输出格式是否正确';
+    }
+
+    await GenerationErrorService.showError({
+      title,
+      message,
+      summary: hasErrors ? this.errorCollector.getSummary() : undefined,
+      details,
+      rawText,
+      onRetry,
+    });
   }
 
   /**

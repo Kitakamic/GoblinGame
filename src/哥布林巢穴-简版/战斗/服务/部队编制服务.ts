@@ -4,6 +4,7 @@ import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import { GOBLIN_UNIT_CHARACTERS } from '../类型/单位数据表';
 import type { BattleUnit } from '../类型/战斗属性';
 import type { Captain, FormationConfig } from '../类型/队长类型';
+import { calculateTroopBonus } from './部队加成计算服务';
 
 /**
  * 部队编制服务
@@ -67,18 +68,19 @@ export class FormationService {
                 if (chineseType) {
                   const goblinUnit = GOBLIN_UNIT_CHARACTERS.find(unit => unit.id === chineseType);
                   if (goblinUnit) {
-                    // 根据部队等级计算加成比例，最高等级10，加成比例 = level/10
+                    // 使用线性计算的部队加成（我方单位，无递减）
                     const troopLevel = Math.min(goblinUnit.level, 10);
-                    const troopMultiplier = troopLevel / 10;
 
                     // 计算部队属性加成（与部队编制界面保持一致）
-                    const attackBonus = Math.floor(troopCount * goblinUnit.attributes.attack * troopMultiplier);
-                    const defenseBonus = Math.floor(troopCount * goblinUnit.attributes.defense * troopMultiplier);
-                    const intelligenceBonus = Math.floor(
-                      troopCount * goblinUnit.attributes.intelligence * troopMultiplier,
+                    const attackBonus = calculateTroopBonus(troopCount, goblinUnit.attributes.attack, troopLevel);
+                    const defenseBonus = calculateTroopBonus(troopCount, goblinUnit.attributes.defense, troopLevel);
+                    const intelligenceBonus = calculateTroopBonus(
+                      troopCount,
+                      goblinUnit.attributes.intelligence,
+                      troopLevel,
                     );
-                    const speedBonus = Math.floor(troopCount * goblinUnit.attributes.speed * troopMultiplier);
-                    const healthBonus = Math.floor(troopCount * goblinUnit.attributes.health * troopMultiplier);
+                    const speedBonus = calculateTroopBonus(troopCount, goblinUnit.attributes.speed, troopLevel);
+                    const healthBonus = calculateTroopBonus(troopCount, goblinUnit.attributes.health, troopLevel);
 
                     // 累加加成
                     troopAttackBonus += attackBonus;
@@ -90,7 +92,7 @@ export class FormationService {
                     console.log(`部队加成计算: ${chineseType} x${troopCount}`, {
                       单位属性: goblinUnit.attributes,
                       等级: troopLevel,
-                      加成比例: troopMultiplier,
+                      加成比例: troopLevel / 10,
                       计算加成: {
                         attack: attackBonus,
                         defense: defenseBonus,

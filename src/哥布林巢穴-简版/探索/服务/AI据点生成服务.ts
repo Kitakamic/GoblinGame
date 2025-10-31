@@ -348,11 +348,44 @@ export class AILocationGenerationService {
       }
 
       if (count === 1) {
+        // 创建重新解析回调函数
+        const onRetry = async (editedText: string): Promise<void> => {
+          console.log('🔄 [据点生成] 用户触发重新解析...');
+          const retryResult = await LocationParser.parseLocations(editedText, editedText, onRetry);
+
+          if (!retryResult) {
+            throw new Error('重新解析失败，请检查编辑后的内容是否正确');
+          }
+
+          // 重新解析成功，更新据点
+          const retryLocation = Array.isArray(retryResult) ? retryResult[0] : retryResult;
+
+          if (!retryLocation) {
+            throw new Error('重新解析后的据点数据为空');
+          }
+
+          // 验证据点数据
+          const validation = LocationParser.validateLocation(retryLocation);
+          if (!validation.valid) {
+            throw new Error(`据点数据验证失败: ${validation.errors.join(', ')}`);
+          }
+
+          // 添加据点到探索服务
+          const added = exploreService.addLocation(retryLocation);
+          if (!added) {
+            throw new Error('据点已存在，无法重复添加');
+          }
+
+          console.log('✅ [据点生成] 重新解析并添加据点成功:', retryLocation.name);
+        };
+
         // 单个据点处理
-        const result = LocationParser.parseLocations(aiResponse);
+        const result = await LocationParser.parseLocations(aiResponse, aiResponse, onRetry);
 
         if (!result) {
-          return { success: false, error: '无法解析据点信息', aiResponse: aiResponse };
+          // parseLocations 已经显示了错误弹窗，这里直接返回失败
+          // 不需要再次显示错误信息，避免重复提示
+          return { success: false, error: '据点信息解析失败，请检查AI输出格式', aiResponse: aiResponse };
         }
 
         // 如果返回的是数组，取第一个元素
@@ -390,14 +423,57 @@ export class AILocationGenerationService {
           aiResponse: aiResponse,
         };
       } else {
+        // 创建重新解析回调函数（多个据点）
+        const onRetryMultiple = async (editedText: string): Promise<void> => {
+          console.log('🔄 [批量据点生成] 用户触发重新解析...');
+          const retryResult = await LocationParser.parseLocations(editedText, editedText, onRetryMultiple);
+
+          if (!retryResult || !Array.isArray(retryResult)) {
+            throw new Error('重新解析失败，请检查编辑后的内容是否正确');
+          }
+
+          // 重新解析成功，处理所有据点
+          const retryLocations = retryResult;
+          const errors: string[] = [];
+          let addedCount = 0;
+
+          for (const location of retryLocations) {
+            try {
+              const validation = LocationParser.validateLocation(location);
+              if (!validation.valid) {
+                errors.push(`据点 ${location.name}: ${validation.errors.join(', ')}`);
+                continue;
+              }
+
+              const added = exploreService.addLocation(location);
+              if (added) {
+                addedCount++;
+                console.log(`✅ [批量据点生成] 重新解析并添加据点成功: ${location.name}`);
+              } else {
+                errors.push(`据点 ${location.name}: 据点已存在`);
+              }
+            } catch (error) {
+              errors.push(`据点 ${location.name}: ${(error as Error).message}`);
+            }
+          }
+
+          if (addedCount === 0) {
+            throw new Error(`所有据点添加失败: ${errors.join('; ')}`);
+          }
+
+          console.log(`✅ [批量据点生成] 重新解析完成，成功添加 ${addedCount}/${retryLocations.length} 个据点`);
+        };
+
         // 多个据点处理
-        const result = LocationParser.parseLocations(aiResponse);
+        const result = await LocationParser.parseLocations(aiResponse, aiResponse, onRetryMultiple);
 
         if (!result || !Array.isArray(result)) {
+          // parseLocations 已经显示了错误弹窗，这里直接返回失败
+          // 不需要再次显示错误信息，避免重复提示
           return {
             success: false,
             locations: [],
-            errors: ['无法从侦察报告中提取据点信息'],
+            errors: ['据点信息解析失败，请检查AI输出格式'],
             totalAdded: 0,
             aiResponse: aiResponse,
           };

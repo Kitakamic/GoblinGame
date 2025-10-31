@@ -25,6 +25,8 @@ export interface Captain {
   description: string;
   /** 单位类型（用于战斗系统） */
   unitType?: 'physical' | 'magical';
+  /** 人物评级（用于计算部队数量限制） */
+  rating?: 'S' | 'A' | 'B' | 'C' | 'D';
   /** 是否已使用 */
   isUsed: boolean;
   /** 部队编制信息 */

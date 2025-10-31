@@ -290,16 +290,38 @@ export class ExploreService {
           } else {
             console.log('AI返回数据:', aiResponse);
 
+            // 创建人物更新回调函数，用于在重新解析成功后更新 location
+            const onCharacterUpdated = async (character: any) => {
+              // 更新 location 的英雄信息
+              location.rewards.heroes = [character];
+              console.log('✅ [探索服务] 通过重新解析成功更新英雄:', character.name);
+
+              // 标记图片资源为已使用
+              if (location.pictureResource?.id) {
+                const { pictureResourceMappingService } = await import('./图片资源映射服务');
+                pictureResourceMappingService.markPictureAsUsed(location.pictureResource.id);
+                console.log(`✅ [探索服务] 图片资源 ${location.pictureResource.id} 已标记为已使用`);
+              }
+
+              // 清除已生成的敌方单位，以便重新生成包含英雄的单位
+              location.enemyUnits = undefined;
+              location.enemyUnitsGeneratedAt = undefined;
+
+              // 标记生成成功
+              aiGenerationSuccess = true;
+            };
+
             // 使用人物生成服务解析AI返回的数据
             const character = await HeroDeterminationService.parseHeroCharacter(
               aiResponse,
               locationId,
               location.type,
               location.pictureResource,
+              onCharacterUpdated,
             );
 
             if (character) {
-              // 用真实英雄替换标记
+              // 第一次解析成功，用真实英雄替换标记
               location.rewards.heroes = [character];
               console.log('AI英雄生成完成:', character.name);
 
@@ -316,7 +338,17 @@ export class ExploreService {
               aiGenerationSuccess = true;
             } else {
               console.error('AI英雄解析失败');
-              aiGenerationSuccess = false;
+              // parseHeroCharacter 返回 null 有两种情况：
+              // 1. 解析错误：会调用 showParseErrorDialog，显示错误弹窗（包含可编辑文本和重新解析功能）
+              //    - 如果用户重新解析成功，会通过 onCharacterUpdated 回调更新 location 和 aiGenerationSuccess
+              //    - 如果用户关闭弹窗没有重新解析成功，aiGenerationSuccess 仍为 false
+              // 2. 其他错误：可能是在 catch 块中被捕获的
+              // 由于 showParseErrorDialog 是 await 的，它会等待用户关闭错误弹窗
+              // 等待结束后，检查 aiGenerationSuccess 的状态来判断是否成功
+
+              // 这里不立即设置 aiGenerationSuccess = false
+              // 而是在等待 showParseErrorDialog 结束后再检查
+              // 如果用户通过重新解析成功，onCharacterUpdated 已经设置了 aiGenerationSuccess = true
             }
           }
         } catch (error) {
@@ -324,7 +356,8 @@ export class ExploreService {
           aiGenerationSuccess = false;
         }
 
-        // 如果AI生成失败，返回需要用户决策的结果
+        // 检查AI生成是否成功
+        // 注意：如果用户通过重新解析成功，onCharacterUpdated 回调会设置 aiGenerationSuccess = true
         if (!aiGenerationSuccess) {
           console.warn(`据点 ${location.name} AI英雄生成失败，需要用户决策`);
 
@@ -353,6 +386,9 @@ export class ExploreService {
               originalCost: cost, // 保存原始侦察成本
             },
           };
+        } else {
+          // AI生成成功（可能是第一次成功，也可能是通过重新解析成功）
+          console.log(`✅ [探索服务] 据点 ${location.name} 英雄生成成功`);
         }
       }
 

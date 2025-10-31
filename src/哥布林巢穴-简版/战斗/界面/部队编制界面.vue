@@ -345,6 +345,7 @@ import { computed, onActivated, onMounted, ref } from 'vue';
 import type { Character } from '../../人物管理/类型/人物类型';
 import { modularSaveManager } from '../../存档管理/模块化存档服务';
 import CustomConfirm from '../../组件/自定义确认框.vue';
+import { calculateMaxNormalGoblins, calculateMaxSpecialGoblins, calculateTroopBonus } from '../服务/部队加成计算服务';
 import { FormationService } from '../服务/部队编制服务';
 import { GOBLIN_UNIT_CHARACTERS } from '../类型/单位数据表';
 import type { Captain } from '../类型/队长类型';
@@ -424,6 +425,7 @@ const initializeCaptains = () => {
     },
     description: `${character.title} - 堕落值: ${character.loyalty || 0}`,
     unitType: character.unitType || 'physical', // 使用人物的单位类型，默认为物理型
+    rating: character.rating || 'C', // 添加评级字段，默认为C级
     isUsed: false,
   }));
 };
@@ -596,10 +598,47 @@ const getTroopCount = (type: string) => {
 const getMaxTroopCount = (type: string) => {
   if (!currentConfigCaptain.value) return 0;
 
-  // 获取队长等级限制
-  const remainingLevels = getRemainingLevelsForType(type);
-  const levelCost = TROOP_LEVEL_COSTS[type] || 1;
-  const levelLimit = Math.floor(remainingLevels / levelCost);
+  const captain = currentConfigCaptain.value;
+  const level = captain.level || 0;
+  const rating = captain.rating || 'C';
+
+  // 根据类型判断是普通哥布林还是特殊哥布林
+  const isNormalGoblin = type === '普通哥布林';
+  const isSpecialGoblin = ['哥布林战士', '哥布林萨满', '哥布林圣骑士'].includes(type);
+
+  let levelLimit = 0;
+
+  if (isNormalGoblin) {
+    // 普通哥布林：使用评级系数计算最大数量
+    levelLimit = calculateMaxNormalGoblins(level, rating);
+
+    // 获取已使用的普通哥布林数量（从当前队长）
+    const usedNormalGoblins = captain.troops?.['普通哥布林'] || 0;
+    levelLimit -= usedNormalGoblins;
+  } else if (isSpecialGoblin) {
+    // 特殊哥布林：使用评级系数计算总数量，然后分配到各类型
+    const maxSpecialTotal = calculateMaxSpecialGoblins(level, rating);
+
+    // 计算已使用的特殊哥布林总数（从当前队长）
+    const usedSpecialTotal =
+      (captain.troops?.['哥布林战士'] || 0) +
+      (captain.troops?.['哥布林萨满'] || 0) +
+      (captain.troops?.['哥布林圣骑士'] || 0);
+
+    // 剩余可用的特殊哥布林数量
+    const remainingSpecial = maxSpecialTotal - usedSpecialTotal;
+
+    // 获取当前类型已使用的数量
+    const usedThisType = (captain.troops as any)?.[type] || 0;
+
+    // 该类型的最大数量 = 剩余总数 + 当前已使用的该类型数量
+    levelLimit = remainingSpecial + usedThisType;
+  } else {
+    // 兼容旧逻辑（如果还有其他类型）
+    const remainingLevels = getRemainingLevelsForType(type);
+    const levelCost = TROOP_LEVEL_COSTS[type] || 1;
+    levelLimit = Math.floor(remainingLevels / levelCost);
+  }
 
   // 获取实际哥布林资源数量
   const availableGoblins = getCurrentGoblinCount(type);
@@ -614,6 +653,11 @@ const getMaxTroopCount = (type: string) => {
   const maxCount = Math.min(levelLimit, availableCount);
 
   console.log(`计算最大哥布林数量 ${type}:`, {
+    类型: type,
+    是否普通: isNormalGoblin,
+    是否特殊: isSpecialGoblin,
+    等级: level,
+    评级: rating,
     等级限制: levelLimit,
     可用资源: availableGoblins,
     已使用: usedGoblins,
@@ -621,7 +665,7 @@ const getMaxTroopCount = (type: string) => {
     最终限制: maxCount,
   });
 
-  return maxCount;
+  return Math.max(0, maxCount); // 确保不返回负数
 };
 
 const getRemainingLevelsForType = (type: string) => {
@@ -675,21 +719,22 @@ const getAttributeBonus = (attribute: string) => {
 
       console.log(`计算部队加成: ${type} x${count}, 等级:${troopLevel}, 倍数:${troopMultiplier}`);
 
+      // 使用线性计算的部队加成（我方单位，无递减）
       switch (attribute) {
         case 'attack': {
-          const attackBonus = Math.floor(count * unitAttributes.attack * troopMultiplier);
+          const attackBonus = calculateTroopBonus(count, unitAttributes.attack, troopLevel);
           bonus += attackBonus;
           console.log(`攻击加成: ${count} * ${unitAttributes.attack} * ${troopMultiplier} = ${attackBonus}`);
           break;
         }
         case 'defense': {
-          const defenseBonus = Math.floor(count * unitAttributes.defense * troopMultiplier);
+          const defenseBonus = calculateTroopBonus(count, unitAttributes.defense, troopLevel);
           bonus += defenseBonus;
           console.log(`防御加成: ${count} * ${unitAttributes.defense} * ${troopMultiplier} = ${defenseBonus}`);
           break;
         }
         case 'intelligence': {
-          const intelligenceBonus = Math.floor(count * unitAttributes.intelligence * troopMultiplier);
+          const intelligenceBonus = calculateTroopBonus(count, unitAttributes.intelligence, troopLevel);
           bonus += intelligenceBonus;
           console.log(
             `智力加成: ${count} * ${unitAttributes.intelligence} * ${troopMultiplier} = ${intelligenceBonus}`,
@@ -697,13 +742,13 @@ const getAttributeBonus = (attribute: string) => {
           break;
         }
         case 'speed': {
-          const speedBonus = Math.floor(count * unitAttributes.speed * troopMultiplier);
+          const speedBonus = calculateTroopBonus(count, unitAttributes.speed, troopLevel);
           bonus += speedBonus;
           console.log(`速度加成: ${count} * ${unitAttributes.speed} * ${troopMultiplier} = ${speedBonus}`);
           break;
         }
         case 'health': {
-          const healthBonus = Math.floor(count * goblinUnit.attributes.health * troopMultiplier);
+          const healthBonus = calculateTroopBonus(count, goblinUnit.attributes.health, troopLevel);
           bonus += healthBonus;
           console.log(`血量加成: ${count} * ${goblinUnit.attributes.health} * ${troopMultiplier} = ${healthBonus}`);
           break;
@@ -799,10 +844,9 @@ const getCaptainTotalHealthForCard = (captain: Captain) => {
       const goblinUnit = GOBLIN_UNIT_CHARACTERS.find(unit => unit.id === type);
 
       if (goblinUnit && count > 0) {
-        // 根据部队等级计算加成比例，最高等级10，加成比例 = level/10
+        // 使用线性计算的部队加成（我方单位，无递减）
         const troopLevel = Math.min(goblinUnit.level, 10);
-        const troopMultiplier = troopLevel / 10;
-        bonusHealth += Math.floor(count * goblinUnit.attributes.health * troopMultiplier);
+        bonusHealth += calculateTroopBonus(count, goblinUnit.attributes.health, troopLevel);
       }
     });
   }
@@ -821,21 +865,20 @@ const getCaptainAttributeBonus = (captain: Captain, attribute: string) => {
 
     if (goblinUnit && count > 0) {
       const unitAttributes = goblinUnit.attributes;
-      // 根据部队等级计算加成比例，最高等级10，加成比例 = level/10
+      // 使用线性计算的部队加成（我方单位，无递减）
       const troopLevel = Math.min(goblinUnit.level, 10);
-      const troopMultiplier = troopLevel / 10;
       switch (attribute) {
         case 'attack':
-          bonus += Math.floor(count * unitAttributes.attack * troopMultiplier);
+          bonus += calculateTroopBonus(count, unitAttributes.attack, troopLevel);
           break;
         case 'defense':
-          bonus += Math.floor(count * unitAttributes.defense * troopMultiplier);
+          bonus += calculateTroopBonus(count, unitAttributes.defense, troopLevel);
           break;
         case 'intelligence':
-          bonus += Math.floor(count * unitAttributes.intelligence * troopMultiplier);
+          bonus += calculateTroopBonus(count, unitAttributes.intelligence, troopLevel);
           break;
         case 'speed':
-          bonus += Math.floor(count * unitAttributes.speed * troopMultiplier);
+          bonus += calculateTroopBonus(count, unitAttributes.speed, troopLevel);
           break;
       }
     }
@@ -1249,35 +1292,39 @@ const performAutoAssignment = () => {
         哥布林圣骑士: 0,
       };
 
-      // 获取队长等级
+      // 获取队长等级和评级
       const captainLevel = captain.level || Math.floor(captain.offspring / 10);
-      let remainingLevels = captainLevel;
+      const captainRating = captain.rating || 'C';
 
-      console.log(`队长 ${captain.name} 等级: ${captainLevel}, 剩余等级: ${remainingLevels}`);
+      console.log(`队长 ${captain.name} 等级: ${captainLevel}, 评级: ${captainRating}`);
+
+      // 使用新的评级系数计算最大部队数量
+      const maxNormalGoblins = calculateMaxNormalGoblins(captainLevel, captainRating);
+      const maxSpecialGoblins = calculateMaxSpecialGoblins(captainLevel, captainRating);
+
+      console.log(`队长 ${captain.name} 最大普通哥布林: ${maxNormalGoblins}, 最大特殊哥布林: ${maxSpecialGoblins}`);
 
       // 判断队长类型（根据身份关键词和种族判断）
       const isMagicalCaptain = captain.unitType === 'magical';
 
       console.log(`队长 ${captain.name} 类型: ${isMagicalCaptain ? '魔法型' : '物理型'}`);
 
+      // 先分配特殊哥布林
       if (isMagicalCaptain) {
         // 魔法型队长：优先萨满→圣骑士→战士
-        remainingLevels = assignTroopsForMagicalCaptain(captain, remainingLevels);
+        assignSpecialGoblinsForMagicalCaptain(captain, maxSpecialGoblins);
       } else {
         // 物理型队长：优先圣骑士→战士
-        remainingLevels = assignTroopsForPhysicalCaptain(captain, remainingLevels);
+        assignSpecialGoblinsForPhysicalCaptain(captain, maxSpecialGoblins);
       }
 
-      // 用普通哥布林填充剩余等级
-      if (remainingLevels > 0) {
-        const normalGoblinCount = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['普通哥布林']);
-        const availableNormalGoblins = getAvailableGoblinCount('普通哥布林');
-        const actualNormalGoblinCount = Math.min(normalGoblinCount, availableNormalGoblins);
+      // 用普通哥布林填充
+      const availableNormalGoblins = getAvailableGoblinCount('普通哥布林');
+      const actualNormalGoblinCount = Math.min(maxNormalGoblins, availableNormalGoblins);
 
-        if (actualNormalGoblinCount > 0) {
-          captain.troops['普通哥布林'] = actualNormalGoblinCount;
-          console.log(`队长 ${captain.name} 分配普通哥布林: ${actualNormalGoblinCount}`);
-        }
+      if (actualNormalGoblinCount > 0) {
+        captain.troops['普通哥布林'] = actualNormalGoblinCount;
+        console.log(`队长 ${captain.name} 分配普通哥布林: ${actualNormalGoblinCount}`);
       }
 
       // 更新队长槽位
@@ -1306,9 +1353,9 @@ const performAutoAssignment = () => {
   }
 };
 
-// 为魔法型队长分配部队
-const assignTroopsForMagicalCaptain = (captain: Captain, remainingLevels: number): number => {
-  console.log(`为魔法型队长 ${captain.name} 分配部队，剩余等级: ${remainingLevels}`);
+// 为魔法型队长分配特殊哥布林
+const assignSpecialGoblinsForMagicalCaptain = (captain: Captain, maxSpecialGoblins: number): void => {
+  console.log(`为魔法型队长 ${captain.name} 分配特殊哥布林，最大数量: ${maxSpecialGoblins}`);
 
   // 确保 troops 对象存在
   if (!captain.troops) {
@@ -1320,51 +1367,48 @@ const assignTroopsForMagicalCaptain = (captain: Captain, remainingLevels: number
     };
   }
 
-  // 1. 优先分配哥布林萨满
-  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林萨满']) {
+  let remainingSpecial = maxSpecialGoblins;
+
+  // 1. 优先分配哥布林萨满（分配50%）
+  if (remainingSpecial > 0) {
     const availableShamans = getAvailableGoblinCount('哥布林萨满');
-    const maxShamans = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林萨满']);
-    const shamanCount = Math.min(maxShamans, availableShamans);
+    const shamanCount = Math.min(Math.floor(maxSpecialGoblins * 0.5), availableShamans, remainingSpecial);
 
     if (shamanCount > 0) {
       captain.troops['哥布林萨满'] = shamanCount;
-      remainingLevels -= shamanCount * TROOP_LEVEL_COSTS['哥布林萨满'];
-      console.log(`分配哥布林萨满: ${shamanCount}, 剩余等级: ${remainingLevels}`);
+      remainingSpecial -= shamanCount;
+      console.log(`分配哥布林萨满: ${shamanCount}, 剩余特殊哥布林: ${remainingSpecial}`);
     }
   }
 
-  // 2. 其次分配哥布林圣骑士
-  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林圣骑士']) {
+  // 2. 分配哥布林圣骑士（分配30%）
+  if (remainingSpecial > 0) {
     const availablePaladins = getAvailableGoblinCount('哥布林圣骑士');
-    const maxPaladins = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林圣骑士']);
-    const paladinCount = Math.min(maxPaladins, availablePaladins);
+    const paladinCount = Math.min(Math.floor(maxSpecialGoblins * 0.3), availablePaladins, remainingSpecial);
 
     if (paladinCount > 0) {
       captain.troops['哥布林圣骑士'] = paladinCount;
-      remainingLevels -= paladinCount * TROOP_LEVEL_COSTS['哥布林圣骑士'];
-      console.log(`分配哥布林圣骑士: ${paladinCount}, 剩余等级: ${remainingLevels}`);
+      remainingSpecial -= paladinCount;
+      console.log(`分配哥布林圣骑士: ${paladinCount}, 剩余特殊哥布林: ${remainingSpecial}`);
     }
   }
 
-  // 3. 最后分配哥布林战士
-  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林战士']) {
+  // 3. 分配哥布林战士（分配剩余部分）
+  if (remainingSpecial > 0) {
     const availableWarriors = getAvailableGoblinCount('哥布林战士');
-    const maxWarriors = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林战士']);
-    const warriorCount = Math.min(maxWarriors, availableWarriors);
+    const warriorCount = Math.min(remainingSpecial, availableWarriors);
 
     if (warriorCount > 0) {
       captain.troops['哥布林战士'] = warriorCount;
-      remainingLevels -= warriorCount * TROOP_LEVEL_COSTS['哥布林战士'];
-      console.log(`分配哥布林战士: ${warriorCount}, 剩余等级: ${remainingLevels}`);
+      remainingSpecial -= warriorCount;
+      console.log(`分配哥布林战士: ${warriorCount}, 剩余特殊哥布林: ${remainingSpecial}`);
     }
   }
-
-  return remainingLevels;
 };
 
-// 为物理型队长分配部队
-const assignTroopsForPhysicalCaptain = (captain: Captain, remainingLevels: number): number => {
-  console.log(`为物理型队长 ${captain.name} 分配部队，剩余等级: ${remainingLevels}`);
+// 为物理型队长分配特殊哥布林
+const assignSpecialGoblinsForPhysicalCaptain = (captain: Captain, maxSpecialGoblins: number): void => {
+  console.log(`为物理型队长 ${captain.name} 分配特殊哥布林，最大数量: ${maxSpecialGoblins}`);
 
   // 确保 troops 对象存在
   if (!captain.troops) {
@@ -1376,33 +1420,31 @@ const assignTroopsForPhysicalCaptain = (captain: Captain, remainingLevels: numbe
     };
   }
 
-  // 1. 优先分配哥布林圣骑士
-  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林圣骑士']) {
+  let remainingSpecial = maxSpecialGoblins;
+
+  // 1. 优先分配哥布林圣骑士（分配60%）
+  if (remainingSpecial > 0) {
     const availablePaladins = getAvailableGoblinCount('哥布林圣骑士');
-    const maxPaladins = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林圣骑士']);
-    const paladinCount = Math.min(maxPaladins, availablePaladins);
+    const paladinCount = Math.min(Math.floor(maxSpecialGoblins * 0.6), availablePaladins, remainingSpecial);
 
     if (paladinCount > 0) {
       captain.troops['哥布林圣骑士'] = paladinCount;
-      remainingLevels -= paladinCount * TROOP_LEVEL_COSTS['哥布林圣骑士'];
-      console.log(`分配哥布林圣骑士: ${paladinCount}, 剩余等级: ${remainingLevels}`);
+      remainingSpecial -= paladinCount;
+      console.log(`分配哥布林圣骑士: ${paladinCount}, 剩余特殊哥布林: ${remainingSpecial}`);
     }
   }
 
-  // 2. 其次分配哥布林战士
-  if (remainingLevels >= TROOP_LEVEL_COSTS['哥布林战士']) {
+  // 2. 分配哥布林战士（分配剩余部分）
+  if (remainingSpecial > 0) {
     const availableWarriors = getAvailableGoblinCount('哥布林战士');
-    const maxWarriors = Math.floor(remainingLevels / TROOP_LEVEL_COSTS['哥布林战士']);
-    const warriorCount = Math.min(maxWarriors, availableWarriors);
+    const warriorCount = Math.min(remainingSpecial, availableWarriors);
 
     if (warriorCount > 0) {
       captain.troops['哥布林战士'] = warriorCount;
-      remainingLevels -= warriorCount * TROOP_LEVEL_COSTS['哥布林战士'];
-      console.log(`分配哥布林战士: ${warriorCount}, 剩余等级: ${remainingLevels}`);
+      remainingSpecial -= warriorCount;
+      console.log(`分配哥布林战士: ${warriorCount}, 剩余特殊哥布林: ${remainingSpecial}`);
     }
   }
-
-  return remainingLevels;
 };
 
 // 获取可用的哥布林数量（考虑其他队长已使用的数量）

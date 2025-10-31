@@ -723,7 +723,7 @@ export const roundStartEvents: RandomEvent[] = [
       minRound: 10,
       requiredThreat: 200,
       probability: 0.25,
-      cooldownRounds: 5, // 触发后2回合内不会再次触发
+      triggerOnce: true, // 只触发一次
     },
     dialogueConfig: {
       title: '🚫 商路中断',
@@ -788,7 +788,7 @@ export const roundStartEvents: RandomEvent[] = [
       minRound: 20,
       requiredThreat: 600,
       probability: 0.2,
-      cooldownRounds: 5, // 触发后3回合内不会再次触发
+      triggerOnce: true, // 只触发一次
     },
     dialogueConfig: {
       title: '🏃 难民潮',
