@@ -235,6 +235,73 @@ export class CharacterParser {
     });
   }
 
+  // ==================== 辅助方法 ====================
+
+  /**
+   * 健壮地读取字段值，支持多种位置和键名变体
+   * 用于处理可能的字符编码或键名匹配问题
+   * @param data 数据对象
+   * @param fieldName 字段名称（如"恐惧"、"性经历"、"秘密"）
+   * @param parentKey 父级键名（如"隐藏特质"），如果提供则优先从此处读取
+   * @returns 字段值，如果不存在返回 undefined
+   */
+  private static robustGetField(
+    data: any,
+    fieldName: string,
+    parentKey?: string,
+  ): { value: any; source: string; allKeys?: string[] } {
+    // 如果提供了父级键，先尝试从父级对象读取
+    if (parentKey && data[parentKey] && typeof data[parentKey] === 'object') {
+      const parentObj = data[parentKey];
+      const parentKeys = Object.keys(parentObj);
+
+      // 直接匹配
+      if (fieldName in parentObj) {
+        return { value: parentObj[fieldName], source: `${parentKey}.${fieldName}`, allKeys: parentKeys };
+      }
+
+      // 遍历所有键，尝试找到相似的键（处理可能的编码问题）
+      for (const key of parentKeys) {
+        if (key === fieldName || key.trim() === fieldName.trim()) {
+          console.warn(`⚠️ [人物解析] 字段 "${fieldName}" 在 "${parentKey}" 中找到相似键: "${key}"`);
+          return { value: parentObj[key], source: `${parentKey}.${key}`, allKeys: parentKeys };
+        }
+      }
+
+      // 输出所有可用的键以便调试
+      console.warn(`⚠️ [人物解析] 在 "${parentKey}" 中未找到字段 "${fieldName}"，可用键:`, parentKeys);
+    }
+
+    // 尝试从顶级字段读取
+    const topLevelKeys = Object.keys(data);
+    if (fieldName in data) {
+      return { value: data[fieldName], source: `顶级.${fieldName}`, allKeys: topLevelKeys };
+    }
+
+    // 遍历顶级键，尝试找到相似的键
+    for (const key of topLevelKeys) {
+      if (key === fieldName || key.trim() === fieldName.trim()) {
+        console.warn(`⚠️ [人物解析] 字段 "${fieldName}" 在顶级找到相似键: "${key}"`);
+        return { value: data[key], source: `顶级.${key}`, allKeys: topLevelKeys };
+      }
+    }
+
+    // 如果都找不到，输出调试信息
+    if (parentKey) {
+      console.warn(`⚠️ [人物解析] 字段 "${fieldName}" 在 "${parentKey}" 和顶级都未找到`);
+      if (data[parentKey]) {
+        console.warn(`⚠️ [人物解析] "${parentKey}" 对象的所有键:`, Object.keys(data[parentKey]));
+      }
+    }
+    console.warn(`⚠️ [人物解析] 顶级对象的所有键:`, topLevelKeys);
+
+    return {
+      value: undefined,
+      source: '未找到',
+      allKeys: parentKey && data[parentKey] ? Object.keys(data[parentKey]) : topLevelKeys,
+    };
+  }
+
   // ==================== 主要解析方法 ====================
 
   /**
@@ -311,22 +378,26 @@ export class CharacterParser {
 
       // 提前检查隐藏特质数据
       console.log('🔍 [人物解析] 提前检查隐藏特质数据（JSON）...');
+
+      // 使用健壮的字段读取方法
+      const sexExperienceField = this.robustGetField(data, '性经历', '隐藏特质');
+      const fearsField = this.robustGetField(data, '恐惧', '隐藏特质');
+      const secretsField = this.robustGetField(data, '秘密', '隐藏特质');
+
       console.log('📊 [人物解析] 隐藏特质原始数据:', {
         隐藏特质存在: !!data.隐藏特质,
         隐藏特质类型: typeof data.隐藏特质,
         隐藏特质内容: JSON.stringify(data.隐藏特质, null, 2),
-        性经历_隐藏特质: data.隐藏特质?.性经历,
-        性经历_顶级: data.性经历,
-        性经历_最终值: data.隐藏特质?.性经历 ?? data.性经历,
-        性经历类型: typeof (data.隐藏特质?.性经历 ?? data.性经历),
-        恐惧_隐藏特质: data.隐藏特质?.恐惧,
-        恐惧_顶级: data.恐惧,
-        恐惧_最终值: data.隐藏特质?.恐惧 ?? data.恐惧,
-        恐惧类型: typeof (data.隐藏特质?.恐惧 ?? data.恐惧),
-        秘密_隐藏特质: data.隐藏特质?.秘密,
-        秘密_顶级: data.秘密,
-        秘密_最终值: data.隐藏特质?.秘密 ?? data.秘密,
-        秘密类型: typeof (data.隐藏特质?.秘密 ?? data.秘密),
+        隐藏特质所有键: data.隐藏特质 ? Object.keys(data.隐藏特质) : [],
+        性经历_值: sexExperienceField.value,
+        性经历_来源: sexExperienceField.source,
+        性经历_隐藏特质可用键: sexExperienceField.allKeys,
+        恐惧_值: fearsField.value,
+        恐惧_来源: fearsField.source,
+        恐惧_隐藏特质可用键: fearsField.allKeys,
+        秘密_值: secretsField.value,
+        秘密_来源: secretsField.source,
+        秘密_隐藏特质可用键: secretsField.allKeys,
       });
 
       // 处理图片资源信息
@@ -486,10 +557,25 @@ export class CharacterParser {
 
         // 隐藏特质（性经历必须，恐惧和秘密改为可选）
         // 兼容AI可能将"性经历"、"恐惧"和"秘密"放在顶级字段的情况
+        // 使用健壮的字段读取方法，处理可能的字符编码或键名匹配问题
         hiddenTraits: {
-          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历 ?? data.性经历, '性经历', '隐藏特质'),
-          fears: this.validateOptionalString(data.隐藏特质?.恐惧 ?? data.恐惧, '恐惧', '隐藏特质', '未知'),
-          secrets: this.validateOptionalString(data.隐藏特质?.秘密 ?? data.秘密, '秘密', '隐藏特质', '未知'),
+          sexExperience: this.validateRequiredString(
+            this.robustGetField(data, '性经历', '隐藏特质').value,
+            '性经历',
+            '隐藏特质',
+          ),
+          fears: this.validateOptionalString(
+            this.robustGetField(data, '恐惧', '隐藏特质').value,
+            '恐惧',
+            '隐藏特质',
+            '未知',
+          ),
+          secrets: this.validateOptionalString(
+            this.robustGetField(data, '秘密', '隐藏特质').value,
+            '秘密',
+            '隐藏特质',
+            '未知',
+          ),
         },
 
         // 头像信息（来自据点图片资源）
@@ -1018,22 +1104,26 @@ export class CharacterParser {
 
       // 提前检查隐藏特质数据
       console.log('🔍 [人物解析] 提前检查隐藏特质数据（YAML）...');
+
+      // 使用健壮的字段读取方法
+      const sexExperienceField = this.robustGetField(data, '性经历', '隐藏特质');
+      const fearsField = this.robustGetField(data, '恐惧', '隐藏特质');
+      const secretsField = this.robustGetField(data, '秘密', '隐藏特质');
+
       console.log('📊 [人物解析] 隐藏特质原始数据:', {
         隐藏特质存在: !!data.隐藏特质,
         隐藏特质类型: typeof data.隐藏特质,
         隐藏特质内容: JSON.stringify(data.隐藏特质, null, 2),
-        性经历_隐藏特质: data.隐藏特质?.性经历,
-        性经历_顶级: data.性经历,
-        性经历_最终值: data.隐藏特质?.性经历 ?? data.性经历,
-        性经历类型: typeof (data.隐藏特质?.性经历 ?? data.性经历),
-        恐惧_隐藏特质: data.隐藏特质?.恐惧,
-        恐惧_顶级: data.恐惧,
-        恐惧_最终值: data.隐藏特质?.恐惧 ?? data.恐惧,
-        恐惧类型: typeof (data.隐藏特质?.恐惧 ?? data.恐惧),
-        秘密_隐藏特质: data.隐藏特质?.秘密,
-        秘密_顶级: data.秘密,
-        秘密_最终值: data.隐藏特质?.秘密 ?? data.秘密,
-        秘密类型: typeof (data.隐藏特质?.秘密 ?? data.秘密),
+        隐藏特质所有键: data.隐藏特质 ? Object.keys(data.隐藏特质) : [],
+        性经历_值: sexExperienceField.value,
+        性经历_来源: sexExperienceField.source,
+        性经历_隐藏特质可用键: sexExperienceField.allKeys,
+        恐惧_值: fearsField.value,
+        恐惧_来源: fearsField.source,
+        恐惧_隐藏特质可用键: fearsField.allKeys,
+        秘密_值: secretsField.value,
+        秘密_来源: secretsField.source,
+        秘密_隐藏特质可用键: secretsField.allKeys,
       });
 
       // 处理图片资源信息
@@ -1191,10 +1281,25 @@ export class CharacterParser {
 
         // 隐藏特质（性经历必须，恐惧和秘密改为可选）
         // 兼容AI可能将"性经历"、"恐惧"和"秘密"放在顶级字段的情况
+        // 使用健壮的字段读取方法，处理可能的字符编码或键名匹配问题
         hiddenTraits: {
-          sexExperience: this.validateRequiredString(data.隐藏特质?.性经历 ?? data.性经历, '性经历', '隐藏特质'),
-          fears: this.validateOptionalString(data.隐藏特质?.恐惧 ?? data.恐惧, '恐惧', '隐藏特质', '未知'),
-          secrets: this.validateOptionalString(data.隐藏特质?.秘密 ?? data.秘密, '秘密', '隐藏特质', '未知'),
+          sexExperience: this.validateRequiredString(
+            this.robustGetField(data, '性经历', '隐藏特质').value,
+            '性经历',
+            '隐藏特质',
+          ),
+          fears: this.validateOptionalString(
+            this.robustGetField(data, '恐惧', '隐藏特质').value,
+            '恐惧',
+            '隐藏特质',
+            '未知',
+          ),
+          secrets: this.validateOptionalString(
+            this.robustGetField(data, '秘密', '隐藏特质').value,
+            '秘密',
+            '隐藏特质',
+            '未知',
+          ),
         },
 
         // 头像信息（来自据点图片资源）
