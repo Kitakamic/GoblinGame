@@ -441,18 +441,31 @@ export class ExploreService {
 
   // 根据难度和距离计算侦察成本（固定费用）
   public calculateScoutCost(difficulty: number, distance?: number): { gold: number; food: number } {
-    // 获取当前大陆的探索成本作为基础值
+    // 获取当前大陆的探索成本作为基础值（大幅增大基础消耗）
     const currentContinent = continentExploreService.getCurrentContinent();
-    const baseCost = currentContinent?.explorationCost || { gold: 5, food: 3 };
+    const baseCost = currentContinent?.explorationCost || { gold: 200, food: 120 };
 
-    // 根据星级计算倍数：使用平方根曲线，让高等级据点增长更平缓
-    // 1星≈1.5倍，5星≈4倍，7星≈4.7倍，10星≈5.7倍（相比之前的线性增长大幅降低）
-    const multiplier = Math.max(1, 1 + Math.sqrt(difficulty) * 0.5);
+    // 根据星级计算倍数：低难度（1-2星）使用固定低倍数，高难度使用平方根曲线
+    let multiplier: number;
+    if (difficulty === 1) {
+      // 1星：固定1.2倍（10km时约240金币）
+      multiplier = 1.2;
+    } else if (difficulty === 2) {
+      // 2星：固定1.4倍（10km时约280金币）
+      multiplier = 1.4;
+    } else {
+      // 3星及以上：使用平方根曲线，调整系数让3星约1.7倍，与2星平滑过渡
+      // 3星≈1.7倍，5星≈2.68倍，7星≈3.18倍，10星≈4.79倍
+      multiplier = Math.max(1, 1 + Math.sqrt(difficulty) * 1.2);
+    }
 
-    // 距离成本：每公里增加 3% 的成本（从5%降低到3%）
-    const distanceMultiplier = distance ? 1 + distance * 0.03 : 1;
+    // 距离成本：每公里增加 0.4% 的成本（大幅降低距离影响）
+    // 500km时：1 + 500 * 0.004 = 3倍（相比之前16倍大幅降低）
+    const distanceMultiplier = distance ? 1 + distance * 0.004 : 1;
 
     // 移除随机因子，使用固定费用计算
+    // 1星10km：200 * 1.2 * 1.04 = 250金币
+    // 10星500km：200 * 4.79 * 3 = 2874金币（接近但不超过3000上限）
     return {
       gold: Math.round(baseCost.gold * multiplier * distanceMultiplier),
       food: Math.round(baseCost.food * multiplier * distanceMultiplier),

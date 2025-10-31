@@ -199,28 +199,28 @@
                 <div class="attr-item">
                   <span>攻:</span>
                   <span
-                    >{{ currentConfigCaptain?.attributes.attack
+                    >{{ getCaptainBaseAttribute('attack')
                     }}<span class="bonus-text">+{{ getAttributeBonus('attack') }}</span></span
                   >
                 </div>
                 <div class="attr-item">
                   <span>防:</span>
                   <span
-                    >{{ currentConfigCaptain?.attributes.defense
+                    >{{ getCaptainBaseAttribute('defense')
                     }}<span class="bonus-text">+{{ getAttributeBonus('defense') }}</span></span
                   >
                 </div>
                 <div class="attr-item">
                   <span>知:</span>
                   <span
-                    >{{ currentConfigCaptain?.attributes.intelligence
+                    >{{ getCaptainBaseAttribute('intelligence')
                     }}<span class="bonus-text">+{{ getAttributeBonus('intelligence') }}</span></span
                   >
                 </div>
                 <div class="attr-item">
                   <span>速:</span>
                   <span
-                    >{{ currentConfigCaptain?.attributes.speed
+                    >{{ getCaptainBaseAttribute('speed')
                     }}<span class="bonus-text">+{{ getAttributeBonus('speed') }}</span></span
                   >
                 </div>
@@ -242,8 +242,9 @@
               <div v-for="goblinUnit in GOBLIN_UNIT_CHARACTERS" :key="goblinUnit.id" class="resource-item">
                 <span class="resource-name">{{ goblinUnit.id }}:</span>
                 <span class="resource-count">
-                  总数量: {{ getCurrentGoblinCount(goblinUnit.id) }} | 已编制: {{ getUsedGoblinCount(goblinUnit.id) }} |
-                  可用: {{ Math.max(0, getCurrentGoblinCount(goblinUnit.id) - getUsedGoblinCount(goblinUnit.id)) }}
+                  总数量: {{ getCurrentGoblinCount(goblinUnit.id) }} | 已编制:
+                  {{ getTotalUsedGoblinCount(goblinUnit.id) }} | 可用:
+                  {{ getAvailableGoblinCountForDisplay(goblinUnit.id) }}
                 </span>
               </div>
             </div>
@@ -485,19 +486,21 @@ const confirmTroopConfig = () => {
     const speedBonus = getAttributeBonus('speed');
     const healthBonus = getAttributeBonus('health');
 
+    // 获取原始属性（如果之前保存过原始属性，使用原始属性；否则使用当前属性作为原始属性）
+    const baseAttributes = currentConfigCaptain.value.originalAttributes || currentConfigCaptain.value.attributes;
+
     // 创建带有属性加成的队长数据
     const updatedCaptain = {
       ...currentConfigCaptain.value,
-      // 保存原始属性（用于恢复）
-      originalAttributes: { ...currentConfigCaptain.value.attributes },
-      // 应用部队加成到属性中
+      // 保存原始属性（用于恢复，如果之前没有保存过才保存）
+      originalAttributes: currentConfigCaptain.value.originalAttributes || { ...baseAttributes },
+      // 应用部队加成到原始属性中（确保不会重复叠加）
       attributes: {
-        ...currentConfigCaptain.value.attributes,
-        attack: currentConfigCaptain.value.attributes.attack + attackBonus,
-        defense: currentConfigCaptain.value.attributes.defense + defenseBonus,
-        intelligence: currentConfigCaptain.value.attributes.intelligence + intelligenceBonus,
-        speed: currentConfigCaptain.value.attributes.speed + speedBonus,
-        health: currentConfigCaptain.value.attributes.health + healthBonus,
+        attack: baseAttributes.attack + attackBonus,
+        defense: baseAttributes.defense + defenseBonus,
+        intelligence: baseAttributes.intelligence + intelligenceBonus,
+        speed: baseAttributes.speed + speedBonus,
+        health: baseAttributes.health + healthBonus,
       },
       // 保存部队加成信息
       troopBonuses: {
@@ -611,10 +614,6 @@ const getMaxTroopCount = (type: string) => {
   if (isNormalGoblin) {
     // 普通哥布林：使用评级系数计算最大数量
     levelLimit = calculateMaxNormalGoblins(level, rating);
-
-    // 获取已使用的普通哥布林数量（从当前队长）
-    const usedNormalGoblins = captain.troops?.['普通哥布林'] || 0;
-    levelLimit -= usedNormalGoblins;
   } else if (isSpecialGoblin) {
     // 特殊哥布林：使用评级系数计算总数量，然后分配到各类型
     const maxSpecialTotal = calculateMaxSpecialGoblins(level, rating);
@@ -643,13 +642,15 @@ const getMaxTroopCount = (type: string) => {
   // 获取实际哥布林资源数量
   const availableGoblins = getCurrentGoblinCount(type);
 
-  // 获取其他队长已使用的哥布林数量
+  // 获取其他队长已使用的哥布林数量（不包括当前正在配置的队长）
   const usedGoblins = getUsedGoblinCount(type);
 
   // 计算可用的哥布林数量
+  // 当前队长的最大可用数量 = 总数量 - 其他队长已使用的
+  // 这样当当前队长调整滑块时，其他队长已使用的数量会被正确扣除
   const availableCount = Math.max(0, availableGoblins - usedGoblins);
 
-  // 返回等级限制和资源限制中的较小值
+  // 返回等级限制和资源限制中的较小值（这是最大总数，不是还能增加的数量）
   const maxCount = Math.min(levelLimit, availableCount);
 
   console.log(`计算最大哥布林数量 ${type}:`, {
@@ -824,11 +825,19 @@ const getUsedGoblinCount = (goblinType: string) => {
   }
 };
 
-// 获取队长基础血量
+// 获取队长基础血量（用于显示）
 const getCaptainBaseHealth = () => {
   if (!currentConfigCaptain.value) return 0;
-  // 使用人物的实际血量属性，如果没有则使用等级 * 10 作为后备
-  return currentConfigCaptain.value.attributes?.health || currentConfigCaptain.value.level * 10;
+  // 如果有原始属性，使用原始属性；否则使用当前属性（可能是已经加成的）
+  const baseAttributes = currentConfigCaptain.value.originalAttributes || currentConfigCaptain.value.attributes;
+  return baseAttributes?.health || currentConfigCaptain.value.level * 10;
+};
+
+// 获取队长基础属性（用于显示，确保显示的是原始属性）
+const getCaptainBaseAttribute = (attribute: string) => {
+  if (!currentConfigCaptain.value) return 0;
+  const baseAttributes = currentConfigCaptain.value.originalAttributes || currentConfigCaptain.value.attributes;
+  return (baseAttributes as any)?.[attribute] || 0;
 };
 
 // 获取部队卡显示的总血量
@@ -1196,13 +1205,14 @@ const refreshData = () => {
   loadAvailableCharacters();
   initializeCaptains();
 
-  // 同步更新已编制队长的等级
+  // 同步更新已编制队长的等级和评级
   captainSlots.value.forEach(captain => {
     if (captain) {
       const character = availableCharacters.value.find(char => char.id === captain.id);
       if (character) {
         captain.level = character.level || Math.floor(character.offspring / 10);
-        console.log(`更新队长 ${captain.name} 等级: ${captain.level}`);
+        captain.rating = character.rating || 'C';
+        console.log(`更新队长 ${captain.name} 等级: ${captain.level}, 评级: ${captain.rating}`);
       }
     }
   });
@@ -1455,6 +1465,23 @@ const getAvailableGoblinCount = (goblinType: string): number => {
 
   console.log(`${goblinType} 可用数量: 总计${totalCount} - 已用${usedCount} = 可用${availableCount}`);
   return availableCount;
+};
+
+// 获取总已编制的哥布林数量（包含当前正在配置的队长）
+const getTotalUsedGoblinCount = (goblinType: string): number => {
+  // 其他队长已使用的数量
+  const otherCaptainsUsed = getUsedGoblinCount(goblinType);
+  // 当前正在配置的队长已使用的数量
+  const currentCaptainUsed =
+    currentConfigCaptain.value?.troops?.[goblinType as keyof typeof currentConfigCaptain.value.troops] || 0;
+  return otherCaptainsUsed + currentCaptainUsed;
+};
+
+// 获取可用哥布林数量（用于显示，包含当前正在配置的队长）
+const getAvailableGoblinCountForDisplay = (goblinType: string): number => {
+  const totalCount = getCurrentGoblinCount(goblinType);
+  const totalUsed = getTotalUsedGoblinCount(goblinType);
+  return Math.max(0, totalCount - totalUsed);
 };
 
 // 暴露刷新方法给父组件

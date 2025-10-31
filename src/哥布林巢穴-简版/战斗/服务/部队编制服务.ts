@@ -339,6 +339,8 @@ export class FormationService {
               offspring: character.offspring,
               attributes: character.attributes,
               description: character.title || '',
+              unitType: character.unitType || 'physical',
+              rating: character.rating || 'C',
               isUsed: true,
               troops: {
                 普通哥布林: character.troopDeployment.normalGoblins,

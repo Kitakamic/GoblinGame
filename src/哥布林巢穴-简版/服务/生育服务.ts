@@ -13,8 +13,8 @@ export class BreedingService {
     let totalOffspring = 0;
 
     // 基础生育数量计算（受忠诚度和生育值加成）
-    const loyaltyBonus = Math.floor(character.loyalty / 25); // 每25点忠诚度+1点加成
-    const fertilityBonus = Math.floor(character.fertility / 40); // 每40点生育值+1点加成（因为生育值范围是0-200）
+    const loyaltyBonus = Math.floor(character.loyalty / 15); // 每15点忠诚度+1点加成（提高忠诚度影响）
+    const fertilityBonus = Math.floor(character.fertility / 40); // 每25点生育值+1点加成（因为生育值范围是0-200）
     const totalBonus = loyaltyBonus + fertilityBonus;
 
     // 根据角色评级决定可生育的哥布林类型
