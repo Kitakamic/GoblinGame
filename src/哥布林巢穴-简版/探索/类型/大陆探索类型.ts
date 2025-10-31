@@ -54,4 +54,6 @@ export interface ContinentExploreState {
   conqueredContinents: string[]; // 已征服的大陆名称
   currentContinent: string; // 当前探索的大陆名称
   continentProgress: Record<string, number>; // 各大陆征服进度
+  selectedContinent?: string; // 探索界面中当前选择的大陆名称
+  selectedRegion?: string; // 探索界面中当前选择的区域名称
 }

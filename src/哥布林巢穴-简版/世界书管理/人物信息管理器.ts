@@ -226,13 +226,10 @@ export class CharacterWorldbookManager {
         ...detail,
         description: detail.description + (unlockStatus.sensitivePoints ? '' : '（当前信息对于{{user}}未知）'),
       })),
-      breedingRecords: character.breedingRecords || [],
-      combatAttributes: {
-        level: Math.floor(character.offspring / 10),
-        baseAttributes: character.attributes,
-        deployedAttributes: character.deployedAttributes,
-        troopDeployment: character.troopDeployment,
-      },
+      breedingRecords:
+        character.breedingRecords && character.breedingRecords.length > 0
+          ? `生育哥布林总数量${character.breedingRecords.reduce((sum, record) => sum + record.count, 0)}个`
+          : '无生育记录',
       locationInfo: {
         locationId: character.locationId,
         capturedAt: character.capturedAt ? TimeParseService.getTimeInfo(currentGameTime).formattedDate : undefined,
@@ -353,7 +350,7 @@ ${JSON.stringify(fixedInfo, null, 2)}
 
     const lifeStoryGuidelines = ['保持角色的背景设定，根据人生经历调整回应'];
     if (!unlockStatus.lifeStory) {
-      lifeStoryGuidelines.push('注意：人生经历信息已显示但标记为未知，调教时请考虑信息未知');
+      lifeStoryGuidelines.push('标记为未知的区域不允许主动提及');
     }
 
     return [...baseGuidelines, ...loyaltyGuidelines, ...raceGuidelines, ...lifeStoryGuidelines];

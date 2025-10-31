@@ -719,6 +719,18 @@ const handleLoad = async (slot: number, data: any) => {
         console.log('没有历史记录，清空回合信息显示');
       }
 
+      // 确保大陆探索服务已经初始化（通过 initializeFromSave）
+      const { continentExploreService } = await import('./探索/服务/大陆探索服务');
+      await continentExploreService.initializeFromSave();
+
+      // 在所有数据加载完成后，重新计算征服进度
+      // 延迟执行，确保所有服务都已初始化完成
+      setTimeout(() => {
+        console.log('🔄 [加载存档] 开始重新计算所有区域和大陆的征服进度...');
+        continentExploreService.recalculateAllRegionProgress();
+        console.log('✅ [加载存档] 征服进度重新计算完成');
+      }, 300);
+
       console.log(`游戏已从槽位 ${slot} 加载`);
     }
 

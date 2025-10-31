@@ -720,7 +720,7 @@ export const roundStartEvents: RandomEvent[] = [
     type: EventType.DISASTER,
     rarity: EventRarity.COMMON,
     trigger: {
-      minRound: 3,
+      minRound: 10,
       requiredThreat: 200,
       probability: 0.25,
       cooldownRounds: 5, // 触发后2回合内不会再次触发
@@ -785,7 +785,7 @@ export const roundStartEvents: RandomEvent[] = [
     type: EventType.DISASTER,
     rarity: EventRarity.UNCOMMON,
     trigger: {
-      minRound: 4,
+      minRound: 20,
       requiredThreat: 600,
       probability: 0.2,
       cooldownRounds: 5, // 触发后3回合内不会再次触发

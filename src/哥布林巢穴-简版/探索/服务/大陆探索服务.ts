@@ -21,6 +21,8 @@ export class ContinentExploreService {
     conqueredContinents: [],
     currentContinent: '',
     continentProgress: {},
+    selectedContinent: '',
+    selectedRegion: '',
   });
 
   // ==================== 构造函数和初始化 ====================
@@ -133,14 +135,30 @@ export class ContinentExploreService {
       regions.map(r => ({ name: r.name, continentName: r.continentName })),
     );
 
+    // 根据难度设置前置关系：难度N的大陆需要征服难度N-1的大陆
     const result = continents.map(continent => {
       const continentRegions = regions.filter(region => region.continentName === continent.name);
       console.log(
         `🔍 [大陆探索服务] 大陆 ${continent.name} 匹配到 ${continentRegions.length} 个区域:`,
         continentRegions.map(r => r.name),
       );
+
+      // 根据难度设置前置大陆关系
+      let unlockCondition = continent.unlockCondition;
+      if (continent.difficulty > 1) {
+        // 查找前一个难度的大陆作为前置
+        const previousContinent = continents.find(c => c.difficulty === continent.difficulty - 1);
+        if (previousContinent) {
+          unlockCondition = {
+            previousContinentName: previousContinent.name,
+            conquestPercentage: 50, // 需要征服前一个大陆的50%才能解锁
+          };
+        }
+      }
+
       return {
         ...continent,
+        unlockCondition,
         regions: continentRegions,
       };
     });
@@ -160,6 +178,103 @@ export class ContinentExploreService {
   // 手动初始化探索数据（供存档系统调用）
   public async initializeFromSave(): Promise<void> {
     await this.loadExploreData();
+  }
+
+  // 修复已加载大陆数据的前置关系（兼容旧存档）
+  private fixContinentUnlockConditions(): void {
+    this.continents.value.forEach(continent => {
+      // 如果前置关系未设置或为空，根据难度重新设置
+      if (!continent.unlockCondition.previousContinentName && continent.difficulty > 1) {
+        const previousContinent = this.continents.value.find(c => c.difficulty === continent.difficulty - 1);
+        if (previousContinent) {
+          continent.unlockCondition = {
+            previousContinentName: previousContinent.name,
+            conquestPercentage: continent.unlockCondition.conquestPercentage || 50,
+          };
+          console.log(
+            `🔧 [数据修复] 已修复大陆 ${continent.name} 的前置关系: 前置大陆=${previousContinent.name}, 需要进度=${continent.unlockCondition.conquestPercentage}%`,
+          );
+        }
+      }
+    });
+  }
+
+  // 同步征服进度从探索状态到大陆数据
+  private syncProgressFromExploreState(): void {
+    console.log('🔄 [同步进度] 开始从探索状态同步征服进度到大陆数据...');
+    let syncedCount = 0;
+
+    this.continents.value.forEach(continent => {
+      // 从 exploreState.continentProgress 同步到 continent.conquestProgress
+      const progressFromState = this.exploreState.value.continentProgress[continent.name];
+      if (progressFromState !== undefined && progressFromState !== null) {
+        // 只有当存档状态中有值时才同步（避免覆盖已计算的正确值）
+        if (continent.conquestProgress === 0 || Math.abs(continent.conquestProgress - progressFromState) > 0.1) {
+          console.log(
+            `🔄 [同步进度] 同步大陆 ${continent.name}: ${continent.conquestProgress}% -> ${progressFromState}%`,
+          );
+          continent.conquestProgress = progressFromState;
+          syncedCount++;
+        }
+      }
+    });
+
+    console.log(`✅ [同步进度] 同步完成: 共同步 ${syncedCount} 个大陆的征服进度`);
+  }
+
+  // 验证并修复解锁状态（兼容旧存档）
+  private validateAndFixUnlockStatus(): void {
+    console.log('🔍 [解锁验证] 开始验证大陆解锁状态...');
+    let fixedCount = 0;
+    let unlockedCount = 0;
+
+    this.continents.value.forEach(continent => {
+      const wasUnlocked = continent.isUnlocked;
+      const shouldBeUnlocked = this.checkUnlockConditions(continent);
+
+      // 如果状态不一致，修复它
+      if (wasUnlocked !== shouldBeUnlocked) {
+        if (shouldBeUnlocked && !wasUnlocked) {
+          // 应该解锁但未解锁 - 自动解锁
+          continent.isUnlocked = true;
+          if (!this.exploreState.value.unlockedContinents.includes(continent.name)) {
+            this.exploreState.value.unlockedContinents.push(continent.name);
+          }
+          console.log(
+            `✅ [解锁验证] 大陆 ${continent.name} 已满足解锁条件，自动解锁 (前置大陆进度: ${this.exploreState.value.continentProgress[continent.unlockCondition.previousContinentName || ''] || 0}%)`,
+          );
+          fixedCount++;
+          unlockedCount++;
+        } else if (!shouldBeUnlocked && wasUnlocked) {
+          // 不应该解锁但已解锁 - 锁定
+          continent.isUnlocked = false;
+          const index = this.exploreState.value.unlockedContinents.indexOf(continent.name);
+          if (index !== -1) {
+            this.exploreState.value.unlockedContinents.splice(index, 1);
+          }
+          const previousProgress =
+            this.exploreState.value.continentProgress[continent.unlockCondition.previousContinentName || ''] || 0;
+          console.log(
+            `⚠️ [解锁验证] 大陆 ${continent.name} 不满足解锁条件，已锁定 (需要前置大陆进度 >= ${continent.unlockCondition.conquestPercentage}%, 当前: ${previousProgress.toFixed(1)}%)`,
+          );
+          fixedCount++;
+        }
+      } else if (shouldBeUnlocked) {
+        unlockedCount++;
+      }
+
+      // 确保探索状态中的解锁列表与大陆状态同步
+      if (continent.isUnlocked && !this.exploreState.value.unlockedContinents.includes(continent.name)) {
+        this.exploreState.value.unlockedContinents.push(continent.name);
+      }
+    });
+
+    console.log(`✅ [解锁验证] 验证完成: 共修复 ${fixedCount} 个大陆状态, 当前解锁 ${unlockedCount} 个大陆`);
+
+    // 如果有修复，保存数据
+    if (fixedCount > 0) {
+      this.saveExploreData();
+    }
   }
 
   // 重新加载CSV数据（开发时使用）
@@ -232,16 +347,25 @@ export class ContinentExploreService {
 
   // 检查解锁条件
   private checkUnlockConditions(continent: Continent): boolean {
-    const { previousContinentName } = continent.unlockCondition;
+    const { previousContinentName, conquestPercentage } = continent.unlockCondition;
 
     // 如果没有前置大陆要求，直接解锁
     if (!previousContinentName) {
       return true;
     }
 
-    // 检查前置大陆的征服进度是否达到50%
+    // 检查前置大陆的征服进度是否达到要求
     const previousProgress = this.exploreState.value.continentProgress[previousContinentName] || 0;
-    return previousProgress >= 50;
+    const requiredProgress = conquestPercentage || 50; // 默认50%
+    const isUnlocked = previousProgress >= requiredProgress;
+
+    if (!isUnlocked) {
+      console.log(
+        `🔍 [解锁检查] 大陆 ${continent.name} 未满足解锁条件: 需要前置大陆 ${previousContinentName} 征服进度 >= ${requiredProgress}%，当前进度 ${previousProgress.toFixed(1)}%`,
+      );
+    }
+
+    return isUnlocked;
   }
 
   // 更新大陆征服进度
@@ -301,6 +425,8 @@ export class ContinentExploreService {
       // 计算平均征服进度
       const averageProgress = regionCount > 0 ? totalProgress / regionCount : 0;
       continent.conquestProgress = Math.min(100, Math.max(0, averageProgress));
+      // 同步更新探索状态中的征服进度，确保解锁检查能读取到最新值
+      this.exploreState.value.continentProgress[continentName] = continent.conquestProgress;
 
       console.log(
         `🔍 [大陆征服进度计算] 大陆 ${continent.name} 征服进度: ${continent.conquestProgress.toFixed(1)}% (基于${regionCount}个区域的平均值)`,
@@ -688,6 +814,8 @@ export class ContinentExploreService {
         // 加载大陆数据 - 优先使用CSV数据，存档数据作为补充
         if (data.continents && Array.isArray(data.continents) && data.continents.length > 0) {
           this.continents.value = data.continents;
+          // 修复已加载数据的前置关系（兼容旧存档）
+          this.fixContinentUnlockConditions();
           console.log('从数据库加载大陆数据成功，共', data.continents.length, '个大陆');
         } else {
           // 如果存档中没有大陆数据，强制从CSV加载
@@ -702,6 +830,16 @@ export class ContinentExploreService {
           this.exploreState.value = data.continentExploreState;
           console.log('从数据库加载大陆探索状态成功');
         }
+
+        // 同步征服进度从探索状态到大陆数据
+        this.syncProgressFromExploreState();
+
+        // 验证并修复解锁状态（兼容旧存档）
+        this.validateAndFixUnlockStatus();
+
+        // 注意：不在这里重新计算，而是在app.vue加载存档完成后统一触发
+        // 这样可以确保探索服务的据点数据已经加载完成
+        console.log('✅ [加载存档] 大陆数据加载完成，等待统一重新计算征服进度');
 
         console.log('从数据库加载大陆探索数据成功');
       } else {
@@ -732,7 +870,19 @@ export class ContinentExploreService {
           conqueredContinents: [],
           currentContinent: '',
           continentProgress: {},
+          selectedContinent: '',
+          selectedRegion: '',
         };
+      }
+
+      // 确保新字段存在（兼容旧存档）
+      if (data.continentExploreState && typeof data.continentExploreState === 'object') {
+        if (data.continentExploreState.selectedContinent === undefined) {
+          data.continentExploreState.selectedContinent = '';
+        }
+        if (data.continentExploreState.selectedRegion === undefined) {
+          data.continentExploreState.selectedRegion = '';
+        }
       }
 
       // 确保大陆数据完整性
@@ -832,6 +982,8 @@ export class ContinentExploreService {
       conqueredContinents: Array.isArray(exploreState.conqueredContinents) ? exploreState.conqueredContinents : [],
       currentContinent: exploreState.currentContinent || '',
       continentProgress: exploreState.continentProgress || {},
+      selectedContinent: exploreState.selectedContinent || '',
+      selectedRegion: exploreState.selectedRegion || '',
     };
   }
 
@@ -860,6 +1012,8 @@ export class ContinentExploreService {
         conqueredContinents: [],
         currentContinent: 'gular',
         continentProgress: {},
+        selectedContinent: '',
+        selectedRegion: '',
       };
 
       console.log('大陆探索数据已重置');

@@ -362,6 +362,7 @@ const selectedBattleTarget = ref<Location | null>(null);
 const battleData = ref<any>(null);
 
 // 大陆相关
+// 默认值会在组件挂载时从探索状态恢复，如果没有保存的状态则使用这些默认值
 const selectedContinent = ref<string>('古拉尔大陆'); // 默认选择古拉尔大陆
 const selectedRegion = ref<string>('巢穴附近'); // 默认选择古拉尔中心区域
 
@@ -572,18 +573,35 @@ const filteredLocations = computed(() => {
 const selectContinent = (continentName: string) => {
   selectedContinent.value = continentName;
   // 切换大陆时，选择该大陆的第一个解锁区域
+  // 注意：切换大陆时不再尝试恢复之前选择的区域，因为区域是绑定到特定大陆的
   const regions = currentContinentRegions.value;
   const firstUnlockedRegion = regions.find(r => r.isUnlocked);
+
   if (firstUnlockedRegion) {
     selectedRegion.value = firstUnlockedRegion.name;
+  } else {
+    // 如果该大陆没有解锁的区域，清空区域选择
+    selectedRegion.value = '';
   }
-  console.log(`切换到大陆: ${continentName}`);
+
+  // 保存选择状态
+  saveSelectionState();
+  console.log(`切换到大陆: ${continentName}, 区域: ${selectedRegion.value}`);
 };
 
 // 选择区域
 const selectRegion = (regionName: string) => {
   selectedRegion.value = regionName;
+  // 保存选择状态
+  saveSelectionState();
   console.log(`切换到区域: ${regionName}`);
+};
+
+// 保存选择状态到探索状态
+const saveSelectionState = () => {
+  continentExploreService.exploreState.value.selectedContinent = selectedContinent.value;
+  continentExploreService.exploreState.value.selectedRegion = selectedRegion.value;
+  // 自动保存（通过 watcher）
 };
 
 const getStatusText = (location: Location) => {
@@ -1083,6 +1101,12 @@ onMounted(async () => {
   // 加载侦察状态
   await loadScoutingState();
 
+  // 等待大陆数据加载完成后再恢复选择状态
+  // 延迟执行，确保大陆数据已经初始化
+  setTimeout(() => {
+    restoreSelectionState();
+  }, 100);
+
   // 检查并添加未加入世界书的人物
   await checkAndAddMissingCharacters();
 
@@ -1094,6 +1118,49 @@ onMounted(async () => {
     window.removeEventListener('location-status-updated', handleLocationStatusUpdate as unknown as EventListener);
   });
 });
+
+// 恢复选择状态
+const restoreSelectionState = () => {
+  const savedContinent = continentExploreService.exploreState.value.selectedContinent;
+  const savedRegion = continentExploreService.exploreState.value.selectedRegion;
+
+  // 恢复大陆选择
+  if (savedContinent) {
+    const continent = allContinents.value.find(c => c.name === savedContinent && c.isUnlocked);
+    if (continent) {
+      selectedContinent.value = savedContinent;
+      console.log(`🔄 [探索界面] 恢复之前选择的大陆: ${savedContinent}`);
+    } else {
+      console.log(`⚠️ [探索界面] 保存的大陆 ${savedContinent} 不存在或未解锁，使用默认值`);
+    }
+  }
+
+  // 恢复区域选择（需要确保大陆已选择且区域属于该大陆）
+  if (savedRegion && selectedContinent.value) {
+    const regions = currentContinentRegions.value;
+    const region = regions.find(r => r.name === savedRegion && r.isUnlocked);
+    if (region) {
+      selectedRegion.value = savedRegion;
+      console.log(`🔄 [探索界面] 恢复之前选择的区域: ${savedRegion}`);
+    } else {
+      // 如果保存的区域不存在，选择该大陆的第一个解锁区域
+      const firstUnlockedRegion = regions.find(r => r.isUnlocked);
+      if (firstUnlockedRegion) {
+        selectedRegion.value = firstUnlockedRegion.name;
+        console.log(
+          `⚠️ [探索界面] 保存的区域 ${savedRegion} 不存在或未解锁，使用第一个解锁区域: ${firstUnlockedRegion.name}`,
+        );
+      }
+    }
+  } else if (selectedContinent.value) {
+    // 如果没有保存的区域，选择当前大陆的第一个解锁区域
+    const regions = currentContinentRegions.value;
+    const firstUnlockedRegion = regions.find(r => r.isUnlocked);
+    if (firstUnlockedRegion) {
+      selectedRegion.value = firstUnlockedRegion.name;
+    }
+  }
+};
 </script>
 
 <style scoped lang="scss">
