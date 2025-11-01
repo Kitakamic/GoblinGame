@@ -125,22 +125,52 @@ export class ModularSaveManager {
       // 【关键修复】如果已经有有效的 currentGameData 或响应式状态有游戏进度，不要覆盖它
       // 检查当前的 currentGameData 或响应式状态是否已经有游戏进度（不是初始状态）
       const checkHasProgress = () => {
-        // 检查响应式状态（可能比 currentGameData 更新）
-        if (
-          this.resources.value.rounds > 0 ||
-          this.resources.value.actionPoints !== this.resources.value.maxActionPoints
-        ) {
+        // 【多重检测机制】避免误判，使用多个条件判断是否有游戏进度
+        // 只要满足任意一个条件，就认为有进度
+
+        // 1. 检查 currentGameData 是否存在
+        // 如果 currentGameData 已存在，说明游戏已经在运行中
+        if (this.currentGameData) {
+          console.log('🔍 [进度检测] currentGameData 已存在，说明游戏正在运行');
           return true;
         }
-        // 检查 currentGameData
-        if (this.currentGameData) {
-          return (
-            this.currentGameData.baseResources.rounds > 0 ||
-            this.currentGameData.baseResources.actionPoints !== this.currentGameData.baseResources.maxActionPoints ||
-            (this.currentGameData.training?.characters?.length ?? 0) > 0 ||
-            (this.currentGameData.exploration?.locations?.length ?? 0) > 0
+
+        // 2. 检查行动力是否被消耗
+        if (this.resources.value.actionPoints !== this.resources.value.maxActionPoints) {
+          console.log(
+            `🔍 [进度检测] 响应式状态：行动力已消耗 (${this.resources.value.actionPoints}/${this.resources.value.maxActionPoints})`,
           );
+          return true;
         }
+
+        // 3. 检查回合数（结束回合后会增加）
+        if (this.resources.value.rounds > 0) {
+          console.log(`🔍 [进度检测] 回合数大于 0 (${this.resources.value.rounds})，说明已进行过游戏`);
+          return true;
+        }
+
+        // 4. 检查是否有额外捕获的人物（trainingSlaves 超过初始值说明捕获了新人物）
+        // 注意：初始就有雫，所以 INITIAL_RESOURCES.trainingSlaves = 1
+        if (this.resources.value.trainingSlaves > INITIAL_RESOURCES.trainingSlaves) {
+          console.log(
+            `🔍 [进度检测] 捕获了新人物 (${this.resources.value.trainingSlaves} > ${INITIAL_RESOURCES.trainingSlaves})，说明已进行过游戏`,
+          );
+          return true;
+        }
+
+        // 5. 检查资源是否改变（金币、食物等）
+        // 使用正确的初始值（从 INITIAL_RESOURCES 导入）
+        if (
+          this.resources.value.gold !== INITIAL_RESOURCES.gold ||
+          this.resources.value.food !== INITIAL_RESOURCES.food
+        ) {
+          console.log(
+            `🔍 [进度检测] 资源已改变 (金币: ${this.resources.value.gold}, 食物: ${this.resources.value.food})，说明已进行过游戏`,
+          );
+          return true;
+        }
+
+        console.log('🔍 [进度检测] 所有检测均未通过，判断为无游戏进度（首次启动）');
         return false;
       };
 

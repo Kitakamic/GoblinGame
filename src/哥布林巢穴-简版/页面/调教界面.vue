@@ -219,10 +219,15 @@
                 🎲 随机选择同种族头像
               </button>
               <div v-if="!editingCharacter?.race" class="random-avatar-hint">提示：需要先选择人物种族</div>
-              <button class="action-btn reset-avatar-btn" :disabled="!editingCharacter" @click="resetAvatarToDefault">
-                🔄 恢复默认头像
+              <button
+                class="action-btn reset-avatar-btn"
+                :disabled="!editingCharacter || !originalAvatars"
+                @click="resetAvatarToOriginal"
+              >
+                🔄 恢复初始头像
               </button>
-              <div class="reset-avatar-hint">清除当前头像设置，恢复为系统默认</div>
+              <div v-if="!originalAvatars" class="reset-avatar-hint">无法恢复：未保存初始值</div>
+              <div v-else class="reset-avatar-hint">恢复到编辑前的头像设置</div>
             </div>
           </div>
         </div>
@@ -365,6 +370,12 @@ const imagePrompt = ref('');
 const selectedAvatarField = ref<'avatar' | 'corruptedAvatar' | 'fullyCorruptedAvatar'>('avatar');
 const isGeneratingImage = ref(false);
 const generatedImagePreview = ref<string>('');
+// 头像初始值（用于恢复）
+const originalAvatars = ref<{
+  avatar?: string;
+  corruptedAvatar?: string;
+  fullyCorruptedAvatar?: string;
+} | null>(null);
 
 // 自定义确认框状态
 const showCustomConfirm = ref(false);
@@ -1658,6 +1669,12 @@ const executeCharacter = async (character: Character) => {
 const editAvatar = (character: Character) => {
   editingCharacter.value = character;
   avatarUrl.value = character.avatar || '';
+  // 保存头像初始值（用于恢复）
+  originalAvatars.value = {
+    avatar: character.avatar,
+    corruptedAvatar: character.corruptedAvatar,
+    fullyCorruptedAvatar: character.fullyCorruptedAvatar,
+  };
   // 初始化文生图相关变量
   imagePrompt.value = '';
   selectedAvatarField.value = 'avatar';
@@ -1676,6 +1693,8 @@ const closeAvatarModal = () => {
   selectedAvatarField.value = 'avatar';
   isGeneratingImage.value = false;
   generatedImagePreview.value = '';
+  // 清理头像初始值
+  originalAvatars.value = null;
 };
 
 // 生成图片（文生图）
@@ -1839,28 +1858,23 @@ const setRandomAvatarByRace = () => {
   closeAvatarModal();
 };
 
-// 恢复默认头像
-const resetAvatarToDefault = () => {
-  if (!editingCharacter.value) {
-    toastRef.value?.warning('无法获取人物信息', { title: '提示', duration: 3000 });
+// 恢复初始头像（恢复到编辑前的初始值）
+const resetAvatarToOriginal = () => {
+  if (!editingCharacter.value || !originalAvatars.value) {
+    toastRef.value?.warning('无法获取人物信息或初始头像值', { title: '提示', duration: 3000 });
     return;
   }
 
   const field = selectedAvatarField.value;
 
-  // 清空当前选择的头像字段
-  (editingCharacter.value as any)[field] = undefined;
+  // 恢复当前选择的头像字段为初始值
+  const originalValue = originalAvatars.value[field];
+  (editingCharacter.value as any)[field] = originalValue;
 
-  // 如果是正常头像，也要强制刷新显示（会使用回退逻辑显示其他头像或默认头像）
+  // 如果是正常头像，也要强制刷新显示
   if (field === 'avatar') {
-    const fallbackAvatar = AvatarSwitchService.getAvatarByCorruptionLevel(editingCharacter.value);
-    if (fallbackAvatar) {
-      editingCharacter.value.avatar = fallbackAvatar;
-      forceRefreshCharacterAvatar(editingCharacter.value.id, fallbackAvatar);
-    } else {
-      // 如果没有任何头像，清空后强制刷新
-      forceRefreshCharacterAvatar(editingCharacter.value.id, '');
-    }
+    const displayAvatar = originalValue || AvatarSwitchService.getAvatarByCorruptionLevel(editingCharacter.value) || '';
+    forceRefreshCharacterAvatar(editingCharacter.value.id, displayAvatar);
   }
 
   // 更新世界书
@@ -1870,13 +1884,13 @@ const resetAvatarToDefault = () => {
   saveTrainingData();
 
   const fieldName = field === 'avatar' ? '正常状态头像' : field === 'corruptedAvatar' ? '半堕落头像' : '完全堕落头像';
-  toastRef.value?.success(`已清空 ${fieldName}，恢复为系统默认`, {
+  const actionText = originalValue ? '已恢复' : '已清空';
+  toastRef.value?.success(`${actionText} ${fieldName}，恢复到编辑前的初始值`, {
     title: '恢复成功',
     duration: 3000,
   });
 
-  // 关闭弹窗
-  closeAvatarModal();
+  // 注意：这里不关闭弹窗，让用户可以继续编辑或查看恢复结果
 };
 
 // 处理图片加载错误
