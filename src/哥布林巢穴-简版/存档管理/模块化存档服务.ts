@@ -309,6 +309,16 @@ export class ModularSaveManager {
       // 使用原来的存档ID作为源，而不是当前已切换的存档ID
       if (previousSaveId && previousSaveId !== saveId) {
         await this.copyTrainingHistoryFromSlot(previousSaveId, slot);
+      } else if (!previousSaveId || previousSaveId === 'slot_init') {
+        // 如果是首次保存到slot0（从初始化槽位或没有previousSaveId），清空slot0的调教记录数据
+        // 避免旧存档的调教记录数据与新存档数据融合
+        try {
+          await databaseService.deleteTrainingHistoryData(saveId);
+          console.log(`✅ 已清空槽位 ${slot} 的旧调教记录数据（首次保存或从初始化槽位保存）`);
+        } catch (error) {
+          // 如果删除失败（可能是因为不存在），不影响后续流程
+          console.log(`ℹ️ 槽位 ${slot} 没有调教记录数据或清除失败（可忽略）`);
+        }
       }
 
       // 触发保存事件

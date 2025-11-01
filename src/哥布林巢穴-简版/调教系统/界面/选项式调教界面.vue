@@ -56,6 +56,10 @@
         <!-- <button class="header-btn delete-btn" title="删除当前页消息" @click="deleteCurrentPageMessage()">
           <span class="btn-icon">🗑️</span>
         </button> -->
+        <!-- 酒馆正则应用按钮已隐藏 -->
+        <!-- <button class="header-btn regex-btn" title="重新应用酒馆正则" @click="reapplyTavernRegex()">
+          <span class="btn-icon">🔧</span>
+        </button> -->
         <button class="header-btn style-btn" title="文字样式设置" @click="showStyleSettings = true">
           <span class="btn-icon">🎨</span>
         </button>
@@ -158,22 +162,25 @@
     <div v-if="showCustomInputPanel" class="custom-input-overlay" @click="closeCustomInputPanel">
       <div class="custom-input-panel" @click.stop>
         <div class="custom-input-header">
-          <h3>自定义输入</h3>
+          <h3>{{ isRetryMode ? '重新生成AI回复' : '自定义输入' }}</h3>
           <button class="close-panel-btn" @click="closeCustomInputPanel">✕</button>
         </div>
         <div class="custom-input-body">
+          <p v-if="isRetryMode" style="color: #f0e6d2; margin-bottom: 12px; font-size: 14px">
+            你可以编辑输入内容，然后确认重新生成：
+          </p>
           <textarea
             v-model="customOptionText"
             class="custom-input-textarea"
             :placeholder="customPlaceholder"
             :disabled="isSending"
-            rows="5"
+            :rows="isRetryMode ? 8 : 5"
             @keydown.enter.exact="submitCustomOption"
           ></textarea>
         </div>
         <div class="custom-input-footer">
           <button class="submit-btn" :disabled="!customOptionText.trim() || isSending" @click="submitCustomOption">
-            {{ isSending ? '发送中...' : '发送' }}
+            {{ isSending ? (isRetryMode ? '生成中...' : '发送中...') : isRetryMode ? '确认重新生成' : '发送' }}
           </button>
         </div>
       </div>
@@ -430,10 +437,12 @@ const appendChoiceToCurrentPage = (text: string) => {
 const customOptionText = ref('');
 const customPlaceholder = '输入你的选择…';
 const showCustomInputPanel = ref(false);
+const isRetryMode = ref(false); // 是否为重新生成模式
 
 // 打开自定义输入面板
 const openCustomInputPanel = () => {
   if (isSending.value) return;
+  isRetryMode.value = false;
   showCustomInputPanel.value = true;
   nextTick(() => {
     const input = document.querySelector('.custom-input-panel textarea') as HTMLTextAreaElement;
@@ -447,14 +456,28 @@ const openCustomInputPanel = () => {
 const closeCustomInputPanel = () => {
   showCustomInputPanel.value = false;
   customOptionText.value = '';
+  isRetryMode.value = false;
 };
 const submitCustomOption = async () => {
   console.log('🎯 submitCustomOption 被调用');
   const text = customOptionText.value.trim();
-  console.log('📝 输入文本:', text, 'isSending:', isSending.value);
+  console.log('📝 输入文本:', text, 'isSending:', isSending.value, 'isRetryMode:', isRetryMode.value);
   if (!text || isSending.value) return;
 
-  // 检查体力限制
+  // 如果是重新生成模式，执行重新生成逻辑
+  if (isRetryMode.value) {
+    // 更新用户输入
+    lastUserInput.value = text;
+
+    // 关闭输入面板
+    closeCustomInputPanel();
+
+    // 执行实际的重新生成逻辑
+    await performRetryAIGeneration();
+    return;
+  }
+
+  // 普通模式：检查体力限制
   if (AttributeChangeParseService.isStaminaTooLow(displayCharacter.value.stamina)) {
     console.log('⚠️ 体力过低，无法继续调教');
     toastRef.value?.warning(`${props.character.name} 体力过低，无法继续调教！`);
@@ -1128,9 +1151,39 @@ const applyPendingAttributeChanges = async () => {
   }
 };
 
-// 重试AI生成
-const retryAIGeneration = async () => {
-  console.log('🔄 用户点击重试按钮，重新生成AI回复');
+// 打开重新生成对话框（使用自定义输入面板）
+const openRetryDialog = async () => {
+  if (isSending.value) return;
+
+  console.log('🔄 打开重新生成对话框');
+
+  // 尝试从数据库加载暂存的对话对，获取之前的用户输入
+  const dbPendingPair = await TrainingRecordManager.getPendingDialoguePair(props.character.name);
+  if (dbPendingPair?.userInput) {
+    customOptionText.value = dbPendingPair.userInput;
+  } else if (lastUserInput.value) {
+    // 如果没有暂存的对话对，使用内存中的用户输入
+    customOptionText.value = lastUserInput.value;
+  } else {
+    // 如果没有之前的输入，使用空字符串
+    customOptionText.value = '';
+  }
+
+  isRetryMode.value = true;
+  showCustomInputPanel.value = true;
+  await nextTick();
+  // 聚焦到输入框
+  const input = document.querySelector('.custom-input-panel textarea') as HTMLTextAreaElement;
+  if (input) {
+    input.focus();
+    // 将光标移动到末尾
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+};
+
+// 执行实际的重新生成逻辑
+const performRetryAIGeneration = async () => {
+  console.log('🔄 开始重新生成AI回复');
 
   // 清除暂存的AI回复和属性变化（包括数据库）
   currentDialoguePair.value = null;
@@ -1154,6 +1207,52 @@ const retryAIGeneration = async () => {
   // 清空上次生成的选项
   options.value = [];
   saveCurrentOptions(); // 清除保存的选项
+
+  // 更新最后一条用户消息的内容（如果用户修改了输入）
+  const lastUserIndex = messages.value.findLastIndex(msg => msg.role === 'user');
+  if (lastUserIndex >= 0) {
+    messages.value[lastUserIndex].content = lastUserInput.value;
+    console.log('🔄 已更新最后一条用户消息:', lastUserInput.value);
+  }
+
+  // 先更新页面中显示的用户选择内容（在删除页面之前）
+  // 找到包含用户选择的页面并更新
+  let pageToUpdate = -1;
+  // 首先尝试找到最后生成的页面（如果它包含用户选择）
+  if (lastGeneratedPageIndex.value >= 0 && lastGeneratedPageIndex.value < pages.value.length) {
+    const page = pages.value[lastGeneratedPageIndex.value];
+    if (page.html && page.html.includes('choice-line')) {
+      pageToUpdate = lastGeneratedPageIndex.value;
+    }
+  }
+
+  // 如果最后生成的页面不包含用户选择，从后往前找第一个包含 choice-line 的页面
+  if (pageToUpdate < 0) {
+    for (let i = pages.value.length - 1; i >= 0; i--) {
+      const page = pages.value[i];
+      if (page.html && page.html.includes('choice-line')) {
+        pageToUpdate = i;
+        break;
+      }
+    }
+  }
+
+  // 更新找到的页面中的用户选择内容
+  if (pageToUpdate >= 0) {
+    const page = pages.value[pageToUpdate];
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = page.html;
+
+    // 查找并更新用户选择部分
+    const choiceLine = tempDiv.querySelector('.choice-line');
+    if (choiceLine) {
+      // 替换 choice-line 的内容
+      choiceLine.innerHTML = `<span class="choice-prefix">→</span> ${safeFormatMessage(lastUserInput.value)}`;
+      // 更新页面HTML
+      page.html = tempDiv.innerHTML;
+      console.log('🔄 已更新页面中的用户选择内容（页面索引:', pageToUpdate, '）:', lastUserInput.value);
+    }
+  }
 
   // 通知父组件恢复到上一次生成前的状态（不触发自动调教）
   emit('update-character', characterToRestore, false);
@@ -1191,8 +1290,13 @@ const retryAIGeneration = async () => {
   currentStreamingPageIndex.value = -1;
   lastGeneratedPageIndex.value = -1;
 
-  // 重新生成（会使用 originalCharacter 作为基准）
+  // 重新生成（会使用 originalCharacter 作为基准，使用更新后的 lastUserInput.value）
   await generateAndHandleAIReply();
+};
+
+// 重试AI生成（打开对话框）
+const retryAIGeneration = async () => {
+  await openRetryDialog();
 };
 
 // 将用户输入和AI回复作为一对保存到世界书
@@ -1449,6 +1553,61 @@ const editCurrentPageMessage = () => {
     // 从 HTML 中提取纯文本，显示给用户编辑
     editingContent.value = extractTextFromHtml(currentPage.html);
   }
+};
+
+// 重新应用酒馆正则到当前页文本
+const reapplyTavernRegex = () => {
+  if (currentPageIndex.value < 0 || currentPageIndex.value >= pages.value.length) {
+    console.warn('当前页索引无效，无法重新应用酒馆正则');
+    return;
+  }
+
+  const currentPage = pages.value[currentPageIndex.value];
+  if (!currentPage || !currentPage.html) {
+    console.warn('当前页内容为空，无法重新应用酒馆正则');
+    return;
+  }
+
+  console.log('🔧 [重新应用酒馆正则] 开始处理当前页文本...');
+
+  // 从HTML中提取纯文本
+  const rawText = extractTextFromHtml(currentPage.html);
+  console.log('📝 [重新应用酒馆正则] 提取的原始文本长度:', rawText.length);
+
+  // 解析页面内容，分离用户选择部分和AI回复部分
+  // 页面结构：可能包含用户选择（choice-line）和AI回复内容
+  const tempDiv = document.createElement('div');
+  tempDiv.innerHTML = currentPage.html;
+
+  // 查找用户选择部分（choice-line）
+  const choiceLine = tempDiv.querySelector('.choice-line');
+  let userChoiceHtml = '';
+  let aiContentText = rawText;
+
+  if (choiceLine) {
+    // 提取用户选择的文本（去掉"→"前缀）
+    const choiceText = choiceLine.textContent?.replace(/^→\s*/, '').trim() || '';
+    userChoiceHtml = `<div class="choice-line"><span class="choice-prefix">→</span> ${safeFormatMessage(choiceText)}</div>`;
+
+    // 从总文本中移除用户选择部分
+    aiContentText = rawText.replace(/^→\s*.*?\n\n?/s, '').trim();
+  }
+
+  // 重新应用酒馆正则在AI回复部分
+  // 注意：safeFormatMessage 内部已经调用了 formatAsTavernRegexedString，所以不需要重复调用
+  // 但是我们需要先清理和过滤，然后让 safeFormatMessage 处理格式化
+  const cleanedContent = cleanAIContent(aiContentText);
+  const filteredContent = filterXmlTags(cleanedContent);
+
+  // 使用 safeFormatMessage 进行格式化（它会自动应用酒馆正则）
+  const formattedContent = safeFormatMessage(filteredContent);
+  console.log('🎨 [重新应用酒馆正则] 格式化后的内容长度:', formattedContent.length);
+
+  // 更新页面HTML（保留用户选择部分，更新AI回复部分）
+  const newHtml = userChoiceHtml ? `${userChoiceHtml}${formattedContent}` : formattedContent;
+  currentPage.html = newHtml;
+
+  console.log('✅ [重新应用酒馆正则] 已重新应用酒馆正则在当前页文本');
 };
 
 // 删除当前页消息
@@ -2349,6 +2508,7 @@ const handleImageError = (event: Event) => {
 .custom-input-footer {
   display: flex;
   justify-content: center;
+  gap: 12px;
   padding: 10px 20px 20px 20px;
   width: 100%;
   flex-shrink: 0;
