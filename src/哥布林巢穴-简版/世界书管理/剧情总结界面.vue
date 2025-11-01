@@ -1,6 +1,6 @@
 <template>
   <div v-if="show" class="story-summary-modal">
-    <div class="modal-overlay" @click="$emit('close')">
+    <div class="modal-overlay">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h2 class="modal-title">📚 剧情总结</h2>
@@ -118,6 +118,7 @@
       :title="confirmModalTitle"
       :info-text="confirmModalInfo"
       :content="confirmModalContent"
+      info-type="warning"
       @confirm="handleConfirmSummary"
       @cancel="handleCancelSummary"
     />
@@ -164,6 +165,8 @@ const confirmModalContent = ref('');
 const pendingSummaries = ref<
   Map<number, { summary: string; incremental: boolean; entryName: string; entryType: string }>
 >(new Map());
+// 存储被禁用的条目UID，用于取消时恢复
+const disabledEntryUids = ref<number[]>([]);
 
 // 是否有任何条目
 const hasAnyEntries = computed(() => {
@@ -351,7 +354,7 @@ async function handleSummarize() {
     // 只传一个条目类型
     const entryTypes = [selectedEntryType.value];
 
-    // 生成总结（不直接更新世界书）
+    // 生成总结（不直接更新世界书，但会禁用相关条目）
     const summaries = await StorySummaryManager.generateSummaries(
       WORLDBOOK_NAME,
       entryTypes,
@@ -361,8 +364,20 @@ async function handleSummarize() {
 
     if (summaries.size === 0) {
       toastRef.value?.warning('没有可总结的内容');
+      // 如果没有生成总结，可能需要恢复被禁用的条目
+      if (disabledEntryUids.value.length > 0) {
+        try {
+          await StorySummaryManager.restoreDisabledEntries(WORLDBOOK_NAME, disabledEntryUids.value);
+          disabledEntryUids.value = [];
+        } catch (error) {
+          console.error('恢复禁用条目失败:', error);
+        }
+      }
       return;
     }
+
+    // 保存被禁用的条目UID（用于取消时恢复）
+    disabledEntryUids.value = Array.from(summaries.keys());
 
     // 只有一个条目，简化显示
     const firstSummary = summaries.values().next().value;
@@ -370,11 +385,21 @@ async function handleSummarize() {
       // 保存待确认的总结
       pendingSummaries.value = summaries;
 
-      // 显示确认弹窗（直接显示内容，不需要标记）
-      confirmModalTitle.value = `AI 总结完成 - ${firstSummary.entryName}`;
-      confirmModalInfo.value = 'AI 已生成总结内容，请检查并编辑后确认更新到世界书';
-      confirmModalContent.value = firstSummary.summary;
-      showConfirmModal.value = true;
+      // 先显示强烈的警告提示
+      toastRef.value?.warning(
+        '⚠️ AI 总结已生成！请仔细检查输出内容，清理可能存在的多余思维链、重复内容或无关信息，确认无误后再应用！',
+        { duration: 5000 },
+      );
+
+      // 延迟一小段时间后再显示确认弹窗，让用户看到警告
+      setTimeout(() => {
+        // 显示确认弹窗（直接显示内容，不需要标记）
+        confirmModalTitle.value = `⚠️ 请仔细检查 - ${firstSummary.entryName}`;
+        confirmModalInfo.value =
+          '⚠️ 强烈建议：请仔细检查AI生成的总结，清理多余的思维链、重复段落或无关内容。确认内容准确无误后再点击"确认并更新"！';
+        confirmModalContent.value = firstSummary.summary;
+        showConfirmModal.value = true;
+      }, 500);
     }
   } catch (error) {
     console.error('总结失败:', error);
@@ -408,18 +433,19 @@ async function handleConfirmSummary(content: string) {
       incremental: originalData.incremental,
     });
 
-    // 应用总结到世界书
+    // 应用总结到世界书（应用总结时会自动启用条目）
     await StorySummaryManager.applySummaries(WORLDBOOK_NAME, finalSummaries);
+
+    // 清除禁用条目记录（已应用总结，条目会被设置为启用）
+    disabledEntryUids.value = [];
 
     toastRef.value?.success('剧情总结已更新到世界书！');
 
     showConfirmModal.value = false;
     pendingSummaries.value = new Map();
 
-    // 关闭对话框
-    setTimeout(() => {
-      emit('close');
-    }, 1500);
+    // 重新加载条目统计，以便用户可以继续总结其他条目
+    await loadEntriesStats();
   } catch (error) {
     console.error('应用总结失败:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -431,10 +457,22 @@ async function handleConfirmSummary(content: string) {
 }
 
 // 取消总结
-function handleCancelSummary() {
+async function handleCancelSummary() {
+  try {
+    // 恢复被禁用的条目
+    if (disabledEntryUids.value.length > 0) {
+      await StorySummaryManager.restoreDisabledEntries(WORLDBOOK_NAME, disabledEntryUids.value);
+      console.log(`✅ 已恢复 ${disabledEntryUids.value.length} 个条目的启用状态`);
+      disabledEntryUids.value = [];
+    }
+  } catch (error) {
+    console.error('恢复禁用条目失败:', error);
+    toastRef.value?.error('恢复条目状态失败，请手动检查世界书');
+  }
+
   showConfirmModal.value = false;
   pendingSummaries.value = new Map();
-  toastRef.value?.info('已取消总结');
+  toastRef.value?.info('已取消总结，相关条目已恢复启用状态');
 }
 
 // 监听show变化，当对话框打开时重新加载条目统计

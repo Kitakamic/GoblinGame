@@ -1,6 +1,6 @@
 <template>
   <teleport :to="teleportTarget">
-    <div v-if="show" class="confirm-modal-overlay" @click.self="handleCancel">
+    <div v-if="show" class="confirm-modal-overlay">
       <div class="confirm-modal-content">
         <div class="confirm-modal-header">
           <h3 class="confirm-modal-title">{{ title }}</h3>
@@ -8,7 +8,7 @@
         </div>
 
         <div class="confirm-modal-body">
-          <div class="info-section">
+          <div class="info-section" :class="{ 'warning-section': props.infoType === 'warning' }">
             <p class="info-text">{{ infoText }}</p>
           </div>
 
@@ -50,6 +50,7 @@ const props = defineProps<{
   title?: string;
   infoText?: string;
   content: string;
+  infoType?: 'default' | 'warning'; // 添加类型控制
 }>();
 
 const emit = defineEmits<{
@@ -212,6 +213,36 @@ defineExpose({
     inset 0 1px 0 rgba(255, 200, 150, 0.08),
     0 2px 8px rgba(0, 0, 0, 0.3);
   margin-bottom: 20px;
+
+  &.warning-section {
+    background: linear-gradient(180deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.2));
+    border: 2px solid rgba(251, 191, 36, 0.5);
+    border-left: 6px solid rgba(251, 191, 36, 0.9);
+    box-shadow:
+      inset 0 1px 0 rgba(251, 191, 36, 0.2),
+      0 4px 12px rgba(245, 158, 11, 0.3);
+    animation: pulse-warning 2s ease-in-out infinite;
+
+    .info-text {
+      color: #fef3c7;
+      font-weight: 600;
+      font-size: 15px;
+    }
+  }
+}
+
+@keyframes pulse-warning {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(251, 191, 36, 0.2),
+      0 4px 12px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(251, 191, 36, 0.3),
+      0 6px 16px rgba(245, 158, 11, 0.5);
+  }
 }
 
 .info-text {

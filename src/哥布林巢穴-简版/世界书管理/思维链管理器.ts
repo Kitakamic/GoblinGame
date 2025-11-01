@@ -22,6 +22,8 @@ export enum ChainOfThoughtMode {
   CHARACTER_TRAINING = 'character_training',
   /** 随机事件模式 */
   RANDOM_EVENT = 'random_event',
+  /** 剧情总结模式 */
+  STORY_SUMMARY = 'story_summary',
 }
 
 /**
@@ -168,6 +170,26 @@ export class ChainOfThoughtManager {
   }
 
   /**
+   * 剧情总结模式思维链
+   */
+  static getStorySummaryChain(): string {
+    return `[Chain of thought]
+在正式创作正文前，需要进行以下思考
+思考内容需要使用<think> </think>包裹，正文紧跟在</think>后
+<think>
+- 当前模式为剧情总结模式
+- 需要总结的是什么类型的内容？（据点征服记录/游戏事件记录/人物剧情记录）
+- 是否已有之前的总结，可否参考？是否只需要总结新的内容？
+- 总结的具体格式要求为何？
+- 总结是否可以时间作为主干，事件作为分支，进行梳理？
+- 总结是否涉及重要人物的俘虏信息？是否需要特别强调？
+- 最后确认：总结是否准确概括了原始内容的核心，是否避免了冗杂？
+</think>
+[/Chain of thought]
+`;
+  }
+
+  /**
    * 获取指定模式的思维链
    */
   static getChain(mode: ChainOfThoughtMode): string {
@@ -184,6 +206,8 @@ export class ChainOfThoughtManager {
         return this.getCharacterTrainingChain();
       case ChainOfThoughtMode.RANDOM_EVENT:
         return this.getRandomEventChain();
+      case ChainOfThoughtMode.STORY_SUMMARY:
+        return this.getStorySummaryChain();
       default:
         return '';
     }
@@ -200,6 +224,7 @@ export class ChainOfThoughtManager {
       [ChainOfThoughtMode.BATTLE_SUMMARY]: '战斗总结思维链',
       [ChainOfThoughtMode.CHARACTER_TRAINING]: '人物调教思维链',
       [ChainOfThoughtMode.RANDOM_EVENT]: '随机事件思维链',
+      [ChainOfThoughtMode.STORY_SUMMARY]: '剧情总结思维链',
     };
     return modeNames[mode] || '未知模式思维链';
   }

@@ -347,7 +347,7 @@ const enableAutoSave = () => {
     clearInterval(autoSaveTimer);
   }
 
-  // 每30秒自动保存一次
+  // 每5分钟自动保存一次
   autoSaveTimer = setInterval(async () => {
     try {
       if (isSaveSystemInitialized.value) {
@@ -357,7 +357,7 @@ const enableAutoSave = () => {
     } catch (error) {
       console.error('自动保存失败:', error);
     }
-  }, 30000);
+  }, 300000); // 5分钟 = 5 * 60 * 1000 = 300000毫秒
 };
 
 // 禁用自动保存

@@ -6,6 +6,9 @@
 
 import { computed, ref } from 'vue';
 import { WorldbookService } from '../世界书管理/世界书服务';
+import { GameEventLorebookManager } from '../世界书管理/冒头事件管理器';
+import { ConquestRecordManager } from '../世界书管理/据点征服管理器';
+import type { Location } from '../探索/类型/探索类型';
 import { databaseService } from './数据库服务';
 import type {
   BaseResources,
@@ -1072,6 +1075,35 @@ export class ModularSaveManager {
           await window.TavernHelper.createWorldbook(defaultWorldbookName, []);
           await window.TavernHelper.replaceWorldbook(defaultWorldbookName, worldbookData);
           console.log(`已从数据库恢复 ${worldbookData.length} 个世界书条目到默认世界书`);
+        }
+
+        // 【旧存档兼容性处理】检查并合并重复的"游戏事件记录"条目
+        try {
+          const merged = await GameEventLorebookManager.mergeDuplicateEventStoryEntries(defaultWorldbookName);
+          if (merged) {
+            console.log('✅ [旧存档兼容] 已合并重复的游戏事件记录条目');
+          }
+        } catch (mergeError) {
+          console.warn('⚠️ [旧存档兼容] 合并重复的游戏事件记录条目时出错（不影响存档加载）:', mergeError);
+        }
+
+        // 【旧存档兼容性处理】修复据点征服记录中的无效英雄信息
+        try {
+          // 获取存档中的据点列表，用于修复英雄信息
+          const explorationData = this.getModuleData<{
+            locations: Location[];
+          }>({ moduleName: 'exploration' });
+          const savedLocations = explorationData?.locations || [];
+
+          const fixed = await ConquestRecordManager.fixInvalidHeroesInConquestRecords(
+            defaultWorldbookName,
+            savedLocations,
+          );
+          if (fixed) {
+            console.log('✅ [旧存档兼容] 已修复据点征服记录中的无效英雄信息');
+          }
+        } catch (fixError) {
+          console.warn('⚠️ [旧存档兼容] 修复据点征服记录中的英雄信息时出错（不影响存档加载）:', fixError);
         }
       } else {
         console.log(`存档 ${saveId} 没有世界书数据，清空默认世界书`);

@@ -329,7 +329,9 @@ export class AILocationGenerationService {
         const region = continent?.regions.find(r => r.name === regionName);
 
         if (continent && region) {
-          const minDifficulty = continent.difficulty;
+          // 提高下限，让不同区域做出区分
+          // 最小难度 = 大陆难度 + 区域难度的一半（向下取整），确保不同区域有区分度
+          const minDifficulty = continent.difficulty + Math.floor(region.difficulty / 2);
           const maxDifficulty = continent.difficulty + region.difficulty;
           finalPrompt = finalPrompt.replace('{星级难度，1-10的数字}', `{${minDifficulty}-${maxDifficulty}}`);
           finalPrompt += `\n# 区域难度信息：当前区域的难度范围应在 ${minDifficulty}-${maxDifficulty} 星之间`;

@@ -1,16 +1,20 @@
 import { databaseService } from '../存档管理/数据库服务';
 import { WorldbookHelper } from './世界书助手';
 import type { HistoryRecord, WorldbookEntry } from './世界书类型定义';
+import { ChainOfThoughtManager, ChainOfThoughtMode } from './思维链管理器';
 import { TrainingRecordManager } from './调教记录管理器';
 
 /**
  * 计算文本的粗略token数量（英文约1:1，中文约1:2）
+ * 注：为了更接近实际情况，最终结果除以2.5进行调整
  */
 function estimateTokens(text: string): number {
   // 简单估算：英文单词每个约1token，中文每个字符约2tokens
   const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
   const nonChineseChars = text.length - chineseChars;
-  return Math.ceil(chineseChars * 2 + nonChineseChars * 0.5);
+  const rawEstimate = chineseChars * 2 + nonChineseChars * 0.5;
+  // 除以2.1调整，更接近实际token消耗
+  return Math.ceil(rawEstimate / 2.1);
 }
 
 /**
@@ -74,15 +78,15 @@ export class StorySummaryManager {
 
       // 如果是增量总结，提取旧summary作为上下文，但标注只总结新数据
       let contextualSummary = '';
-      if (incremental && (content.includes('<summary>') || /<summary_\d+>/.test(content))) {
-        // 提取所有旧的summary作为上下文，用空行分隔
-        const summaryMatches = content.matchAll(/<summary(?:_(\d+))?>([\s\S]*?)<\/summary(?:_\1)?>/g);
+      if (incremental && /<summary_\d+>/.test(content)) {
+        // 提取所有旧的summary作为上下文，用空行分隔（只支持新格式<summary_N>）
+        const summaryMatches = content.matchAll(/<summary_(\d+)>([\s\S]*?)<\/summary_\1>/g);
         for (const match of summaryMatches) {
           contextualSummary += match[2].trim() + '\n\n';
         }
 
-        // 提取新数据部分
-        content = content.replace(/<summary(?:_\d+)?>[\s\S]*?<\/summary(?:_\d+)?>\n*/g, '').trim();
+        // 提取新数据部分（移除所有summary_N标签）
+        content = content.replace(/<summary_\d+>[\s\S]*?<\/summary_\d+>\n*/g, '').trim();
         console.log(`📝 增量总结: ${entryName} (提取新数据部分，已保留旧总结作为上下文)`);
 
         if (!content) {
@@ -125,7 +129,7 @@ ${basePrompt}`;
       // 直接调用AI生成总结，不创建消息
       const aiResponse = await window.TavernHelper.generate({
         user_input: prompt,
-        should_stream: true, // 启用流式传输
+        should_stream: false, // 禁用流式传输
       });
 
       // 检查AI回复是否为空或无效
@@ -173,10 +177,7 @@ ${content}
 - 简洁但要包含核心信息
 
 ### 3. **输出格式**
-直接输出总结性的段落描述，不需要序号或标签。
-
-**示例格式：**
-哥布林巢穴在[某个时期]开始对外扩张，首先征服了[地点]的[据点类型]。随后，攻势向[方向]推进，占领了[地点]的[据点类型]。在征服过程中，俘获了[人物名称]，[她的身份背景]。[继续描述其他重要的征服活动]...
+以时间为主干的编年体，直接输出总结性的段落描述
 
 ### 4. **关键要求**
 - **用连贯的段落形式**描述征服历史
@@ -203,14 +204,12 @@ ${content}
 采用**第三人称叙述者视角**，语言要：
 - **中立客观**，类似新闻报道或历史记录
 - **生动真实**，符合奇幻冒险色情游戏的风格
-- **叙事性强**，能够吸引读者
-- **保持戏剧性和紧张感**
 
 ### 2. **总结目标**
 - 将零散的事件整合成**连贯的叙事段落**
 - 展现事件之间的**时间脉络和因果关联**
 - 突出事件的**重要性和世界影响**
-- 保留关键的**人物、地点、情节细节**
+- 保留关键的细节
 
 ### 3. **内容要求**
 - 从**全局视角**描述事件对世界的影响
@@ -219,18 +218,16 @@ ${content}
 - 语言要**庄重史诗**，符合重要历史事件的感觉
 
 ### 4. **输出格式**
-直接输出叙事性的段落描述，不要序号或列表。
-
-**示例格式：**
-...[以连贯的叙事方式描述事件的经过]...
+章节体，直接输出叙事性的段落描述
 
 ### 5. **关键要求**
-- **用第三人称叙事的段落形式**，像新闻报道或历史记录
+- 风格类似编年史
 - **保持叙述的连贯性和流畅性**
 - **体现事件的世界性影响和重要性**
 - **展现多方势力的反应和互动**
 - **字数控制在400-800字，根据事件多少调整**
 - **仅输出叙事性描述，禁止输出任何分析过程或额外评论**
+- 每次总结只总结为一章最新章节，不加入序号，只列标题
 
 现在开始处理，直接输出叙事性描述：`;
   }
@@ -313,9 +310,8 @@ ${content}
       const entryType = entry.extra?.entry_type || 'unknown';
       const entryName = entry.name || 'unnamed';
 
-      // 判断是否为增量总结（检查是否有任何format的summary）
-      const hasSummary =
-        !!entry.content && (entry.content.includes('<summary>') || /<summary_\d+>/.test(entry.content));
+      // 判断是否为增量总结（检查是否有新格式的summary_N）
+      const hasSummary = !!entry.content && /<summary_\d+>/.test(entry.content);
 
       console.log(
         `📄 [${i + 1}/${entries.length}] 处理条目: ${entryName}, 类型: ${entryType}, UID: ${entry.uid}, 增量: ${hasSummary}`,
@@ -379,15 +375,12 @@ ${content}
       const entriesNeedingSummary: WorldbookEntry[] = []; // 完全没有summary的条目
 
       filteredEntries.forEach(entry => {
-        // 检查是否有summary（包括旧格式<summary>和新格式<summary_N>）
-        const hasSummary =
-          entry.content && (entry.content.includes('<summary>') || /<summary_\d+>/.test(entry.content));
+        // 检查是否有summary（只支持新格式<summary_N>）
+        const hasSummary = entry.content && /<summary_\d+>/.test(entry.content);
 
         if (hasSummary) {
           // 检查是否有原始数据（所有summary之外的内容）
-          const contentAfterSummaries = entry.content
-            .replace(/<summary(?:_\d+)?>[\s\S]*?<\/summary(?:_\d+)?>\n*/g, '')
-            .trim();
+          const contentAfterSummaries = entry.content.replace(/<summary_\d+>[\s\S]*?<\/summary_\d+>\n*/g, '').trim();
 
           if (contentAfterSummaries.length > 0) {
             // 已有summary但有新数据，需要增量总结
@@ -434,7 +427,7 @@ ${content}
         if (toastRef) {
           // 检查是否有已总结的条目被跳过
           const totalEntries = entryTypes.length > 0 ? this.filterEntriesByType(entries, entryTypes) : entries;
-          const summarizedCount = totalEntries.filter(e => e.content && e.content.includes('<summary>')).length;
+          const summarizedCount = totalEntries.filter(e => e.content && /<summary_\d+>/.test(e.content)).length;
 
           if (summarizedCount > 0) {
             toastRef.warning(`所有符合条件的条目都已被总结过了（共${summarizedCount}个）`);
@@ -446,6 +439,44 @@ ${content}
       }
 
       console.log('📝 开始生成摘要...');
+
+      // 生成总结前，先禁用相关条目避免重复信息（不包括思维链，思维链会切换到总结模式）
+      console.log(`🔒 生成总结前，禁用 ${filteredEntries.length} 个相关条目以避免重复信息...`);
+      const worldbook = await this.getWorldbookEntries(worldbookName);
+      const entryUidsToDisable = new Set(filteredEntries.map(e => e.uid));
+      let disabledCount = 0;
+
+      // 保存思维链的原始模式，以便后续恢复
+      let originalChainMode: ChainOfThoughtMode | null = null;
+      const chainEntry = worldbook.find(
+        entry => entry.extra?.entry_type === 'chain_of_thought' || entry.uid === 999999999,
+      );
+      if (chainEntry?.extra?.mode) {
+        originalChainMode = chainEntry.extra.mode as ChainOfThoughtMode;
+      }
+
+      for (let i = 0; i < worldbook.length; i++) {
+        const entry = worldbook[i];
+        // 禁用需要总结的条目（不包括思维链）
+        if (entryUidsToDisable.has(entry.uid)) {
+          // 保存原始启用状态，以便取消时恢复
+          if (!entry.extra) {
+            entry.extra = {};
+          }
+          entry.extra._original_enabled = entry.enabled ?? true;
+          entry.enabled = false;
+          disabledCount++;
+        }
+      }
+
+      if (disabledCount > 0) {
+        await WorldbookHelper.replace(worldbookName, worldbook);
+        console.log(`✅ 已禁用 ${disabledCount} 个条目`);
+      }
+
+      // 切换到总结模式的思维链
+      await ChainOfThoughtManager.addChainToWorldbook(worldbookName, ChainOfThoughtMode.STORY_SUMMARY);
+      console.log('🔄 已切换到剧情总结思维链模式');
 
       // 为每个条目生成总结（使用AI）
       // 注意：不在这里保存调教记录，而是在确认总结时再保存（确保使用正确的存档ID）
@@ -598,16 +629,14 @@ ${content}
 
           // 清理AI返回内容中可能包含的summary标签，避免嵌套或连续的summary
           let summaryContent = summaryContentRaw;
-          if (summaryContent.includes('<summary>') || /<summary_\d+>/.test(summaryContent)) {
-            // 移除所有summary标签（包括旧格式<summary>和新格式<summary_X>），只保留标签内的内容
+          if (/<summary_\d+>/.test(summaryContent)) {
+            // 移除所有summary_N标签，只保留标签内的内容
             // 需要递归处理，因为可能有嵌套的summary标签
             let previousContent = '';
             while (previousContent !== summaryContent) {
               previousContent = summaryContent;
-              // 先处理带数字的格式 <summary_X>...</summary_X>（需要匹配数字）
+              // 处理新格式 <summary_N>...</summary_N>（需要匹配数字）
               summaryContent = summaryContent.replace(/<summary_(\d+)>([\s\S]*?)<\/summary_\1>/g, '$2');
-              // 再处理旧格式 <summary>...</summary>
-              summaryContent = summaryContent.replace(/<summary>([\s\S]*?)<\/summary>/g, '$1');
             }
             summaryContent = summaryContent.trim();
             console.log('🧹 清理了AI返回内容中的summary标签');
@@ -622,10 +651,11 @@ ${content}
           let newContent = '';
 
           if (incremental) {
-            // 增量总结：寻找已有的summary序号，新增下一个序号
-            const summaryMatches = entry.content.matchAll(/<summary_(\d+)>([\s\S]*?)<\/summary_\1>/g);
+            // 增量总结：寻找已有的summary序号，新增下一个序号（只支持新格式<summary_N>）
             const existingSummaries: Array<{ index: number; content: string; innerContent: string }> = [];
 
+            // 查找新格式的 summary_N
+            const summaryMatches = entry.content.matchAll(/<summary_(\d+)>([\s\S]*?)<\/summary_\1>/g);
             for (const match of summaryMatches) {
               const innerContent = match[2].trim(); // 标签内的实际内容
               // 只保留非空的summary标签，过滤掉空内容的summary
@@ -686,6 +716,69 @@ ${content}
       console.error('应用总结失败:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`应用总结失败: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * 恢复被禁用的世界书条目（用于取消总结时）
+   * @param worldbookName 世界书名称
+   * @param entryUids 要恢复的条目UID列表
+   */
+  static async restoreDisabledEntries(worldbookName: string, entryUids: number[]): Promise<void> {
+    try {
+      const worldbook = await WorldbookHelper.get(worldbookName);
+      let restoredCount = 0;
+
+      for (let i = 0; i < worldbook.length; i++) {
+        const entry = worldbook[i];
+        // 恢复指定的总结条目
+        if (entryUids.includes(entry.uid)) {
+          // 恢复原始启用状态
+          const originalEnabled = entry.extra?._original_enabled ?? true;
+          entry.enabled = originalEnabled;
+
+          // 清除临时存储的原始状态
+          if (entry.extra && '_original_enabled' in entry.extra) {
+            delete entry.extra._original_enabled;
+          }
+
+          restoredCount++;
+        }
+        // 同时恢复思维链条目（检查是否有保存的原始状态）
+        else if (
+          (entry.extra?.entry_type === 'chain_of_thought' || entry.uid === 999999999) &&
+          entry.extra &&
+          '_original_enabled' in entry.extra
+        ) {
+          // 恢复原始启用状态
+          const originalEnabled = entry.extra._original_enabled ?? true;
+          entry.enabled = originalEnabled;
+
+          // 清除临时存储的原始状态
+          delete entry.extra._original_enabled;
+
+          restoredCount++;
+        }
+      }
+
+      if (restoredCount > 0) {
+        await WorldbookHelper.replace(worldbookName, worldbook);
+        // 检查是否恢复了思维链
+        const chainRestored = worldbook.some(
+          e =>
+            (e.extra?.entry_type === 'chain_of_thought' || e.uid === 999999999) &&
+            !('_original_enabled' in (e.extra || {})) &&
+            e.enabled === true,
+        );
+        const messages = [`✅ 已恢复 ${restoredCount} 个条目的启用状态`];
+        if (chainRestored) {
+          messages.push('（包含思维链）');
+        }
+        console.log(messages.join(' '));
+      }
+    } catch (error) {
+      console.error('恢复禁用条目失败:', error);
+      throw error;
     }
   }
 
