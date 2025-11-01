@@ -255,6 +255,9 @@ const exportSingleSave = async (slot: number) => {
       isInitialized.value = true;
     }
 
+    // 显示加载提示
+    toast.info('正在准备导出数据...');
+
     const saveData = await modularSaveManager.exportSave(slot);
     if (!saveData) {
       toast.error('导出存档失败');
@@ -267,10 +270,22 @@ const exportSingleSave = async (slot: number) => {
     const a = document.createElement('a');
     a.href = url;
     a.download = `哥布林巢穴-存档${slot}-${new Date().toISOString().slice(0, 10)}.json`;
+
+    // 设置下载属性以提升兼容性
+    a.setAttribute('download', `哥布林巢穴-存档${slot}-${new Date().toISOString().slice(0, 10)}.json`);
+
     document.body.appendChild(a);
+
+    // 在手机浏览器中，延迟一下确保元素已添加到DOM
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    // 延迟清理，确保下载已开始
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
 
     toast.success('存档导出成功');
   } catch (error) {
@@ -286,6 +301,9 @@ const exportAllSaves = async () => {
       await modularSaveManager.init();
       isInitialized.value = true;
     }
+
+    // 显示加载提示
+    toast.info('正在准备导出数据...');
 
     // 获取所有有存档的槽位
     const allSlots = await modularSaveManager.getAllSlots();
@@ -326,10 +344,22 @@ const exportAllSaves = async () => {
     const a = document.createElement('a');
     a.href = url;
     a.download = `哥布林巢穴-全部存档-${new Date().toISOString().slice(0, 10)}.json`;
+
+    // 设置下载属性以提升兼容性
+    a.setAttribute('download', `哥布林巢穴-全部存档-${new Date().toISOString().slice(0, 10)}.json`);
+
     document.body.appendChild(a);
+
+    // 在手机浏览器中，延迟一下确保元素已添加到DOM
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
+    // 延迟清理，确保下载已开始
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
 
     toast.success(`成功导出 ${saveDataList.length} 个存档`);
   } catch (error) {

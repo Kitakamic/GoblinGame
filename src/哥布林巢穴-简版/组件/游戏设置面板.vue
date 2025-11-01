@@ -133,13 +133,14 @@
             <button class="tutorial-button" @click="openTutorial">📖 查看教程（强烈建议先看教程）</button>
           </div>
 
-          <div class="setting-item">
+          <!-- 暂时关闭清除缓存功能 -->
+          <!-- <div class="setting-item">
             <label class="setting-label">
               <span class="label-text">更新与刷新</span>
               <span class="label-desc">如果遇到缓存问题，可以强制清除缓存并刷新页面以获取最新版本</span>
             </label>
             <button class="update-button" @click="forceRefresh">🔄 清除缓存并刷新</button>
-          </div>
+          </div> -->
         </div>
       </div>
     </div>

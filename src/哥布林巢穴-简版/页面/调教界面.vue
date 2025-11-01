@@ -167,8 +167,8 @@
               <label>应用到哪个头像:</label>
               <select v-model="selectedAvatarField" class="avatar-field-select">
                 <option value="avatar">正常状态头像</option>
-                <option value="corruptedAvatar">半堕落头像 (loyalty≥50%)</option>
-                <option value="fullyCorruptedAvatar">完全堕落头像 (loyalty=100%)</option>
+                <option value="corruptedAvatar">半堕落头像</option>
+                <option value="fullyCorruptedAvatar">完全堕落头像</option>
               </select>
             </div>
 
@@ -232,7 +232,7 @@
               >
                 无法恢复：角色还没有保存初始头像值（首次打开时会自动保存）
               </div>
-              <div v-else class="reset-avatar-hint">恢复到首次编辑头像时保存的原始值</div>
+              <div v-else class="reset-avatar-hint">恢复到人物初始头像</div>
             </div>
           </div>
         </div>
@@ -1664,10 +1664,21 @@ const executeCharacter = async (character: Character) => {
   }
 };
 
+// 根据选择字段更新URL显示
+const updateAvatarUrlByField = () => {
+  if (!editingCharacter.value) return;
+
+  const field = selectedAvatarField.value;
+  const currentValue = (editingCharacter.value as any)[field] as string | undefined;
+  avatarUrl.value = currentValue || '';
+};
+
 // 编辑头像
 const editAvatar = async (character: Character) => {
   editingCharacter.value = character;
-  avatarUrl.value = character.avatar || '';
+  selectedAvatarField.value = 'avatar';
+  // 根据当前选择字段更新URL显示
+  updateAvatarUrlByField();
 
   // 如果原始头像字段还没有值，将当前头像值永久保存为原始值（首次打开时）
   let needsSave = false;
@@ -1695,11 +1706,15 @@ const editAvatar = async (character: Character) => {
 
   // 初始化文生图相关变量
   imagePrompt.value = '';
-  selectedAvatarField.value = 'avatar';
   isGeneratingImage.value = false;
   generatedImagePreview.value = '';
   showAvatarModal.value = true;
 };
+
+// 监听头像字段选择变化，自动更新URL显示
+watch(selectedAvatarField, () => {
+  updateAvatarUrlByField();
+});
 
 // 关闭头像弹窗
 const closeAvatarModal = () => {
@@ -1917,7 +1932,7 @@ const resetAvatarToOriginal = () => {
 
   const fieldName = field === 'avatar' ? '正常状态头像' : field === 'corruptedAvatar' ? '半堕落头像' : '完全堕落头像';
   const actionText = originalValue ? '已恢复' : '已清空';
-  toastRef.value?.success(`${actionText} ${fieldName}，恢复到首次编辑时的头像`, {
+  toastRef.value?.success(`${actionText} ${fieldName}，恢复到人物初始头像`, {
     title: '恢复成功',
     duration: 3000,
   });

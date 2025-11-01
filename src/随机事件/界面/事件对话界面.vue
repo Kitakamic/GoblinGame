@@ -168,6 +168,33 @@ const endEvent = () => {
   handleCloseEvent(); // 使用新的关闭处理逻辑
 };
 
+/**
+ * 删除HTML代码块
+ * 用于保存到世界书时清理AI回复中可能包含的HTML代码块
+ */
+const removeHtmlCodeBlocks = (content: string): string => {
+  let cleaned = content;
+
+  // 1. 删除 markdown 格式的 HTML 代码块：```html ... ```
+  cleaned = cleaned.replace(/```html\s*[\s\S]*?```/gi, '');
+  cleaned = cleaned.replace(/```HTML\s*[\s\S]*?```/gi, '');
+
+  // 2. 删除 markdown 格式的代码块（可能是HTML）：``` ... ```（如果内容看起来像HTML）
+  // 匹配包含 <html> 或 <!DOCTYPE html> 的代码块
+  cleaned = cleaned.replace(/```[\s\S]*?<html[\s\S]*?```/gi, '');
+  cleaned = cleaned.replace(/```[\s\S]*?<!DOCTYPE\s+html[\s\S]*?```/gi, '');
+
+  // 3. 删除独立的 <!DOCTYPE html> ... </html> 代码块（不在代码块中的）
+  cleaned = cleaned.replace(/<!DOCTYPE\s+html[\s\S]*?<\/html>/gi, '');
+
+  // 4. 清理多余的空白字符和换行
+  cleaned = cleaned
+    .replace(/\n{3,}/g, '\n\n') // 多个换行合并为两个
+    .trim();
+
+  return cleaned;
+};
+
 // 构建事件内容
 const buildEventContent = (): string => {
   if (!props.event) return '';
@@ -175,7 +202,15 @@ const buildEventContent = (): string => {
   // 只使用AI回复内容，不使用基础信息
   if (aiReplyContent.value && aiReplyContent.value.trim()) {
     console.log('使用AI回复内容作为事件内容:', aiReplyContent.value.substring(0, 100) + '...');
-    return aiReplyContent.value;
+
+    // 删除HTML代码块（防止AI回复中包含HTML代码被保存到世界书）
+    const cleanedContent = removeHtmlCodeBlocks(aiReplyContent.value);
+
+    if (cleanedContent !== aiReplyContent.value) {
+      console.log('🧹 已删除AI回复中的HTML代码块');
+    }
+
+    return cleanedContent;
   }
 
   // 如果没有AI回复内容，返回空字符串（不保存）
