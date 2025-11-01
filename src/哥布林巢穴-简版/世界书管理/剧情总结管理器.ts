@@ -466,10 +466,7 @@ ${content}
       return result;
     } catch (error) {
       console.error('总结生成失败:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (toastRef) {
-        toastRef.error(`总结生成失败: ${errorMessage}`);
-      }
+      // 不在这里显示 toast，让调用方处理用户提示
       throw error;
     }
   }
@@ -490,27 +487,57 @@ ${content}
       for (let i = 0; i < worldbook.length; i++) {
         const entry = worldbook[i];
         if (summaries.has(entry.uid)) {
-          const { summary: summaryContent, incremental } = summaries.get(entry.uid)!;
+          const { summary: summaryContentRaw, incremental } = summaries.get(entry.uid)!;
+
+          // 清理AI返回内容中可能包含的summary标签，避免嵌套或连续的summary
+          let summaryContent = summaryContentRaw;
+          if (summaryContent.includes('<summary>') || /<summary_\d+>/.test(summaryContent)) {
+            // 移除所有summary标签（包括旧格式<summary>和新格式<summary_X>），只保留标签内的内容
+            // 需要递归处理，因为可能有嵌套的summary标签
+            let previousContent = '';
+            while (previousContent !== summaryContent) {
+              previousContent = summaryContent;
+              // 先处理带数字的格式 <summary_X>...</summary_X>（需要匹配数字）
+              summaryContent = summaryContent.replace(/<summary_(\d+)>([\s\S]*?)<\/summary_\1>/g, '$2');
+              // 再处理旧格式 <summary>...</summary>
+              summaryContent = summaryContent.replace(/<summary>([\s\S]*?)<\/summary>/g, '$1');
+            }
+            summaryContent = summaryContent.trim();
+            console.log('🧹 清理了AI返回内容中的summary标签');
+          }
+
+          // 检查清理后的内容是否为空
+          if (!summaryContent || summaryContent.trim().length === 0) {
+            console.warn('⚠️ AI生成的总结内容为空，跳过保存');
+            continue; // 跳过这个条目，不保存空内容
+          }
 
           let newContent = '';
 
           if (incremental) {
             // 增量总结：寻找已有的summary序号，新增下一个序号
             const summaryMatches = entry.content.matchAll(/<summary_(\d+)>([\s\S]*?)<\/summary_\1>/g);
-            const existingSummaries: Array<{ index: number; content: string }> = [];
+            const existingSummaries: Array<{ index: number; content: string; innerContent: string }> = [];
 
             for (const match of summaryMatches) {
-              existingSummaries.push({
-                index: parseInt(match[1]),
-                content: match[0],
-              });
+              const innerContent = match[2].trim(); // 标签内的实际内容
+              // 只保留非空的summary标签，过滤掉空内容的summary
+              if (innerContent.length > 0) {
+                existingSummaries.push({
+                  index: parseInt(match[1]),
+                  content: match[0],
+                  innerContent,
+                });
+              } else {
+                console.warn(`⚠️ 发现空的summary_${match[1]}标签，已过滤`);
+              }
             }
 
             // 找到最大的序号
             const maxIndex = existingSummaries.length > 0 ? Math.max(...existingSummaries.map(s => s.index)) : 0;
             const nextIndex = maxIndex + 1;
 
-            // 组合所有summary
+            // 组合所有非空的summary
             const allSummaries = existingSummaries.map(s => s.content).join('\n\n');
             const newSummary = `<summary_${nextIndex}>\n${summaryContent}\n</summary_${nextIndex}>`;
 
@@ -520,7 +547,7 @@ ${content}
               newContent = newSummary;
             }
 
-            console.log(`📝 增量总结: 添加到summary_${nextIndex}`);
+            console.log(`📝 增量总结: 添加到summary_${nextIndex}（保留${existingSummaries.length}个已有summary）`);
           } else {
             // 首次总结：使用summary_1
             newContent = `<summary_1>\n${summaryContent}\n</summary_1>`;

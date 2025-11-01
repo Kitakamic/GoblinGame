@@ -74,6 +74,39 @@ class ParseErrorCollector {
  */
 export class LocationParser {
   private static errorCollector = new ParseErrorCollector();
+
+  /**
+   * 根据种族获取默认emoji头像
+   * 当图片资源匹配失败时使用此默认头像
+   */
+  private static getDefaultAvatarByRace(race: string): string {
+    const raceAvatars: Record<string, string> = {
+      人类: '👤',
+      狐族: '🦊',
+      永恒精灵: '🧝‍♀️',
+      黑暗精灵: '🧝‍♂️',
+      哥布林: '👺',
+      亡灵: '💀',
+      天使: '👼',
+      魔族: '😈',
+    };
+    return raceAvatars[race] || '👤';
+  }
+
+  /**
+   * 创建默认的pictureResource（当匹配失败时使用）
+   */
+  private static createDefaultPictureResource(race: string): any {
+    return {
+      id: 'default',
+      race: race,
+      class: '默认',
+      prompt: '',
+      imageUrl: this.getDefaultAvatarByRace(race),
+      generatedName: undefined,
+    };
+  }
+
   /**
    * 中文类型到英文类型的映射
    */
@@ -388,8 +421,12 @@ export class LocationParser {
           };
         } else {
           console.warn(
-            `🖼️ [JSON解析器] 据点 ${locationData.name} 未能匹配到合适的图片资源 (类型: ${englishType}, 种族: ${locationData.race})`,
+            `🖼️ [JSON解析器] 据点 ${locationData.name} 未能匹配到合适的图片资源 (类型: ${englishType}, 种族: ${locationData.race})，使用默认头像`,
           );
+          // 即使匹配失败，也要设置默认头像，确保人物至少有一个基于种族的头像
+          const defaultPictureResource = this.createDefaultPictureResource(locationData.race);
+          (location as any).pictureResource = defaultPictureResource;
+          console.log(`✅ [JSON解析器] 已为据点 ${locationData.name} 设置默认头像: ${defaultPictureResource.imageUrl}`);
         }
       }
 
@@ -648,7 +685,13 @@ export class LocationParser {
               };
             } else {
               console.warn(
-                `🖼️ [批量解析器] 据点 ${locationData.name} 未能匹配到合适的图片资源 (类型: ${englishType}, 种族: ${locationData.race})`,
+                `🖼️ [批量解析器] 据点 ${locationData.name} 未能匹配到合适的图片资源 (类型: ${englishType}, 种族: ${locationData.race})，使用默认头像`,
+              );
+              // 即使匹配失败，也要设置默认头像，确保人物至少有一个基于种族的头像
+              const defaultPictureResource = this.createDefaultPictureResource(locationData.race);
+              (location as any).pictureResource = defaultPictureResource;
+              console.log(
+                `✅ [批量解析器] 已为据点 ${locationData.name} 设置默认头像: ${defaultPictureResource.imageUrl}`,
               );
             }
           }

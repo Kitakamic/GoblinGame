@@ -552,7 +552,6 @@ const fieldNameMap: Record<string, string> = {
   intelligence: '智力',
   speed: '速度',
   health: '血量',
-  Unittype: '单位类型（physical[物理], magical[魔法]）',
 
   // 外观子字段
   height: '身高',
@@ -719,36 +718,136 @@ const saveJson = async () => {
     // 解析JSON（此时字段名是中文）
     const chineseJson = JSON.parse(jsonText.value);
 
+    // 在转换之前，先保存原始appearance的深拷贝（用于后续恢复服装信息）
+    const originalAppearance = props.character.appearance
+      ? JSON.parse(JSON.stringify(props.character.appearance))
+      : null;
+
     // 将字段名转换回英文
     const updatedCharacter = translateKeysToEnglish(chineseJson) as Character;
 
-    // 恢复所有隐藏字段的原始值（避免丢失）
+    // 处理attributes.Unittype到unitType的转换（向后兼容）
+    if (updatedCharacter.attributes?.Unittype && !updatedCharacter.unitType) {
+      // 如果attributes中有Unittype，将其转换为unitType
+      updatedCharacter.unitType = updatedCharacter.attributes.Unittype as 'physical' | 'magical';
+      // 从attributes中移除Unittype，因为正确的字段名是unitType（不在attributes中）
+      delete (updatedCharacter.attributes as any).Unittype;
+    }
+
+    // 确保unitType字段存在（如果缺失则从原始数据恢复或使用默认值）
+    if (!updatedCharacter.unitType) {
+      updatedCharacter.unitType = props.character.unitType || 'physical';
+    }
+
+    // 特殊处理appearance中的服装信息（必须在其他隐藏字段恢复之前处理）
+    if (originalAppearance) {
+      console.log('🔍 [人物编辑] 开始恢复服装信息...', {
+        原始clothing存在: !!originalAppearance.clothing,
+        原始originalClothing存在: !!originalAppearance.originalClothing,
+        原始corruptedClothing存在: !!originalAppearance.corruptedClothing,
+        用户appearance存在: !!updatedCharacter.appearance,
+      });
+
+      // 确保appearance对象存在
+      if (!updatedCharacter.appearance) {
+        // 如果用户删除了整个 appearance，完全恢复原始数据
+        console.log('📦 [人物编辑] 用户删除了appearance，完全恢复原始数据');
+        updatedCharacter.appearance = JSON.parse(JSON.stringify(originalAppearance));
+      } else {
+        // 用户保留了appearance，需要合并字段并强制恢复服装信息
+        // 先合并用户修改的其他字段（height、weight、description等）
+        const mergedAppearance: any = {
+          ...updatedCharacter.appearance,
+        };
+
+        console.log('🔄 [人物编辑] 合并appearance字段，恢复服装信息', {
+          用户appearance字段: Object.keys(updatedCharacter.appearance),
+          合并前clothing存在: !!mergedAppearance.clothing,
+        });
+
+        // 强制恢复服装信息（无论用户是否修改了appearance的其他字段）
+        // 这些字段在JSON编辑器中是隐藏的，所以必须从原始数据恢复
+        if (originalAppearance.clothing) {
+          mergedAppearance.clothing = JSON.parse(JSON.stringify(originalAppearance.clothing));
+          console.log('✅ [人物编辑] 已恢复clothing:', Object.keys(mergedAppearance.clothing));
+        }
+        if (originalAppearance.originalClothing) {
+          mergedAppearance.originalClothing = JSON.parse(JSON.stringify(originalAppearance.originalClothing));
+          console.log('✅ [人物编辑] 已恢复originalClothing:', Object.keys(mergedAppearance.originalClothing));
+        }
+        if (originalAppearance.corruptedClothing) {
+          mergedAppearance.corruptedClothing = JSON.parse(JSON.stringify(originalAppearance.corruptedClothing));
+          console.log('✅ [人物编辑] 已恢复corruptedClothing:', Object.keys(mergedAppearance.corruptedClothing));
+        }
+
+        updatedCharacter.appearance = mergedAppearance;
+
+        console.log('✅ [人物编辑] 服装信息恢复完成', {
+          最终clothing存在: !!mergedAppearance.clothing,
+          最终originalClothing存在: !!mergedAppearance.originalClothing,
+          最终corruptedClothing存在: !!mergedAppearance.corruptedClothing,
+        });
+      }
+    } else {
+      console.warn('⚠️ [人物编辑] 原始人物没有appearance数据，无法恢复服装信息');
+    }
+
+    // 特殊处理attributes对象（战斗属性是计算出来的，必须完整保留）
+    if (props.character.attributes) {
+      console.log('🔍 [人物编辑] 恢复attributes战斗属性...');
+      updatedCharacter.attributes = JSON.parse(JSON.stringify(props.character.attributes));
+      console.log('✅ [人物编辑] attributes已恢复:', updatedCharacter.attributes);
+    }
+
+    // 特殊处理sensitivePointsDetail数组中的isSensitive字段
+    if (props.character.sensitivePointsDetail && props.character.sensitivePointsDetail.length > 0) {
+      console.log('🔍 [人物编辑] 检查sensitivePointsDetail数组...');
+
+      // 如果用户修改了sensitivePointsDetail，需要恢复每个元素中的isSensitive字段
+      if (updatedCharacter.sensitivePointsDetail) {
+        const originalDetailMap = new Map(
+          props.character.sensitivePointsDetail.map(item => [item.part, item.isSensitive]),
+        );
+
+        // 恢复每个敏感点的isSensitive状态
+        updatedCharacter.sensitivePointsDetail = updatedCharacter.sensitivePointsDetail.map((item: any) => {
+          const originalIsSensitive = originalDetailMap.get(item.part);
+          if (originalIsSensitive !== undefined) {
+            return {
+              ...item,
+              isSensitive: originalIsSensitive,
+            };
+          }
+          return item;
+        });
+
+        console.log('✅ [人物编辑] sensitivePointsDetail中的isSensitive已恢复');
+      } else {
+        // 如果用户删除了sensitivePointsDetail，完全恢复原始数据
+        updatedCharacter.sensitivePointsDetail = JSON.parse(JSON.stringify(props.character.sensitivePointsDetail));
+        console.log('✅ [人物编辑] sensitivePointsDetail已完全恢复');
+      }
+    }
+
+    // 恢复其他隐藏字段的原始值（避免丢失）
     for (const hiddenField of hiddenFields) {
+      // 跳过已特殊处理的字段
+      if (
+        hiddenField === 'clothing' ||
+        hiddenField === 'originalClothing' ||
+        hiddenField === 'corruptedClothing' ||
+        hiddenField === 'attributes' ||
+        hiddenField === 'isSensitive' // isSensitive在数组中，不在顶层
+      ) {
+        continue;
+      }
+
       const originalValue = (props.character as any)[hiddenField];
       if (originalValue !== undefined) {
-        // 特殊处理嵌套在 appearance 中的字段
-        if (hiddenField === 'clothing' || hiddenField === 'originalClothing' || hiddenField === 'corruptedClothing') {
-          if (props.character.appearance) {
-            if (!updatedCharacter.appearance) {
-              // 如果用户删除了整个 appearance，从原始数据恢复
-              updatedCharacter.appearance = { ...props.character.appearance };
-            } else {
-              // 保留衣着的原始值
-              if (hiddenField === 'clothing' && props.character.appearance.clothing) {
-                updatedCharacter.appearance.clothing = props.character.appearance.clothing;
-              }
-              if (hiddenField === 'originalClothing' && props.character.appearance.originalClothing) {
-                updatedCharacter.appearance.originalClothing = props.character.appearance.originalClothing;
-              }
-              if (hiddenField === 'corruptedClothing' && props.character.appearance.corruptedClothing) {
-                updatedCharacter.appearance.corruptedClothing = props.character.appearance.corruptedClothing;
-              }
-            }
-          }
-        } else {
-          // 直接设置隐藏字段的原始值
-          (updatedCharacter as any)[hiddenField] = originalValue;
-        }
+        console.log(`🔍 [人物编辑] 恢复隐藏字段: ${hiddenField}`);
+        // 直接设置隐藏字段的原始值（使用深拷贝）
+        (updatedCharacter as any)[hiddenField] = JSON.parse(JSON.stringify(originalValue));
+        console.log(`✅ [人物编辑] ${hiddenField}已恢复`);
       }
     }
 

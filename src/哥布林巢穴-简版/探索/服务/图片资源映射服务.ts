@@ -419,9 +419,20 @@ export class PictureResourceMappingService {
     const validClasses = this.getValidClassesForRaceAndLocation(race, locationType);
     console.log(`🎯 [职业选择] 种族 "${race}" + 据点类型 "${locationType}" 的有效职业列表:`, validClasses);
 
+    // 如果据点类型+种族没有交集职业，降级到使用该种族的所有职业
     if (validClasses.length === 0) {
-      console.log(`❌ [职业选择] 种族 "${race}" 在据点类型 "${locationType}" 中没有有效的职业组合`);
-      return null;
+      console.warn(
+        `⚠️ [职业选择] 种族 "${race}" 在据点类型 "${locationType}" 中没有有效的职业组合，降级到使用该种族的所有职业`,
+      );
+      // 降级策略：使用该种族的所有职业
+      const raceClasses = this.RACE_TO_CLASS_MAPPING[race] || [];
+      if (raceClasses.length === 0) {
+        console.error(`❌ [职业选择] 种族 "${race}" 没有配置任何职业，返回null`);
+        return null;
+      }
+      // 使用该种族的所有职业作为候选
+      validClasses.push(...raceClasses);
+      console.log(`✅ [职业降级] 降级后的职业列表:`, validClasses);
     }
 
     // 第二步：随机选择一个职业
@@ -447,8 +458,166 @@ export class PictureResourceMappingService {
       遍历状态: '已完成',
     });
 
+    // 如果该职业没有图片，先尝试交集职业列表中的其他职业
     if (matchingResources.length === 0) {
-      console.log(`❌ [图片匹配] 没有找到匹配的图片资源`);
+      console.warn(`⚠️ [图片匹配] 种族 "${race}" + 职业 "${selectedClass}" 没有找到图片，尝试交集职业列表中的其他职业`);
+      // 降级策略1：先尝试交集职业列表中的其他职业（种族+交集职业列表中的其他职业）
+      const otherValidClasses = validClasses.filter((className: string) => className !== selectedClass);
+      console.log(`🔄 [降级策略1] 开始尝试交集职业列表中的其他职业:`, otherValidClasses);
+
+      for (const className of otherValidClasses) {
+        const otherMatchingResources = this.pictureResources.filter(
+          resource => resource.race === race && resource.class === className,
+        );
+        const unusedOtherResources = otherMatchingResources.filter(resource => !this.usedPictureIds.has(resource.id));
+
+        console.log(`🔍 [降级策略1] 尝试交集职业 "${className}":`, {
+          匹配图片数: otherMatchingResources.length,
+          未使用图片数: unusedOtherResources.length,
+        });
+
+        if (unusedOtherResources.length > 0) {
+          const randomIndex = Math.floor(Math.random() * unusedOtherResources.length);
+          const selectedResource = unusedOtherResources[randomIndex];
+
+          // 根据参数决定是否立即标记为已使用
+          if (markAsUsed) {
+            this.usedPictureIds.add(selectedResource.id);
+            console.log(`🔒 [降级策略1] 图片ID ${selectedResource.id} 已标记为已使用`);
+          } else {
+            console.log(`⏸️ [降级策略1] 图片ID ${selectedResource.id} 暂未标记为已使用（延迟标记）`);
+          }
+
+          // 生成人物名称（如果需要）
+          if (generateName) {
+            try {
+              const nameOptions: NameGenerationOptions = {
+                race: selectedResource.race,
+              };
+
+              const generatedName = characterNameGenerationService.generateName(nameOptions);
+              selectedResource.generatedName = generatedName;
+
+              console.log(`🎭 [名称生成] 降级策略1生成名称:`, {
+                id: selectedResource.id,
+                name: generatedName.fullName,
+              });
+            } catch (error) {
+              console.warn(`⚠️ [名称生成] 降级策略1生成失败:`, error);
+            }
+          }
+
+          console.log(`🎯 [图片选择] 降级策略1选择结果:`);
+          console.log(`  - 降级职业: ${className}`);
+          console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
+          console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+          console.log(`  - 生成名称: ${selectedResource.generatedName?.fullName || '未生成'}`);
+          console.log(`✅ [图片选择] 降级策略1选择完成`);
+
+          return selectedResource;
+        }
+      }
+
+      // 降级策略2：如果交集职业列表中的所有职业都没有图片，再降级到该种族的任意职业
+      console.warn(`⚠️ [图片选择] 交集职业列表中的所有职业都没有可用图片，降级到该种族的任意职业`);
+      console.log(`⚠️ [图片选择] 尝试同种族其他职业...`);
+
+      // 进一步降级：同种族的其他职业
+      const allSameRaceResources = this.pictureResources.filter(resource => resource.race === race);
+      const unusedSameRaceResources = allSameRaceResources.filter(resource => !this.usedPictureIds.has(resource.id));
+
+      console.log(`🔍 [降级策略2] 种族 "${race}" 所有职业匹配结果:`, {
+        总图片数: allSameRaceResources.length,
+        未使用图片数: unusedSameRaceResources.length,
+        遍历状态: '已完成',
+      });
+
+      if (unusedSameRaceResources.length > 0) {
+        const randomIndex = Math.floor(Math.random() * unusedSameRaceResources.length);
+        const selectedResource = unusedSameRaceResources[randomIndex];
+
+        // 根据参数决定是否立即标记为已使用
+        if (markAsUsed) {
+          this.usedPictureIds.add(selectedResource.id);
+          console.log(`🔒 [降级策略2] 图片ID ${selectedResource.id} 已标记为已使用`);
+        } else {
+          console.log(`⏸️ [降级策略2] 图片ID ${selectedResource.id} 暂未标记为已使用（延迟标记）`);
+        }
+
+        // 生成人物名称（如果需要）
+        if (generateName) {
+          try {
+            const nameOptions: NameGenerationOptions = {
+              race: selectedResource.race,
+            };
+
+            const generatedName = characterNameGenerationService.generateName(nameOptions);
+            selectedResource.generatedName = generatedName;
+
+            console.log(`🎭 [名称生成] 降级策略2生成名称:`, {
+              id: selectedResource.id,
+              name: generatedName.fullName,
+            });
+          } catch (error) {
+            console.warn(`⚠️ [名称生成] 降级策略2生成失败:`, error);
+          }
+        }
+
+        console.log(`🎯 [图片选择] 降级策略2选择结果:`);
+        console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
+        console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+        console.log(`  - 生成名称: ${selectedResource.generatedName?.fullName || '未生成'}`);
+        console.log(`✅ [图片选择] 降级策略2选择完成`);
+
+        return selectedResource;
+      }
+
+      console.log(`❌ [图片选择] 所有图片资源都已使用，重置使用记录并重新选择`);
+
+      // 如果所有图片都用完了，重置使用记录
+      this.resetUsedPictureIds();
+
+      // 重新尝试：直接使用同种族的任意图片
+      if (allSameRaceResources.length > 0) {
+        const randomIndex = Math.floor(Math.random() * allSameRaceResources.length);
+        const selectedResource = allSameRaceResources[randomIndex];
+
+        // 根据参数决定是否立即标记为已使用
+        if (markAsUsed) {
+          this.usedPictureIds.add(selectedResource.id);
+          console.log(`🔒 [重置后选择] 图片ID ${selectedResource.id} 已标记为已使用`);
+        } else {
+          console.log(`⏸️ [重置后选择] 图片ID ${selectedResource.id} 暂未标记为已使用（延迟标记）`);
+        }
+
+        // 生成人物名称（如果需要）
+        if (generateName) {
+          try {
+            const nameOptions: NameGenerationOptions = {
+              race: selectedResource.race,
+            };
+
+            const generatedName = characterNameGenerationService.generateName(nameOptions);
+            selectedResource.generatedName = generatedName;
+
+            console.log(`🎭 [名称生成] 重置后生成名称:`, {
+              id: selectedResource.id,
+              name: generatedName.fullName,
+            });
+          } catch (error) {
+            console.warn(`⚠️ [名称生成] 重置后生成失败:`, error);
+          }
+        }
+
+        console.log(`🔄 [图片选择] 重置后重新选择:`);
+        console.log(`  - 选中资源: ID=${selectedResource.id}, 职业=${selectedResource.class}`);
+        console.log(`  - 图片URL: ${selectedResource.imageUrl}`);
+        console.log(`  - 生成名称: ${selectedResource.generatedName?.fullName || '未生成'}`);
+
+        return selectedResource;
+      }
+
+      console.error(`❌ [图片选择] 种族 "${race}" 没有任何图片资源，返回null`);
       return null;
     }
 
