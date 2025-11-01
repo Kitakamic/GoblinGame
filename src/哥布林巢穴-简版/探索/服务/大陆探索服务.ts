@@ -372,15 +372,7 @@ export class ContinentExploreService {
     // 检查前置大陆的征服进度是否达到要求
     const previousProgress = this.exploreState.value.continentProgress[previousContinentName] || 0;
     const requiredProgress = conquestPercentage || 50; // 默认50%
-    const isUnlocked = previousProgress >= requiredProgress;
-
-    if (!isUnlocked) {
-      console.log(
-        `🔍 [解锁检查] 大陆 ${continent.name} 未满足解锁条件: 需要前置大陆 ${previousContinentName} 征服进度 >= ${requiredProgress}%，当前进度 ${previousProgress.toFixed(1)}%`,
-      );
-    }
-
-    return isUnlocked;
+    return previousProgress >= requiredProgress;
   }
 
   // 更新大陆征服进度
@@ -427,11 +419,7 @@ export class ContinentExploreService {
       let totalProgress = 0;
       let regionCount = 0;
 
-      console.log(`🔍 [大陆征服进度计算] 开始计算大陆 ${continent.name} 的征服进度`);
       continent.regions.forEach(region => {
-        console.log(
-          `🔍 [大陆征服进度计算] 区域 ${region.name}: 解锁=${region.isUnlocked}, 征服进度=${region.conquestProgress}%`,
-        );
         // 计算所有区域的征服进度，不管是否解锁
         totalProgress += region.conquestProgress;
         regionCount++;
@@ -442,10 +430,6 @@ export class ContinentExploreService {
       continent.conquestProgress = Math.min(100, Math.max(0, averageProgress));
       // 同步更新探索状态中的征服进度，确保解锁检查能读取到最新值
       this.exploreState.value.continentProgress[continentName] = continent.conquestProgress;
-
-      console.log(
-        `🔍 [大陆征服进度计算] 大陆 ${continent.name} 征服进度: ${continent.conquestProgress.toFixed(1)}% (基于${regionCount}个区域的平均值)`,
-      );
 
       // 检查大陆是否完全征服
       if (continent.conquestProgress >= 100 && !continent.isConquered) {
@@ -619,6 +603,9 @@ export class ContinentExploreService {
         return;
       }
 
+      // 在计算进度前，先检查该区域已征服的据点中是否有首都
+      this.checkCapitalConquestFromConqueredLocations(regionName);
+
       // 计算该区域已征服的据点总星级
       const conqueredStars = this.calculateRegionConqueredStars(regionName);
 
@@ -682,20 +669,11 @@ export class ContinentExploreService {
         loc => loc.continent === continent.name && loc.region === region.name && loc.status === 'conquered',
       );
 
-      console.log(`🔍 [征服进度计算] 区域 ${region.name} 的据点匹配:`);
-      console.log(`🔍 [征服进度计算] 大陆名称: ${continent.name}`);
-      console.log(`🔍 [征服进度计算] 区域名称: ${region.name}`);
-      console.log(`🔍 [征服进度计算] 匹配到的据点数量: ${regionLocations.length}`);
-      regionLocations.forEach(loc => {
-        console.log(`🔍 [征服进度计算] 据点: ${loc.name}, 难度: ${loc.difficulty}, 状态: ${loc.status}`);
-      });
-
       let totalStars = 0;
       regionLocations.forEach(location => {
         totalStars += location.difficulty || 0;
       });
 
-      console.log(`🔍 [征服进度计算] 区域 ${region.name} 总征服星级: ${totalStars}`);
       return totalStars;
     } catch (error) {
       console.error('计算区域征服星级失败:', error);
@@ -794,44 +772,24 @@ export class ContinentExploreService {
         return;
       }
 
-      console.log(`🔍 [区域解锁检查] 开始检查大陆 ${continent.name} 的区域解锁条件...`);
-
-      // 计算大陆上所有区域的据点征服总星级（用于区域解锁判断）
-      const totalConqueredStars = this.calculateContinentConqueredStars(continent.name);
-      console.log(`🔍 [区域解锁检查] 大陆 ${continent.name} 当前征服总星级: ${totalConqueredStars}`);
-
       let unlockedCount = 0;
 
       // 检查该大陆的所有区域是否可以解锁
       continent.regions.forEach(region => {
         if (region.isUnlocked) {
-          console.log(`🔍 [区域解锁检查] 区域 ${region.name} 已解锁，跳过`);
           return;
         }
 
         // 检查区域解锁条件
         if (this.checkRegionUnlockConditions(region)) {
-          if (region.unlockStars === 0) {
-            console.log(`✅ [区域解锁检查] 区域 ${region.name} 满足解锁条件 (默认解锁，解锁星级为0)`);
-          } else {
-            console.log(
-              `✅ [区域解锁检查] 区域 ${region.name} 满足解锁条件 (解锁星级: ${region.unlockStars}, 当前总星级: ${totalConqueredStars})`,
-            );
-          }
           if (this.unlockRegion(region.name)) {
             unlockedCount++;
           }
-        } else {
-          console.log(
-            `🔍 [区域解锁检查] 区域 ${region.name} 未满足解锁条件 (需要: ${region.unlockStars}星, 当前: ${totalConqueredStars}星)`,
-          );
         }
       });
 
       if (unlockedCount > 0) {
         console.log(`✅ [区域解锁检查] 大陆 ${continent.name} 解锁了 ${unlockedCount} 个区域`);
-      } else {
-        console.log(`🔍 [区域解锁检查] 大陆 ${continent.name} 没有可解锁的区域`);
       }
     } catch (error) {
       console.error('检查并解锁区域失败:', error);
@@ -845,6 +803,53 @@ export class ContinentExploreService {
       return false;
     }
     return region.capital === locationName;
+  }
+
+  // 检查该区域已征服的据点中是否有首都被征服
+  private checkCapitalConquestFromConqueredLocations(regionName: string): void {
+    try {
+      const region = this.findRegionByName(regionName);
+      if (!region) {
+        return;
+      }
+
+      // 如果区域没有设置首都，跳过检查
+      if (!region.capital || region.capital.trim() === '') {
+        return;
+      }
+
+      // 从探索服务获取所有据点数据
+      const exploreData = modularSaveManager.getModuleData({ moduleName: 'exploration' });
+      if (!exploreData || !(exploreData as any).locations) {
+        return;
+      }
+
+      const locations: Location[] = (exploreData as any).locations;
+      const continent = this.continents.value.find(c => c.name === region.continentName);
+      if (!continent) {
+        return;
+      }
+
+      // 查找该区域已征服的据点中是否有首都被征服
+      const conqueredLocations = locations.filter(
+        loc => loc.continent === continent.name && loc.region === region.name && loc.status === 'conquered',
+      );
+
+      // 检查是否有据点的名称与区域的首都名称匹配
+      const capitalLocation = conqueredLocations.find(loc => loc.name === region.capital);
+
+      if (capitalLocation && !region.isCapitalConquered) {
+        // 如果首都被征服了但状态还是未征服，更新状态
+        region.isCapitalConquered = true;
+        console.log(`✅ [首都状态更新] 区域 ${region.name} 的首都 ${region.capital} 已被征服，更新首都征服状态`);
+      } else if (!capitalLocation && region.isCapitalConquered) {
+        // 如果首都未被征服但状态是已征服，重置状态
+        region.isCapitalConquered = false;
+        console.log(`⚠️ [首都状态更新] 区域 ${region.name} 的首都 ${region.capital} 未被征服，重置首都征服状态`);
+      }
+    } catch (error) {
+      console.error('检查首都征服状态失败:', error);
+    }
   }
 
   // 更新首都征服状态
@@ -871,22 +876,6 @@ export class ContinentExploreService {
   // 重新计算所有区域的征服进度（供外部调用）
   public recalculateAllRegionProgress(): void {
     try {
-      console.log('🔄 重新计算所有区域征服进度...');
-
-      // 临时禁用 watch 监听器，避免每次数据变化都触发保存
-      // 注意：由于 watch 无法临时禁用，我们需要在最后统一保存
-
-      // 在重新计算前，记录已征服的区域
-      const beforeConqueredRegions: string[] = [];
-      this.continents.value.forEach(continent => {
-        continent.regions.forEach(region => {
-          if (region.isConquered) {
-            beforeConqueredRegions.push(`${continent.name} - ${region.name}`);
-          }
-        });
-      });
-      console.log(`[recalculateAllRegionProgress] 重新计算前已征服的区域:`, beforeConqueredRegions);
-
       // 批量计算所有区域的征服进度（跳过每次保存）
       this.continents.value.forEach(continent => {
         continent.regions.forEach(region => {
@@ -896,20 +885,9 @@ export class ContinentExploreService {
         this.calculateContinentProgressFromRegions(continent.name, true); // skipSave = true
       });
 
-      // 在重新计算后，记录已征服的区域
-      const afterConqueredRegions: string[] = [];
-      this.continents.value.forEach(continent => {
-        continent.regions.forEach(region => {
-          if (region.isConquered) {
-            afterConqueredRegions.push(`${continent.name} - ${region.name}`);
-          }
-        });
-      });
-      console.log(`[recalculateAllRegionProgress] 重新计算后已征服的区域:`, afterConqueredRegions);
-
       // 所有计算完成后，统一保存一次
       this.saveExploreData();
-      console.log('✅ 所有区域征服进度重新计算完成，数据已保存');
+      console.log('✅ 所有区域征服进度重新计算完成');
     } catch (error) {
       console.error('重新计算区域征服进度失败:', error);
     }

@@ -87,13 +87,32 @@
           <div class="tab-content">
             <div class="tab-name">{{ region.name }}</div>
             <div class="tab-progress">
-              <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: `${region.conquestProgress}%` }"></div>
+              <div class="progress-bar" :class="{ 'unlock-progress': !region.isUnlocked && region.unlockStars > 0 }">
+                <div
+                  class="progress-fill"
+                  :class="{ 'unlock-fill': !region.isUnlocked && region.unlockStars > 0 }"
+                  :style="{
+                    width: `${
+                      !region.isUnlocked && region.unlockStars > 0
+                        ? Math.min(100, (currentContinentConqueredStars / region.unlockStars) * 100)
+                        : region.conquestProgress
+                    }%`,
+                  }"
+                ></div>
               </div>
-              <span class="progress-text">{{ Math.round(region.conquestProgress) }}%</span>
+              <span
+                class="progress-text"
+                :class="{ 'unlock-text-small': !region.isUnlocked && region.unlockStars > 0 }"
+              >
+                {{
+                  !region.isUnlocked && region.unlockStars > 0
+                    ? `${currentContinentConqueredStars}/${region.unlockStars}⭐`
+                    : `${Math.round(region.conquestProgress)}%`
+                }}
+              </span>
             </div>
             <!-- 首都征服状态 -->
-            <div v-if="region.capital" class="capital-status">
+            <div v-if="region.capital && region.isUnlocked" class="capital-status">
               <span class="capital-icon">🏛️</span>
               <span class="capital-name">{{ region.capital }}</span>
               <span class="capital-conquest" :class="{ conquered: region.isCapitalConquered }">
@@ -426,8 +445,6 @@ const formatNumber = (num: number): string => {
 
 // 大陆相关计算属性
 const allContinents = computed(() => {
-  console.log('🔍 [探索界面] 大陆数据:', continentExploreService.continents.value);
-  console.log('🔍 [探索界面] 大陆数量:', continentExploreService.continents.value.length);
   // 显示所有大陆，包括未解锁的（类似区域的处理方式）
   return continentExploreService.continents.value;
 });
@@ -444,13 +461,23 @@ const currentContinentRegions = computed(() => {
 
 const unlockedRegions = computed(() => {
   // 显示所有区域，包括未解锁的（用于开发调试）
-  console.log('🔍 [探索界面] 当前大陆区域:', currentContinentRegions.value);
-  console.log('🔍 [探索界面] 区域数量:', currentContinentRegions.value.length);
   return currentContinentRegions.value;
 });
 
 const currentRegion = computed(() => {
   return currentContinentRegions.value.find(r => r.name === selectedRegion.value);
+});
+
+// 计算当前大陆已征服的总星级
+const currentContinentConqueredStars = computed(() => {
+  if (!selectedContinent.value) return 0;
+
+  const locations = exploreService.getAllLocations();
+  const conqueredLocations = locations.filter(
+    loc => loc.continent === selectedContinent.value && loc.status === 'conquered',
+  );
+
+  return conqueredLocations.reduce((total, loc) => total + (loc.difficulty || 0), 0);
 });
 
 // 根据当前大陆生成可用的据点类型选项
@@ -510,46 +537,23 @@ const availableLocationTypes = computed(() => {
 
 // 所有目标据点（合并侦察和进攻）
 const allTargetLocations = computed(() => {
-  const locations = exploreService.getAllLocations();
-  console.log('🔍 [探索界面] 所有据点数据:', locations);
-  console.log('🔍 [探索界面] 据点数量:', locations.length);
-  return locations;
+  return exploreService.getAllLocations();
 });
 
 // 根据大陆、区域和筛选条件过滤据点
 const filteredLocations = computed(() => {
   let locations = allTargetLocations.value;
-  console.log('🔍 [探索界面] 筛选前据点数量:', locations.length);
 
   // 首先按大陆筛选
   if (selectedContinent.value) {
-    console.log('🔍 [探索界面] 按大陆筛选:', selectedContinent.value);
-    locations = locations.filter(location => {
-      const matches = location.continent === selectedContinent.value;
-      console.log(
-        `🔍 [探索界面] 据点 ${location.name} (${location.continent}) 匹配 ${selectedContinent.value}:`,
-        matches,
-      );
-      return matches;
-    });
-    console.log('🔍 [探索界面] 大陆筛选后据点数量:', locations.length);
+    locations = locations.filter(location => location.continent === selectedContinent.value);
   }
 
   // 然后按区域筛选
   if (selectedRegion.value) {
     const currentRegionData = currentRegion.value;
-    console.log('🔍 [探索界面] 按区域筛选:', selectedRegion.value, currentRegionData);
     if (currentRegionData) {
-      locations = locations.filter(location => {
-        // 根据据点的区域属性匹配
-        const matches = location.region === currentRegionData.name;
-        console.log(
-          `🔍 [探索界面] 据点 ${location.name} (${location.region}) 匹配 ${currentRegionData.name}:`,
-          matches,
-        );
-        return matches;
-      });
-      console.log('🔍 [探索界面] 区域筛选后据点数量:', locations.length);
+      locations = locations.filter(location => location.region === currentRegionData.name);
     }
   }
 
@@ -1658,11 +1662,22 @@ const restoreSelectionState = () => {
           border-radius: 2px;
           overflow: hidden;
 
+          &.unlock-progress {
+            background: rgba(139, 69, 19, 0.3);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            height: 4px;
+          }
+
           .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, #dc2626, #b91c1c);
             border-radius: 2px;
             transition: width 0.3s ease;
+
+            &.unlock-fill {
+              background: linear-gradient(90deg, #ff8c00, #ffd700);
+              box-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+            }
           }
         }
 
@@ -1672,6 +1687,12 @@ const restoreSelectionState = () => {
           font-weight: 600;
           min-width: 25px;
           text-align: right;
+
+          &.unlock-text-small {
+            color: #ffd700;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+            font-weight: 700;
+          }
 
           @media (max-width: 768px) {
             font-size: 8px;

@@ -98,6 +98,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { toast } from '../服务/弹窗提示服务';
 import { FRONTEND_UPDATE_DATE, FRONTEND_VERSION } from '../服务/版本信息';
+import { ConfirmService } from '../服务/确认框服务';
 import { modularSaveManager } from './模块化存档服务';
 import type { BaseResources, ModularSaveSlot } from './模块化存档类型';
 
@@ -182,6 +183,24 @@ const loadSaveSlots = async () => {
 // 保存到指定槽位
 const saveToSlot = async (slot: number) => {
   try {
+    // 检查该槽位是否已有存档
+    const existingSlot = saveSlots.value.find(s => s.slot === slot);
+    if (existingSlot && existingSlot.timestamp > 0) {
+      // 如果已有存档，显示确认框
+      const slotName = slot === 0 ? '自动存档' : `槽位 ${slot}`;
+      const saveTime = formatTime(existingSlot.timestamp);
+      const confirmed = await ConfirmService.showWarning(
+        `该槽位已有存档，是否覆盖？`,
+        '覆盖存档',
+        `槽位: ${slotName}\n存档时间: ${saveTime}\n\n覆盖后将无法恢复原有存档数据，请确认是否继续。`,
+      );
+
+      if (!confirmed) {
+        // 用户取消操作
+        return;
+      }
+    }
+
     // 获取当前游戏数据
     const currentGameData = modularSaveManager.getCurrentGameData();
     if (!currentGameData) {
@@ -203,6 +222,7 @@ const saveToSlot = async (slot: number) => {
     if (success) {
       await loadSaveSlots();
       emit('save', slot);
+      toast.success(`已保存到${slot === 0 ? '自动存档' : `槽位 ${slot}`}`);
     } else {
       emit('error', `保存到槽位 ${slot} 失败`);
     }
