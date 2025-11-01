@@ -950,7 +950,24 @@ const handleBattleComplete = async (result: any) => {
 };
 
 // 侦察队相关方法
-const closeScoutTeamModal = () => {
+const closeScoutTeamModal = async () => {
+  // 如果用户关闭弹窗时侦察操作还在进行中，停止生成并重置状态
+  if (isGenerating.value) {
+    try {
+      // 停止所有正在进行的生成操作（放弃这次酒馆的回复）
+      await stopAllGeneration();
+      console.log('已停止正在进行的侦察队生成操作');
+    } catch (error) {
+      console.error('停止生成操作失败:', error);
+    }
+
+    // 重置生成状态
+    isGenerating.value = false;
+    // 返还行动力（因为操作被用户中断）
+    actionPointsService.refundActionPoints('sendScoutTeam');
+    console.warn('用户关闭侦察队弹窗时操作仍在进行中，已停止生成、重置状态并返还行动力');
+  }
+
   showScoutTeamModal.value = false;
   scoutResult.value = null;
   customPrompt.value = '';

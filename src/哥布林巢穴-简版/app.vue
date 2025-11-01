@@ -684,13 +684,30 @@ const handleSave = async (slot: number) => {
   try {
     console.log(`保存到槽位 ${slot}`);
 
-    // 确保存档系统已初始化
-    if (!isSaveSystemInitialized.value) {
-      await initializeSaveSystem();
+    // 【关键修复】先确保当前响应式状态已同步到 currentGameData，避免初始化时覆盖
+    // 如果没有 currentGameData，先创建一个新的，但立即用当前状态填充
+    let currentGameData = modularSaveManager.getCurrentGameData();
+    if (!currentGameData) {
+      // 创建新游戏数据，但立即用当前响应式状态填充，避免被初始值覆盖
+      modularSaveManager.createNewGame();
+      modularSaveManager.syncReactiveToResources();
+      currentGameData = modularSaveManager.getCurrentGameData();
+    } else {
+      // 确保当前响应式状态已同步到游戏数据
+      modularSaveManager.syncReactiveToResources();
     }
 
-    // 保存当前游戏状态到模块化系统
+    // 保存当前游戏状态到模块化系统（包括所有模块数据）
     saveCurrentGameState();
+
+    // 确保存档系统已初始化
+    // 注意：initializeDefaultSlot 现在会检查是否有游戏进度，如果有就不会覆盖 currentGameData
+    if (!isSaveSystemInitialized.value) {
+      await initializeSaveSystem();
+      // 初始化后，再次确保当前状态已同步（initializeDefaultSlot 可能已经保留了我们的状态）
+      modularSaveManager.syncReactiveToResources();
+      saveCurrentGameState();
+    }
 
     // 保存到指定槽位
     const success = await modularSaveManager.saveCurrentGameData(slot, `存档 ${slot}`);

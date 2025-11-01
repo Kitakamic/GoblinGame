@@ -1490,11 +1490,36 @@ const editingContent = ref('');
 
 const saveEdit = () => {
   if (editingMessageIndex.value >= 0 && editingMessageIndex.value < pages.value.length) {
-    // 将纯文本转换回 HTML 格式
-    const htmlContent = convertTextToHtml(editingContent.value);
+    const currentPage = pages.value[editingMessageIndex.value];
 
-    // 直接更新页面内容
-    pages.value[editingMessageIndex.value].html = htmlContent;
+    // 解析原始页面内容，检查是否有用户选择部分（choice-line）
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = currentPage.html;
+    const choiceLine = tempDiv.querySelector('.choice-line');
+
+    let finalHtml = '';
+
+    // 如果有用户选择部分，需要分离并保留它
+    if (choiceLine) {
+      // 提取用户选择的文本（去掉"→"前缀）
+      const choiceText = choiceLine.textContent?.replace(/^→\s*/, '').trim() || '';
+      const userChoiceHtml = `<div class="choice-line"><span class="choice-prefix">→</span> ${safeFormatMessage(choiceText)}</div>`;
+
+      // 从编辑的文本中移除用户选择部分（如果用户编辑时保留了）
+      const editedText = editingContent.value.replace(/^→\s*.*?\n\n?/s, '').trim();
+
+      // 格式化AI回复部分
+      const aiContentHtml = convertTextToHtml(editedText);
+
+      // 合并用户选择和AI回复
+      finalHtml = `${userChoiceHtml}${aiContentHtml}`;
+    } else {
+      // 没有用户选择部分，直接格式化编辑的内容
+      finalHtml = convertTextToHtml(editingContent.value);
+    }
+
+    // 更新页面内容
+    pages.value[editingMessageIndex.value].html = finalHtml;
 
     // 消息已通过世界书服务自动保存
     editingMessageIndex.value = -1;
@@ -1533,14 +1558,9 @@ const extractTextFromHtml = (html: string): string => {
 
 // 将纯文本转换为 HTML（保存时使用）
 const convertTextToHtml = (text: string): string => {
-  // 转义特殊字符
-  let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-  // 将换行符转换为 <br>
-  html = html.replace(/\n/g, '<br>');
-
-  // 使用 MessageService 格式化（支持引号、粗体等）
-  return MessageService.formatMessage(html, { enableMarkdown: false, enableCodeHighlight: false, enableQuote: true });
+  // 使用 safeFormatMessage 进行完整格式化（包括酒馆正则格式化，恢复颜色样式）
+  // 这会重新应用 formatAsTavernRegexedString 和 MessageService.formatMessage
+  return safeFormatMessage(text);
 };
 
 // 编辑当前页消息

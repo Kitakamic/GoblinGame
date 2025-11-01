@@ -9,19 +9,20 @@ export class AvatarSwitchService {
   /**
    * 根据堕落值获取对应的头像（不包含完全堕落状态）
    * @param character 人物对象
-   * @returns 对应的头像URL
+   * @returns 对应的头像URL，如果不存在则返回空字符串（避免undefined）
    */
-  static getAvatarByCorruptionLevel(character: Character): string | undefined {
+  static getAvatarByCorruptionLevel(character: Character): string {
     const loyalty = character.loyalty;
 
     // 半堕落（50%及以上，但小于100%）
     if (loyalty >= 50 && loyalty < 100) {
-      return character.corruptedAvatar || character.avatar;
+      // 如果有半堕落头像则使用，否则回退到正常头像
+      return character.corruptedAvatar || character.avatar || '';
     }
 
     // 正常状态（50%以下）和完全堕落状态（100%）都显示正常头像
     // 完全堕落头像需要通过堕落按钮手动切换
-    return character.avatar;
+    return character.avatar || '';
   }
 
   /**
@@ -63,11 +64,13 @@ export class AvatarSwitchService {
    * @returns 更新后的人物对象
    */
   static updateCharacterAvatar(character: Character): Character {
+    // 获取对应堕落值的头像（已包含回退逻辑）
     const newAvatar = this.getAvatarByCorruptionLevel(character);
 
+    // 确保 avatar 字段不会变成 undefined
     return {
       ...character,
-      avatar: newAvatar,
+      avatar: newAvatar || character.avatar || '',
     };
   }
 
@@ -100,7 +103,8 @@ export class AvatarSwitchService {
   static switchToFullyCorruptedAvatar(character: Character): Character {
     return {
       ...character,
-      avatar: character.fullyCorruptedAvatar || character.avatar,
+      // 如果有完全堕落头像则使用，否则回退到正常头像，如果都没有则使用空字符串
+      avatar: character.fullyCorruptedAvatar || character.avatar || '',
     };
   }
 

@@ -122,6 +122,47 @@ export class ModularSaveManager {
 
       console.log('🔄 [初始化默认slot] 开始处理初始化槽位...');
 
+      // 【关键修复】如果已经有有效的 currentGameData 或响应式状态有游戏进度，不要覆盖它
+      // 检查当前的 currentGameData 或响应式状态是否已经有游戏进度（不是初始状态）
+      const checkHasProgress = () => {
+        // 检查响应式状态（可能比 currentGameData 更新）
+        if (
+          this.resources.value.rounds > 0 ||
+          this.resources.value.actionPoints !== this.resources.value.maxActionPoints
+        ) {
+          return true;
+        }
+        // 检查 currentGameData
+        if (this.currentGameData) {
+          return (
+            this.currentGameData.baseResources.rounds > 0 ||
+            this.currentGameData.baseResources.actionPoints !== this.currentGameData.baseResources.maxActionPoints ||
+            (this.currentGameData.training?.characters?.length ?? 0) > 0 ||
+            (this.currentGameData.exploration?.locations?.length ?? 0) > 0
+          );
+        }
+        return false;
+      };
+
+      if (checkHasProgress()) {
+        console.log('✅ [初始化默认slot] 当前已有游戏进度，跳过初始化以避免覆盖当前状态');
+        // 只确保初始化槽位存在，但不覆盖当前的 currentGameData
+        try {
+          const existingInitData = await databaseService.loadSave(INIT_SLOT_ID);
+          if (!existingInitData) {
+            // 如果初始化槽位不存在，创建一个，但不加载到内存
+            const initGameData = createFullGameData();
+            await databaseService.saveGameData(INIT_SLOT_ID, initGameData);
+            await databaseService.upsertSaveMeta(INIT_SLOT_ID, '初始化存档');
+            console.log('✅ [初始化默认slot] 已创建初始化槽位（不覆盖当前进度）');
+          }
+        } catch (error) {
+          // 如果失败，不影响当前状态
+          console.log('ℹ️ [初始化默认slot] 检查初始化槽位失败（可忽略）');
+        }
+        return;
+      }
+
       // 检查是否存在初始化槽位
       let initGameData: ModularGameData | null = null;
       try {
@@ -167,9 +208,11 @@ export class ModularSaveManager {
       }
     } catch (error) {
       console.error('初始化默认slot失败:', error);
-      // 如果失败，至少创建新游戏数据
-      this.currentGameData = createFullGameData();
-      this.syncResourcesToReactive();
+      // 如果失败，只有在没有 currentGameData 时才创建新游戏数据
+      if (!this.currentGameData) {
+        this.currentGameData = createFullGameData();
+        this.syncResourcesToReactive();
+      }
     }
   }
 

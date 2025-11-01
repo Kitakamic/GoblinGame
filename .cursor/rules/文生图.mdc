@@ -1,0 +1,33 @@
+---
+description: 文生图
+alwaysApply: false
+---
+
+主要简单通过 
+
+前端助手的事件来沟通
+eventEmit 发送事件 
+eventOn  监听事件 
+
+const EventType = {
+    GENERATE_IMAGE_REQUEST: 'generate-image-request',
+    GENERATE_IMAGE_RESPONSE: 'generate-image-response',
+};
+
+const requestData = { id: requestId, prompt: prompt, width: null, height: null };
+
+requestId 是要你自己生成唯一的。
+
+
+const imageResponseHandler = (responseData) => {
+  if (responseData.id !== requestId) return;//id不一样 不对
+  eventRemoveListener(EventType.GENERATE_IMAGE_RESPONSE, imageResponseHandler);//取消监听
+  const { success, imageData, error, prompt, change } = responseData;
+  //imageData就是base64的图片了
+
+}
+
+
+eventOn(EventType.GENERATE_IMAGE_RESPONSE, imageResponseHandler);//开启监听
+
+await eventEmit(EventType.GENERATE_IMAGE_REQUEST, requestData);//发送请求

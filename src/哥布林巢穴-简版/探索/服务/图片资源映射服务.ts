@@ -971,6 +971,37 @@ export class PictureResourceMappingService {
   }
 
   /**
+   * 根据种族随机获取一个头像URL（用于用户手动选择头像）
+   * 注意：此方法不会标记图片为已使用，因为这是用户手动选择
+   * @param race 种族
+   * @returns 随机选择的头像URL，如果没有找到则返回null
+   */
+  public getRandomAvatarByRace(race: string): string | null {
+    // 筛选该种族的所有图片资源
+    const sameRaceResources = this.pictureResources.filter(resource => resource.race === race);
+
+    if (sameRaceResources.length === 0) {
+      console.warn(`⚠️ [随机头像] 种族 "${race}" 没有可用的图片资源`);
+      return null;
+    }
+
+    // 随机选择一个
+    const randomIndex = Math.floor(Math.random() * sameRaceResources.length);
+    const selectedResource = sameRaceResources[randomIndex];
+
+    // 如果图片资源有 imageUrl，直接使用；否则根据 ID 构建 URL
+    const avatarUrl = selectedResource.imageUrl || this.getImageUrlById(selectedResource.id);
+
+    console.log(`🎲 [随机头像] 为种族 "${race}" 随机选择了头像:`, {
+      图片ID: selectedResource.id,
+      职业: selectedResource.class,
+      图片URL: avatarUrl,
+    });
+
+    return avatarUrl;
+  }
+
+  /**
    * 重新加载图片资源（开发时使用）
    */
   public reloadPictureResources(): void {

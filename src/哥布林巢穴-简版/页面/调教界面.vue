@@ -157,11 +157,47 @@
     <div v-if="showAvatarModal" class="modal-overlay" @click="closeAvatarModal">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h4>编辑头像</h4>
+          <h4>编辑头像 - {{ editingCharacter?.name }}</h4>
           <button class="close-btn" @click="closeAvatarModal">×</button>
         </div>
         <div class="modal-body">
           <div class="avatar-options">
+            <!-- 头像字段选择 -->
+            <div class="option-group">
+              <label>应用到哪个头像:</label>
+              <select v-model="selectedAvatarField" class="avatar-field-select">
+                <option value="avatar">正常状态头像</option>
+                <option value="corruptedAvatar">半堕落头像 (loyalty≥50%)</option>
+                <option value="fullyCorruptedAvatar">完全堕落头像 (loyalty=100%)</option>
+              </select>
+            </div>
+
+            <!-- 文生图生成 -->
+            <div class="option-group">
+              <label>🎨 AI文生图生成:</label>
+              <div class="generate-image-group">
+                <textarea
+                  v-model="imagePrompt"
+                  class="prompt-textarea"
+                  placeholder="输入提示词，例如：beautiful elf girl, fantasy portrait, detailed face..."
+                  rows="3"
+                ></textarea>
+                <button
+                  class="action-btn primary generate-btn"
+                  :disabled="!imagePrompt.trim() || isGeneratingImage"
+                  @click="generateImageForAvatar"
+                >
+                  {{ isGeneratingImage ? '生成中...' : '生成图片' }}
+                </button>
+              </div>
+              <div v-if="generatedImagePreview" class="generated-image-preview">
+                <img :src="generatedImagePreview" alt="生成的图片预览" />
+                <button class="action-btn primary apply-btn" @click="applyGeneratedImage">应用此图片</button>
+              </div>
+            </div>
+
+            <div class="option-divider">或</div>
+
             <div class="option-group">
               <label>网络图片URL:</label>
               <div class="url-input-group">
@@ -174,17 +210,19 @@
               <input type="file" accept="image/*" class="file-input" @change="handleFileUpload" />
             </div>
             <div class="option-group">
-              <label>预设头像:</label>
-              <div class="preset-avatars">
-                <div
-                  v-for="preset in presetAvatars"
-                  :key="preset"
-                  class="preset-avatar"
-                  @click="setPresetAvatar(preset)"
-                >
-                  {{ preset }}
-                </div>
-              </div>
+              <label>随机头像:</label>
+              <button
+                class="action-btn primary random-avatar-btn"
+                :disabled="!editingCharacter?.race"
+                @click="setRandomAvatarByRace"
+              >
+                🎲 随机选择同种族头像
+              </button>
+              <div v-if="!editingCharacter?.race" class="random-avatar-hint">提示：需要先选择人物种族</div>
+              <button class="action-btn reset-avatar-btn" :disabled="!editingCharacter" @click="resetAvatarToDefault">
+                🔄 恢复默认头像
+              </button>
+              <div class="reset-avatar-hint">清除当前头像设置，恢复为系统默认</div>
             </div>
           </div>
         </div>
@@ -228,11 +266,13 @@ import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { WorldbookService } from '../世界书管理/世界书服务';
 import { AvatarSwitchService } from '../人物管理/服务/头像切换服务';
+import { generateImage } from '../人物管理/服务/文生图服务';
 import { ClothingSwitchService } from '../人物管理/服务/衣着切换服务';
 import CharacterCardInterface from '../人物管理/界面/人物卡界面.vue';
 import OutfitInterface from '../人物管理/界面/换装界面.vue';
 import type { Character } from '../人物管理/类型/人物类型';
 import { modularSaveManager } from '../存档管理/模块化存档服务';
+import { pictureResourceMappingService } from '../探索/服务/图片资源映射服务';
 import { ConfirmService } from '../服务/确认框服务';
 import { actionPointsService } from '../服务/行动力服务';
 import ToastNotification from '../组件/弹窗提示.vue';
@@ -320,6 +360,11 @@ const showManualTraining = ref(false);
 const showOutfitModal = ref(false);
 const avatarUrl = ref('');
 const editingCharacter = ref<Character | null>(null);
+// 文生图相关
+const imagePrompt = ref('');
+const selectedAvatarField = ref<'avatar' | 'corruptedAvatar' | 'fullyCorruptedAvatar'>('avatar');
+const isGeneratingImage = ref(false);
+const generatedImagePreview = ref<string>('');
 
 // 自定义确认框状态
 const showCustomConfirm = ref(false);
@@ -335,8 +380,7 @@ const confirmConfig = ref({
 // 人物列表
 const filteredCharacters = ref<Character[]>([]);
 
-// 预设头像
-const presetAvatars = ['Ⅰ', 'Ⅱ', 'Ⅲ', 'Ⅳ', 'Ⅴ', 'Ⅵ'];
+// 移除预设头像数组，改为随机选择功能
 
 // 计算属性
 const canBatchTrain = computed(() => characters.value.some(c => c.status === 'imprisoned'));
@@ -1614,6 +1658,11 @@ const executeCharacter = async (character: Character) => {
 const editAvatar = (character: Character) => {
   editingCharacter.value = character;
   avatarUrl.value = character.avatar || '';
+  // 初始化文生图相关变量
+  imagePrompt.value = '';
+  selectedAvatarField.value = 'avatar';
+  isGeneratingImage.value = false;
+  generatedImagePreview.value = '';
   showAvatarModal.value = true;
 };
 
@@ -1622,13 +1671,99 @@ const closeAvatarModal = () => {
   showAvatarModal.value = false;
   editingCharacter.value = null;
   avatarUrl.value = '';
+  // 清理文生图相关变量
+  imagePrompt.value = '';
+  selectedAvatarField.value = 'avatar';
+  isGeneratingImage.value = false;
+  generatedImagePreview.value = '';
+};
+
+// 生成图片（文生图）
+const generateImageForAvatar = async () => {
+  if (!editingCharacter.value || !imagePrompt.value.trim()) {
+    toastRef.value?.warning('请输入提示词', { title: '提示', duration: 3000 });
+    return;
+  }
+
+  try {
+    isGeneratingImage.value = true;
+    generatedImagePreview.value = '';
+
+    const prompt = imagePrompt.value.trim();
+    toastRef.value?.info('正在生成图片，请稍候...', { title: '文生图', duration: 5000 });
+
+    // 人物头像使用固定尺寸：728x1456（宽x高）
+    const imageData = await generateImage(prompt, 728, 1456);
+
+    generatedImagePreview.value = imageData;
+    toastRef.value?.success('图片生成成功！请预览后点击"应用此图片"按钮应用', {
+      title: '生成成功',
+      duration: 5000,
+    });
+  } catch (error) {
+    console.error('生成图片失败:', error);
+    toastRef.value?.error(error instanceof Error ? error.message : '生成图片失败，请检查文生图接口是否正常工作', {
+      title: '生成失败',
+      duration: 5000,
+    });
+  } finally {
+    isGeneratingImage.value = false;
+  }
+};
+
+// 应用生成的图片
+const applyGeneratedImage = () => {
+  if (!editingCharacter.value || !generatedImagePreview.value) {
+    toastRef.value?.warning('没有可应用的图片', { title: '提示', duration: 3000 });
+    return;
+  }
+
+  const field = selectedAvatarField.value;
+  if (!editingCharacter.value) return;
+
+  // 应用图片到选择的字段
+  (editingCharacter.value as any)[field] = generatedImagePreview.value;
+
+  // 如果是正常头像，也要强制刷新显示
+  if (field === 'avatar') {
+    forceRefreshCharacterAvatar(editingCharacter.value.id, generatedImagePreview.value);
+  }
+
+  // 更新世界书
+  WorldbookService.updateCharacterEntry(editingCharacter.value);
+
+  // 保存数据
+  saveTrainingData();
+
+  toastRef.value?.success(
+    `已将生成的图片应用到${field === 'avatar' ? '正常状态头像' : field === 'corruptedAvatar' ? '半堕落头像' : '完全堕落头像'}`,
+    {
+      title: '应用成功',
+      duration: 3000,
+    },
+  );
+
+  // 关闭弹窗
+  closeAvatarModal();
 };
 
 // 从URL设置头像
 const setAvatarFromUrl = () => {
   if (editingCharacter.value && avatarUrl.value) {
-    editingCharacter.value.avatar = avatarUrl.value;
-    forceRefreshCharacterAvatar(editingCharacter.value.id, avatarUrl.value);
+    const field = selectedAvatarField.value;
+    (editingCharacter.value as any)[field] = avatarUrl.value;
+
+    // 如果是正常头像，也要强制刷新显示
+    if (field === 'avatar') {
+      forceRefreshCharacterAvatar(editingCharacter.value.id, avatarUrl.value);
+    }
+
+    // 更新世界书
+    WorldbookService.updateCharacterEntry(editingCharacter.value);
+
+    // 保存数据
+    saveTrainingData();
+
     closeAvatarModal();
   }
 };
@@ -1641,8 +1776,20 @@ const handleFileUpload = (event: Event) => {
     const reader = new FileReader();
     reader.onload = e => {
       if (editingCharacter.value && e.target?.result) {
-        editingCharacter.value.avatar = e.target.result as string;
-        forceRefreshCharacterAvatar(editingCharacter.value.id, e.target.result as string);
+        const field = selectedAvatarField.value;
+        (editingCharacter.value as any)[field] = e.target.result as string;
+
+        // 如果是正常头像，也要强制刷新显示
+        if (field === 'avatar') {
+          forceRefreshCharacterAvatar(editingCharacter.value.id, e.target.result as string);
+        }
+
+        // 更新世界书
+        WorldbookService.updateCharacterEntry(editingCharacter.value);
+
+        // 保存数据
+        saveTrainingData();
+
         closeAvatarModal();
       }
     };
@@ -1650,13 +1797,86 @@ const handleFileUpload = (event: Event) => {
   }
 };
 
-// 设置预设头像（开发中）
-const setPresetAvatar = async (_preset: string) => {
-  await ConfirmService.showInfo(
-    '预设头像功能正在开发中',
-    '开发中',
-    '抱歉，预设头像功能尚未完成，请使用网络图片URL或本地图片上传。',
-  );
+// 根据种族随机选择头像
+const setRandomAvatarByRace = () => {
+  if (!editingCharacter.value || !editingCharacter.value.race) {
+    toastRef.value?.warning('无法获取人物种族信息', { title: '提示', duration: 3000 });
+    return;
+  }
+
+  const race = editingCharacter.value.race;
+  const randomAvatarUrl = pictureResourceMappingService.getRandomAvatarByRace(race);
+
+  if (!randomAvatarUrl) {
+    toastRef.value?.warning(`未找到种族 "${race}" 的头像资源，请使用其他方式设置头像`, {
+      title: '未找到头像',
+      duration: 4000,
+    });
+    return;
+  }
+
+  // 应用头像到选择的字段
+  const field = selectedAvatarField.value;
+  (editingCharacter.value as any)[field] = randomAvatarUrl;
+
+  // 如果是正常头像，也要强制刷新显示
+  if (field === 'avatar') {
+    forceRefreshCharacterAvatar(editingCharacter.value.id, randomAvatarUrl);
+  }
+
+  // 更新世界书
+  WorldbookService.updateCharacterEntry(editingCharacter.value);
+
+  // 保存数据
+  saveTrainingData();
+
+  toastRef.value?.success(`已为 ${editingCharacter.value.name} 随机选择了一个 ${race} 种族的头像`, {
+    title: '头像设置成功',
+    duration: 3000,
+  });
+
+  // 关闭弹窗
+  closeAvatarModal();
+};
+
+// 恢复默认头像
+const resetAvatarToDefault = () => {
+  if (!editingCharacter.value) {
+    toastRef.value?.warning('无法获取人物信息', { title: '提示', duration: 3000 });
+    return;
+  }
+
+  const field = selectedAvatarField.value;
+
+  // 清空当前选择的头像字段
+  (editingCharacter.value as any)[field] = undefined;
+
+  // 如果是正常头像，也要强制刷新显示（会使用回退逻辑显示其他头像或默认头像）
+  if (field === 'avatar') {
+    const fallbackAvatar = AvatarSwitchService.getAvatarByCorruptionLevel(editingCharacter.value);
+    if (fallbackAvatar) {
+      editingCharacter.value.avatar = fallbackAvatar;
+      forceRefreshCharacterAvatar(editingCharacter.value.id, fallbackAvatar);
+    } else {
+      // 如果没有任何头像，清空后强制刷新
+      forceRefreshCharacterAvatar(editingCharacter.value.id, '');
+    }
+  }
+
+  // 更新世界书
+  WorldbookService.updateCharacterEntry(editingCharacter.value);
+
+  // 保存数据
+  saveTrainingData();
+
+  const fieldName = field === 'avatar' ? '正常状态头像' : field === 'corruptedAvatar' ? '半堕落头像' : '完全堕落头像';
+  toastRef.value?.success(`已清空 ${fieldName}，恢复为系统默认`, {
+    title: '恢复成功',
+    duration: 3000,
+  });
+
+  // 关闭弹窗
+  closeAvatarModal();
 };
 
 // 处理图片加载错误
@@ -3136,31 +3356,160 @@ watch(
           font-size: 14px;
         }
 
-        .preset-avatars {
+        .random-avatar-btn {
+          width: 100%;
+          padding: 10px 16px;
+          font-size: 14px;
+          font-weight: 600;
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+
+        .random-avatar-hint {
+          margin-top: 8px;
+          color: rgba(205, 133, 63, 0.7);
+          font-size: 12px;
+          font-style: italic;
+        }
+
+        .reset-avatar-btn {
+          width: 100%;
+          padding: 10px 16px;
+          font-size: 14px;
+          font-weight: 600;
+          margin-top: 8px;
+          background: rgba(107, 114, 128, 0.2);
+          color: #d1d5db;
+          border-color: rgba(107, 114, 128, 0.4);
+
+          &:hover:not(:disabled) {
+            background: rgba(107, 114, 128, 0.3);
+            border-color: rgba(107, 114, 128, 0.6);
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+
+        .reset-avatar-hint {
+          margin-top: 4px;
+          color: rgba(205, 133, 63, 0.6);
+          font-size: 11px;
+          font-style: italic;
+        }
+
+        .avatar-field-select {
+          background: rgba(40, 26, 20, 0.7);
+          border: 1px solid rgba(205, 133, 63, 0.25);
+          border-radius: 8px;
+          padding: 8px 12px;
+          color: #ffe9d2;
+          font-size: 14px;
+          width: 100%;
+          cursor: pointer;
+
+          &:focus {
+            outline: none;
+            border-color: rgba(255, 120, 60, 0.5);
+          }
+        }
+
+        .generate-image-group {
           display: flex;
+          flex-direction: column;
           gap: 8px;
-          justify-content: space-evenly;
-          flex-wrap: nowrap;
 
-          .preset-avatar {
-            width: 40px;
-            height: 40px;
-            border: 1px solid rgba(205, 133, 63, 0.3);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            font-size: 18px;
-            transition: all 0.2s ease;
-            background: rgba(40, 26, 20, 0.3);
-            flex-shrink: 0;
+          .prompt-textarea {
+            background: rgba(40, 26, 20, 0.7);
+            border: 1px solid rgba(205, 133, 63, 0.25);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: #ffe9d2;
+            font-size: 14px;
+            width: 100%;
+            resize: vertical;
+            min-height: 80px;
+            font-family: inherit;
 
-            &:hover {
-              border-color: rgba(255, 120, 60, 0.6);
-              background: rgba(255, 120, 60, 0.1);
-              transform: scale(1.05);
+            &:focus {
+              outline: none;
+              border-color: rgba(255, 120, 60, 0.5);
             }
+
+            &::placeholder {
+              color: rgba(255, 233, 210, 0.5);
+            }
+          }
+
+          .generate-btn {
+            width: 100%;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 600;
+
+            &:disabled {
+              opacity: 0.5;
+              cursor: not-allowed;
+            }
+          }
+        }
+
+        .generated-image-preview {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-top: 12px;
+          padding: 12px;
+          background: rgba(40, 26, 20, 0.5);
+          border: 1px solid rgba(205, 133, 63, 0.3);
+          border-radius: 8px;
+
+          img {
+            width: 100%;
+            max-width: 300px;
+            height: auto;
+            border-radius: 8px;
+            border: 1px solid rgba(205, 133, 63, 0.3);
+            margin: 0 auto;
+          }
+
+          .apply-btn {
+            width: 100%;
+            padding: 10px 16px;
+            font-size: 14px;
+            font-weight: 600;
+          }
+        }
+
+        .option-divider {
+          text-align: center;
+          color: rgba(205, 133, 63, 0.6);
+          font-size: 12px;
+          font-weight: 600;
+          margin: 8px 0;
+          position: relative;
+
+          &::before,
+          &::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 40%;
+            height: 1px;
+            background: rgba(205, 133, 63, 0.3);
+          }
+
+          &::before {
+            left: 0;
+          }
+
+          &::after {
+            right: 0;
           }
         }
       }
