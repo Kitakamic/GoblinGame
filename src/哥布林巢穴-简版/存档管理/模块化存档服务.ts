@@ -222,6 +222,9 @@ export class ModularSaveManager {
       await databaseService.saveGameData(saveId, gameData as any);
       await databaseService.upsertSaveMeta(saveId, options.saveName ?? (slot === 0 ? '自动存档' : `槽位 ${slot}`));
 
+      // 在切换存档ID之前，先保存原来的存档ID（用于复制调教记录数据）
+      const previousSaveId = databaseService.getCurrentSaveId();
+
       // 设置当前存档ID
       databaseService.setCurrentSaveId(saveId);
 
@@ -230,6 +233,12 @@ export class ModularSaveManager {
 
       // 保存当前世界书数据到数据库
       await this.saveWorldbookToDatabase(slot);
+
+      // 复制调教记录数据到新槽位（如果从其他槽位保存）
+      // 使用原来的存档ID作为源，而不是当前已切换的存档ID
+      if (previousSaveId && previousSaveId !== saveId) {
+        await this.copyTrainingHistoryFromSlot(previousSaveId, slot);
+      }
 
       // 触发保存事件
       if (this.events.onSave) {
@@ -264,6 +273,17 @@ export class ModularSaveManager {
 
       // 更新当前游戏数据
       this.currentGameData = slotData.data;
+
+      // 调试日志：记录存档中的行动力
+      console.log(
+        `[loadFromSlot] 存档中的行动力: ${slotData.data.baseResources.actionPoints}, 最大行动力: ${slotData.data.baseResources.maxActionPoints}`,
+      );
+
+      // 同步资源状态到Vue响应式状态（必须在设置currentGameData后立即调用）
+      this.syncResourcesToReactive();
+
+      // 调试日志：同步后的行动力
+      console.log(`[loadFromSlot] 同步后响应式状态中的行动力: ${this.resources.value.actionPoints}`);
 
       // 设置当前存档ID（直接使用稳定键）
       databaseService.setCurrentSaveId(`slot_${slot}`);
@@ -340,7 +360,16 @@ export class ModularSaveManager {
    */
   syncResourcesToReactive(): void {
     if (this.currentGameData) {
+      const oldActionPoints = this.resources.value.actionPoints;
+      const newActionPoints = this.currentGameData.baseResources.actionPoints;
       this.resources.value = { ...this.currentGameData.baseResources };
+
+      // 调试日志：检测行动力变化
+      if (oldActionPoints !== newActionPoints) {
+        console.log(`[syncResourcesToReactive] 行动力变化: ${oldActionPoints} -> ${newActionPoints}`, {
+          stackTrace: new Error().stack,
+        });
+      }
     }
   }
 
@@ -582,6 +611,15 @@ export class ModularSaveManager {
     if (!this.currentGameData) {
       this.createNewGame();
     }
+
+    // 调试日志：检测行动力设置
+    if (type === 'actionPoints') {
+      const oldValue = this.currentGameData!.baseResources[type];
+      console.log(`[setResource] 设置行动力: ${oldValue} -> ${value}`, {
+        stackTrace: new Error().stack,
+      });
+    }
+
     this.currentGameData!.baseResources[type] = value;
     this.currentGameData!.metadata.lastSaved = Date.now();
 
@@ -613,6 +651,14 @@ export class ModularSaveManager {
     const currentValue = this.currentGameData!.baseResources[type];
     const newValue = currentValue + amount;
     console.log(`资源 ${type}: 当前值 ${currentValue} -> 新值 ${newValue}`);
+
+    // 调试日志：检测行动力增加
+    if (type === 'actionPoints') {
+      console.log(`[addResource] 行动力增加: ${currentValue} + ${amount} = ${newValue}`, {
+        reason,
+        stackTrace: new Error().stack,
+      });
+    }
 
     // 检查是否会导致负数（对于某些资源类型）
     if (
@@ -886,6 +932,78 @@ export class ModularSaveManager {
       }
     } catch (error) {
       console.error('从数据库恢复世界书数据失败:', error);
+    }
+  }
+
+  /**
+   * 从源槽位复制调教记录数据到目标槽位
+   * 当从其他槽位保存到新槽位时，需要将调教记录数据也复制过去
+   */
+  async copyTrainingHistoryFromSlot(sourceSaveId: string, targetSlot: number): Promise<void> {
+    try {
+      const targetSaveId = `slot_${targetSlot}`;
+
+      // 如果源槽位就是目标槽位，不需要复制
+      if (sourceSaveId === targetSaveId) {
+        console.log(`源槽位和目标槽位相同，跳过复制调教记录数据`);
+        return;
+      }
+
+      console.log(`📋 复制调教记录数据: ${sourceSaveId} -> ${targetSaveId}`);
+
+      // 从源存档读取调教记录数据
+      const sourceData = await databaseService.loadTrainingHistoryData(sourceSaveId);
+
+      if (sourceData) {
+        // 提取调教记录数据（不包括暂存数据，暂存数据应该保持为空）
+        const trainingHistoryData: Record<string, any[]> = {};
+        const pendingDialoguePairs: Record<string, { userInput: string; aiResponse: string } | null> = {};
+        const pendingAttributeChanges: Record<string, { loyalty: number; stamina: number; character: any } | null> = {};
+        const originalCharacters: Record<string, any | null> = {};
+
+        // 复制调教记录（排除 pendingDialoguePairs、pendingAttributeChanges、originalCharacters）
+        for (const [key, value] of Object.entries(sourceData)) {
+          if (key !== 'pendingDialoguePairs' && key !== 'pendingAttributeChanges' && key !== 'originalCharacters') {
+            if (Array.isArray(value)) {
+              trainingHistoryData[key] = value;
+            }
+          }
+        }
+
+        // 复制暂存数据（如果存在）
+        if (sourceData.pendingDialoguePairs) {
+          Object.assign(pendingDialoguePairs, sourceData.pendingDialoguePairs);
+        }
+        if (sourceData.pendingAttributeChanges) {
+          Object.assign(pendingAttributeChanges, sourceData.pendingAttributeChanges);
+        }
+        if (sourceData.originalCharacters) {
+          Object.assign(originalCharacters, sourceData.originalCharacters);
+        }
+
+        // 保存到目标槽位
+        await databaseService.saveTrainingHistoryData(
+          targetSaveId,
+          trainingHistoryData,
+          pendingDialoguePairs,
+          pendingAttributeChanges,
+          originalCharacters,
+        );
+
+        const recordCount = Object.keys(trainingHistoryData).length;
+        const pendingPairCount = Object.values(pendingDialoguePairs).filter(v => v !== null).length;
+        const pendingAttrCount = Object.values(pendingAttributeChanges).filter(v => v !== null).length;
+        const originalCharCount = Object.values(originalCharacters).filter(v => v !== null).length;
+
+        console.log(
+          `✅ 已复制调教记录数据到 ${targetSaveId}: ${recordCount} 个角色, ${pendingPairCount} 个暂存对话对, ${pendingAttrCount} 个暂存属性变化, ${originalCharCount} 个原始人物属性`,
+        );
+      } else {
+        console.log(`ℹ️ 源存档 ${sourceSaveId} 没有调教记录数据，跳过复制`);
+      }
+    } catch (error) {
+      console.error('复制调教记录数据失败:', error);
+      // 不抛出错误，避免影响主流程
     }
   }
 

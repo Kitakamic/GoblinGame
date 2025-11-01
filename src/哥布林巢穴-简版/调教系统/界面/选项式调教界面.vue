@@ -243,6 +243,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { generateWithChainOfThought } from '../../世界书管理/AI生成助手';
 import { WorldbookService } from '../../世界书管理/世界书服务';
 import { ChainOfThoughtMode } from '../../世界书管理/思维链管理器';
+import { TrainingRecordManager } from '../../世界书管理/调教记录管理器';
 import { AvatarSwitchService } from '../../人物管理/服务/头像切换服务';
 import CharacterDetailModal from '../../人物管理/界面/人物卡界面.vue';
 import type { Character } from '../../人物管理/类型/人物类型';
@@ -506,9 +507,36 @@ onMounted(async () => {
     id: props.character.id,
   });
 
-  // 初始化原始人物属性
-  originalCharacter.value = { ...props.character };
-  console.log('💾 已保存原始人物属性:', originalCharacter.value);
+  // 从数据库加载暂存数据
+  try {
+    // 加载原始人物属性
+    const dbOriginalChar = await TrainingRecordManager.getOriginalCharacter(props.character.name);
+    originalCharacter.value = dbOriginalChar || { ...props.character };
+    if (!dbOriginalChar) {
+      // 如果数据库没有，保存当前人物属性
+      await TrainingRecordManager.saveOriginalCharacter(props.character.name, originalCharacter.value);
+    }
+    console.log('💾 已加载原始人物属性（从数据库）:', originalCharacter.value);
+
+    // 加载暂存的属性变化
+    const dbPendingAttrs = await TrainingRecordManager.getPendingAttributeChanges(props.character.name);
+    if (dbPendingAttrs) {
+      pendingAttributeChanges.value = dbPendingAttrs;
+      console.log('💾 已加载暂存属性变化（从数据库）:', dbPendingAttrs);
+    }
+
+    // 加载暂存的对话对
+    const dbPendingPair = await TrainingRecordManager.getPendingDialoguePair(props.character.name);
+    if (dbPendingPair) {
+      currentDialoguePair.value = dbPendingPair;
+      console.log('💾 已加载暂存对话对（从数据库）:', dbPendingPair);
+    }
+  } catch (error) {
+    console.error('加载暂存数据失败:', error);
+    // 如果加载失败，使用默认值
+    originalCharacter.value = { ...props.character };
+    await TrainingRecordManager.saveOriginalCharacter(props.character.name, originalCharacter.value);
+  }
 
   console.log('📦 开始加载历史调教消息...');
   await loadCharacterTrainingMessages();
@@ -641,6 +669,9 @@ const loadCharacterTrainingMessages = async () => {
         console.log(`  [${index}] ${record.gameTime} - ${record.sender}`);
       });
 
+      // 用于追踪上一个用户消息，以便将用户选择附加到AI回复页面上
+      let lastUserMessage: string | null = null;
+
       sortedHistory.forEach((record, index) => {
         const isUser = record.sender === 'user' || record.sender === '{{user}}';
         console.log(`➕ 添加第 ${index + 1} 条消息:`, {
@@ -650,12 +681,33 @@ const loadCharacterTrainingMessages = async () => {
         });
 
         if (isUser) {
+          // 用户消息：添加到 messages 和保存用户选择文本
           addUserMessageWithGameTime(record.content);
+          lastUserMessage = record.content;
+          console.log(`  📝 已添加用户消息到 messages，等待附加到下一个AI回复页面`);
         } else {
+          // AI消息：创建新页面，并将上一个用户选择附加到页面开头
+          let pageHtml = '';
+
+          // 如果有上一个用户消息，先将用户选择附加到页面开头（格式化但不清理AI内容）
+          if (lastUserMessage) {
+            pageHtml += `<div class="choice-line"><span class="choice-prefix">→</span> ${safeFormatMessage(lastUserMessage)}</div>`;
+            console.log(`  📝 已将用户选择附加到AI回复页面开头`);
+            lastUserMessage = null; // 清除，避免重复附加
+          }
+
+          // 处理AI回复内容（清理和格式化）
+          const cleanedContent = cleanAIContent(record.content);
+          const formattedContent = safeFormatMessage(filterXmlTags(cleanedContent));
+          pageHtml += formattedContent;
+
+          // 创建页面（直接使用HTML，不再经过 pushAIPage 的处理）
+          pages.value.push({ html: pageHtml });
+          currentPageIndex.value = pages.value.length - 1;
+
+          // 同时添加到 messages
           addAIMessageWithGameTime(record.content, props.character.name);
-          // 回放为书页
-          pushAIPage(record.content);
-          console.log(`  📄 已添加为书页，当前页面数: ${pages.value.length}`);
+          console.log(`  📄 已添加为书页（包含用户选择），当前页面数: ${pages.value.length}`);
         }
       });
 
@@ -760,6 +812,8 @@ const generateAndHandleAIReply = async () => {
     // 所以此时 displayCharacter 应该已经反映了应用后的最新状态
     const currentCharacterState = displayCharacter.value;
     originalCharacter.value = { ...currentCharacterState };
+    // 同步保存到数据库
+    await TrainingRecordManager.saveOriginalCharacter(props.character.name, originalCharacter.value);
     console.log(
       '💾 保存当前人物状态作为重试基准（堕落值:',
       currentCharacterState.loyalty,
@@ -874,11 +928,18 @@ const generateAndHandleAIReply = async () => {
       if (props.character.status === 'surrendered') {
         console.log('🚫 已堕落人物不应用属性变化，保持原有属性');
         // 已堕落人物不应用任何属性变化，直接使用原有人物数据
+        // 同时保存到数据库
         pendingAttributeChanges.value = {
           loyalty: props.character.loyalty,
           stamina: props.character.stamina,
           character: props.character,
         };
+        await TrainingRecordManager.savePendingAttributeChanges(
+          props.character.name,
+          props.character.loyalty,
+          props.character.stamina,
+          props.character,
+        );
       } else {
         // 未堕落人物正常应用属性变化
         const newAttributes = AttributeChangeParseService.applyAttributeChanges(
@@ -924,11 +985,18 @@ const generateAndHandleAIReply = async () => {
         }
 
         // 暂存属性变化，等待下一轮对话开始前应用
+        // 同时保存到数据库
         pendingAttributeChanges.value = {
           loyalty: newAttributes.loyalty,
           stamina: newAttributes.stamina,
           character: finalCharacter,
         };
+        await TrainingRecordManager.savePendingAttributeChanges(
+          props.character.name,
+          newAttributes.loyalty,
+          newAttributes.stamina,
+          finalCharacter,
+        );
 
         // 通知父组件更新人物数据（但不触发自动调教）
         emit('update-character', finalCharacter, false);
@@ -975,11 +1043,13 @@ const generateAndHandleAIReply = async () => {
     currentStreamingPageIndex.value = -1;
 
     // AI回复成功后，暂存用户输入和AI回复，等待用户下一步操作时再保存到世界书
+    // 同时保存到数据库
     if (isAISuccess && lastUserInput.value) {
       currentDialoguePair.value = {
         userInput: lastUserInput.value,
         aiResponse: formattedResponse,
       };
+      await TrainingRecordManager.savePendingDialoguePair(props.character.name, lastUserInput.value, formattedResponse);
       console.log('📝 暂存对话对，等待用户下一步操作时保存:', currentDialoguePair.value);
     }
   } catch (error) {
@@ -999,19 +1069,29 @@ const generateAndHandleAIReply = async () => {
 
 // 保存暂存的对话对到世界书
 const savePendingDialogue = async () => {
-  if (currentDialoguePair.value) {
-    console.log('💾 保存暂存的对话对到世界书:', currentDialoguePair.value);
-    await saveTrainingPairToWorldbook(currentDialoguePair.value.userInput, currentDialoguePair.value.aiResponse);
+  // 优先从数据库读取（确保获取最新数据）
+  const dbPendingPair = await TrainingRecordManager.getPendingDialoguePair(props.character.name);
+  const pendingPair = dbPendingPair || currentDialoguePair.value;
+
+  if (pendingPair) {
+    console.log('💾 保存暂存的对话对到世界书:', pendingPair);
+    await saveTrainingPairToWorldbook(pendingPair.userInput, pendingPair.aiResponse);
+    // 清除内存和数据库中的暂存对话对
     currentDialoguePair.value = null;
+    await TrainingRecordManager.clearPendingDialoguePair(props.character.name);
   }
 };
 
 // 应用暂存的属性变化
 const applyPendingAttributeChanges = async () => {
-  if (pendingAttributeChanges.value) {
-    console.log('🔄 应用暂存的属性变化:', pendingAttributeChanges.value);
+  // 优先从数据库读取（确保获取最新数据）
+  const dbPendingAttrs = await TrainingRecordManager.getPendingAttributeChanges(props.character.name);
+  const pendingAttrs = dbPendingAttrs || pendingAttributeChanges.value;
 
-    const { character: finalCharacter } = pendingAttributeChanges.value;
+  if (pendingAttrs) {
+    console.log('🔄 应用暂存的属性变化:', pendingAttrs);
+
+    const { character: finalCharacter } = pendingAttrs;
 
     // 更新世界书信息
     console.log('📚 更新世界书信息...');
@@ -1037,11 +1117,14 @@ const applyPendingAttributeChanges = async () => {
     });
 
     // 更新 originalCharacter 为最新状态，确保重试时使用正确的基准
+    // 同时保存到数据库
     originalCharacter.value = { ...finalCharacter };
+    await TrainingRecordManager.saveOriginalCharacter(props.character.name, originalCharacter.value);
     console.log('💾 已更新 originalCharacter 为最新状态（堕落值:', finalCharacter.loyalty, '）');
 
-    // 清除暂存的属性变化
+    // 清除内存和数据库中的暂存属性变化
     pendingAttributeChanges.value = null;
+    await TrainingRecordManager.clearPendingAttributeChanges(props.character.name);
   }
 };
 
@@ -1049,21 +1132,24 @@ const applyPendingAttributeChanges = async () => {
 const retryAIGeneration = async () => {
   console.log('🔄 用户点击重试按钮，重新生成AI回复');
 
-  // 清除暂存的AI回复和属性变化
+  // 清除暂存的AI回复和属性变化（包括数据库）
   currentDialoguePair.value = null;
+  await TrainingRecordManager.clearPendingDialoguePair(props.character.name);
 
   // 如果有暂存的属性变化，先清除它（但不应用到存档），因为我们只是重试最后一次生成
   // 优先使用 originalCharacter（保存了生成前的正确状态），如果没有则使用当前显示状态
-  const characterToRestore = originalCharacter.value || displayCharacter.value;
+  const dbOriginalChar = await TrainingRecordManager.getOriginalCharacter(props.character.name);
+  const characterToRestore = dbOriginalChar || originalCharacter.value || displayCharacter.value;
 
   console.log('🔄 恢复到上一次生成前的状态:', {
     loyalty: characterToRestore.loyalty,
     stamina: characterToRestore.stamina,
-    usingOriginal: !!originalCharacter.value,
+    usingOriginal: !!dbOriginalChar || !!originalCharacter.value,
   });
 
-  // 如果暂存的属性变化还未应用，清除它
+  // 如果暂存的属性变化还未应用，清除它（包括数据库）
   pendingAttributeChanges.value = null;
+  await TrainingRecordManager.clearPendingAttributeChanges(props.character.name);
 
   // 清空上次生成的选项
   options.value = [];

@@ -593,6 +593,14 @@ const saveCurrentGameState = () => {
 // 恢复基础资源的公共函数
 const restoreBaseResources = (baseResources: any) => {
   if (baseResources) {
+    // 调试日志：记录恢复前的行动力
+    const beforeActionPoints = modularSaveManager.resources.value.actionPoints;
+    const beforeMaxActionPoints = modularSaveManager.resources.value.maxActionPoints;
+    console.log(`[restoreBaseResources] 恢复前行动力: ${beforeActionPoints}/${beforeMaxActionPoints}`);
+    console.log(
+      `[restoreBaseResources] 存档中的行动力: ${baseResources.actionPoints}/${baseResources.maxActionPoints}`,
+    );
+
     modularSaveManager.setResource('gold', baseResources.gold);
     modularSaveManager.setResource('food', baseResources.food);
     modularSaveManager.setResource('threat', baseResources.threat);
@@ -603,10 +611,25 @@ const restoreBaseResources = (baseResources: any) => {
     modularSaveManager.setResource('paladinGoblins', baseResources.paladinGoblins);
     modularSaveManager.setResource('trainingSlaves', baseResources.trainingSlaves);
     modularSaveManager.setResource('rounds', baseResources.rounds);
-    // 恢复行动力系统数据
-    modularSaveManager.setResource('actionPoints', baseResources.actionPoints || 3);
-    modularSaveManager.setResource('maxActionPoints', baseResources.maxActionPoints || 3);
-    modularSaveManager.setResource('conqueredRegions', baseResources.conqueredRegions || 0);
+    // 恢复行动力系统数据（使用??操作符，只有在undefined或null时才使用默认值）
+    const targetActionPoints = baseResources.actionPoints ?? 3;
+    const targetMaxActionPoints = baseResources.maxActionPoints ?? 3;
+    console.log(`[restoreBaseResources] 准备设置行动力: ${targetActionPoints}/${targetMaxActionPoints}`);
+    modularSaveManager.setResource('actionPoints', targetActionPoints);
+    modularSaveManager.setResource('maxActionPoints', targetMaxActionPoints);
+    modularSaveManager.setResource('conqueredRegions', baseResources.conqueredRegions ?? 0);
+
+    // 调试日志：记录恢复后的行动力
+    const afterActionPoints = modularSaveManager.resources.value.actionPoints;
+    const afterMaxActionPoints = modularSaveManager.resources.value.maxActionPoints;
+    console.log(`[restoreBaseResources] 恢复后行动力: ${afterActionPoints}/${afterMaxActionPoints}`);
+
+    if (beforeActionPoints !== afterActionPoints) {
+      console.warn(
+        `[restoreBaseResources] ⚠️ 行动力在恢复过程中发生变化: ${beforeActionPoints} -> ${afterActionPoints}`,
+      );
+    }
+
     console.log('基础资源已恢复');
   }
 };
@@ -692,10 +715,24 @@ const handleLoad = async (slot: number, data: any) => {
     }
 
     // 从指定槽位加载游戏
+    console.log(`[handleLoad] 开始加载槽位 ${slot}`);
     const gameData = await modularSaveManager.loadFromSlot({ slot });
     if (gameData) {
+      // 调试日志：记录加载后的游戏数据
+      console.log(
+        `[handleLoad] 加载后游戏数据中的行动力: ${gameData.baseResources.actionPoints}/${gameData.baseResources.maxActionPoints}`,
+      );
+      console.log(
+        `[handleLoad] 加载后响应式状态中的行动力: ${modularSaveManager.resources.value.actionPoints}/${modularSaveManager.resources.value.maxActionPoints}`,
+      );
+
       // 恢复基础资源
       restoreBaseResources(gameData.baseResources);
+
+      // 调试日志：恢复后的最终行动力
+      console.log(
+        `[handleLoad] 恢复后最终行动力: ${modularSaveManager.resources.value.actionPoints}/${modularSaveManager.resources.value.maxActionPoints}`,
+      );
 
       // 巢穴数据现在由数据库系统处理，不需要单独恢复
       // 建筑槽位和历史记录数据现在由数据库系统管理

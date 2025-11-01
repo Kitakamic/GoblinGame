@@ -1,3 +1,4 @@
+import { databaseService } from '../存档管理/数据库服务';
 import { WorldbookHelper } from './世界书助手';
 import type { HistoryRecord } from './世界书类型定义';
 import { RecordBuilder } from './记录构建器';
@@ -8,6 +9,7 @@ import { RecordBuilder } from './记录构建器';
 export class TrainingRecordManager {
   /**
    * 获取现有的调教记录
+   * 优先从数据库读取，如果数据库没有则从世界书读取（兼容旧数据）
    */
   static async getExistingTrainingHistory(characterName: string, worldbookName: string): Promise<HistoryRecord[]> {
     console.log('🔍 [调教记录管理器] 开始获取调教记录', {
@@ -16,7 +18,34 @@ export class TrainingRecordManager {
     });
 
     try {
-      console.log('📚 正在获取世界书数据...');
+      // 首先尝试从数据库读取
+      const currentSaveId = databaseService.getCurrentSaveId();
+      if (currentSaveId) {
+        console.log('💾 正在从数据库读取调教记录...', { saveId: currentSaveId, characterName });
+        const dbData = await databaseService.loadTrainingHistoryData(currentSaveId);
+        if (dbData && dbData[characterName]) {
+          const records = dbData[characterName];
+          // 验证格式并转换
+          const validatedRecords = this.validateAndConvertHistoryRecords(records);
+
+          // 如果有暂存的对话对，也添加到记录中（但标记为未保存）
+          // 注意：暂存的对话对不会永久保存，只在总结时使用
+          // 如果需要显示暂存的对话对，可以在UI层处理
+
+          if (validatedRecords.length > 0) {
+            console.log(`✅ 从数据库获取到 ${validatedRecords.length} 条调教记录`);
+            // 如果有暂存的对话对，在日志中提示
+            if (dbData.pendingDialoguePairs?.[characterName]) {
+              console.log(`ℹ️ 该角色有暂存的对话对（未选择下一个选项）`);
+            }
+            return validatedRecords;
+          }
+        }
+        console.log('ℹ️ 数据库中未找到该角色的调教记录，尝试从世界书读取');
+      }
+
+      // 如果数据库没有，则从世界书读取（兼容旧数据）
+      console.log('📚 正在从世界书获取调教记录...');
       const worldbook = await WorldbookHelper.get(worldbookName);
       console.log(`📊 世界书包含 ${worldbook.length} 个条目`);
 
@@ -36,6 +65,12 @@ export class TrainingRecordManager {
         console.log('🔄 正在解析调教记录...');
         const records = this.parseTrainingHistory(historyEntry.content);
         console.log(`✅ 解析完成，共 ${records.length} 条记录`);
+
+        // 如果从世界书读取到数据，同步到数据库（兼容旧数据迁移）
+        if (records.length > 0 && currentSaveId) {
+          console.log('💾 将世界书中的调教记录同步到数据库...');
+          await this.saveTrainingHistoryToDatabase(characterName, records, currentSaveId);
+        }
 
         return records;
       } else {
@@ -66,7 +101,7 @@ export class TrainingRecordManager {
 
   /**
    * 批量添加调教记录（增量追加模式）
-   * 直接读取旧的世界书内容，追加新记录，避免重复解析
+   * 同时保存到世界书和数据库
    */
   static async addMultipleTrainingRecords(
     characterId: string,
@@ -102,10 +137,350 @@ export class TrainingRecordManager {
       // 更新世界书
       await this.updateTrainingEntry(characterId, characterName, worldbookName, newContent);
 
+      // 同时保存到数据库
+      const currentSaveId = databaseService.getCurrentSaveId();
+      if (currentSaveId) {
+        console.log('💾 同时保存调教记录到数据库...');
+        // 从数据库获取已有记录（不递归调用getExistingTrainingHistory）
+        const existingData = await databaseService.loadTrainingHistoryData(currentSaveId);
+        const existingRecords = (existingData && existingData[characterName]) || [];
+        // 合并新记录（追加模式）
+        const allRecords = [...existingRecords, ...trainingRecords];
+        await this.saveTrainingHistoryToDatabase(characterName, allRecords, currentSaveId);
+      }
+
       console.log(`✅ 已增量添加 ${trainingRecords.length} 条调教记录到 ${characterName}`);
     } catch (error) {
       console.error('批量添加调教记录失败:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 保存调教记录到数据库
+   */
+  private static async saveTrainingHistoryToDatabase(
+    characterName: string,
+    records: HistoryRecord[],
+    saveId: string,
+    pendingDialoguePair?: { userInput: string; aiResponse: string } | null,
+  ): Promise<void> {
+    try {
+      // 获取数据库中已有的所有调教记录
+      const existingData = await databaseService.loadTrainingHistoryData(saveId);
+      const allTrainingHistory = existingData || {};
+      const existingPendingPairs = existingData?.pendingDialoguePairs || {};
+
+      // 更新该角色的调教记录
+      allTrainingHistory[characterName] = records;
+
+      // 如果有暂存的对话对，更新它（null表示清除）
+      if (pendingDialoguePair !== undefined) {
+        existingPendingPairs[characterName] = pendingDialoguePair;
+      }
+
+      // 保存回数据库（包括所有暂存数据）
+      await databaseService.saveTrainingHistoryData(
+        saveId,
+        allTrainingHistory,
+        existingPendingPairs,
+        undefined, // pendingAttributeChanges 由单独的方法管理
+        undefined, // originalCharacters 由单独的方法管理
+      );
+      console.log(`✅ 已保存 ${records.length} 条调教记录到数据库 (${characterName})`);
+    } catch (error) {
+      console.error('保存调教记录到数据库失败:', error);
+      // 不抛出错误，避免影响主流程
+    }
+  }
+
+  /**
+   * 保存暂存的对话对到数据库
+   * @param characterName 角色名称
+   * @param userInput 用户输入
+   * @param aiResponse AI回复
+   * @param saveId 存档ID
+   */
+  static async savePendingDialoguePair(
+    characterName: string,
+    userInput: string,
+    aiResponse: string,
+    saveId?: string,
+  ): Promise<void> {
+    try {
+      const currentSaveId = saveId || databaseService.getCurrentSaveId();
+      if (!currentSaveId) {
+        console.log('ℹ️ 没有当前存档ID，跳过保存暂存对话对');
+        return;
+      }
+
+      // 获取数据库中已有的所有数据
+      const existingData = await databaseService.loadTrainingHistoryData(currentSaveId);
+      const allTrainingHistory = existingData || {};
+      const existingPendingPairs = existingData?.pendingDialoguePairs || {};
+      const existingPendingAttrs = existingData?.pendingAttributeChanges || {};
+      const existingOriginalChars = existingData?.originalCharacters || {};
+
+      // 更新暂存的对话对
+      existingPendingPairs[characterName] = {
+        userInput,
+        aiResponse,
+      };
+
+      // 保存回数据库（包括所有暂存数据）
+      await databaseService.saveTrainingHistoryData(
+        currentSaveId,
+        allTrainingHistory,
+        existingPendingPairs,
+        existingPendingAttrs,
+        existingOriginalChars,
+      );
+      console.log(`✅ 已保存暂存对话对到数据库 (${characterName})`);
+    } catch (error) {
+      console.error('保存暂存对话对到数据库失败:', error);
+      // 不抛出错误，避免影响主流程
+    }
+  }
+
+  /**
+   * 清除暂存的对话对（当用户选择下一个选项时）
+   * @param characterName 角色名称
+   * @param saveId 存档ID
+   */
+  static async clearPendingDialoguePair(characterName: string, saveId?: string): Promise<void> {
+    try {
+      const currentSaveId = saveId || databaseService.getCurrentSaveId();
+      if (!currentSaveId) {
+        return;
+      }
+
+      // 获取数据库中已有的所有数据
+      const existingData = await databaseService.loadTrainingHistoryData(currentSaveId);
+      const allTrainingHistory = existingData || {};
+      const existingPendingPairs = existingData?.pendingDialoguePairs || {};
+      const existingPendingAttrs = existingData?.pendingAttributeChanges || {};
+      const existingOriginalChars = existingData?.originalCharacters || {};
+
+      // 清除暂存的对话对
+      existingPendingPairs[characterName] = null;
+
+      // 保存回数据库（包括所有暂存数据）
+      await databaseService.saveTrainingHistoryData(
+        currentSaveId,
+        allTrainingHistory,
+        existingPendingPairs,
+        existingPendingAttrs,
+        existingOriginalChars,
+      );
+      console.log(`✅ 已清除暂存对话对 (${characterName})`);
+    } catch (error) {
+      console.error('清除暂存对话对失败:', error);
+      // 不抛出错误，避免影响主流程
+    }
+  }
+
+  /**
+   * 获取暂存的对话对
+   * @param characterName 角色名称
+   * @param saveId 存档ID
+   * @returns 暂存的对话对，如果没有则返回null
+   */
+  static async getPendingDialoguePair(
+    characterName: string,
+    saveId?: string,
+  ): Promise<{ userInput: string; aiResponse: string } | null> {
+    try {
+      const currentSaveId = saveId || databaseService.getCurrentSaveId();
+      if (!currentSaveId) {
+        return null;
+      }
+
+      const existingData = await databaseService.loadTrainingHistoryData(currentSaveId);
+      if (existingData?.pendingDialoguePairs?.[characterName]) {
+        return existingData.pendingDialoguePairs[characterName];
+      }
+      return null;
+    } catch (error) {
+      console.error('获取暂存对话对失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 保存暂存的属性变化到数据库
+   * @param characterName 角色名称
+   * @param loyalty 忠诚度
+   * @param stamina 体力
+   * @param character 完整的人物对象
+   * @param saveId 存档ID
+   */
+  static async savePendingAttributeChanges(
+    characterName: string,
+    loyalty: number,
+    stamina: number,
+    character: any,
+    saveId?: string,
+  ): Promise<void> {
+    try {
+      const currentSaveId = saveId || databaseService.getCurrentSaveId();
+      if (!currentSaveId) {
+        console.log('ℹ️ 没有当前存档ID，跳过保存暂存属性变化');
+        return;
+      }
+
+      // 获取数据库中已有的所有数据
+      const existingData = await databaseService.loadTrainingHistoryData(currentSaveId);
+      const allTrainingHistory = existingData || {};
+      const existingPendingPairs = existingData?.pendingDialoguePairs || {};
+      const existingPendingAttrs = existingData?.pendingAttributeChanges || {};
+      const existingOriginalChars = existingData?.originalCharacters || {};
+
+      // 更新暂存的属性变化
+      existingPendingAttrs[characterName] = {
+        loyalty,
+        stamina,
+        character,
+      };
+
+      // 保存回数据库（包括所有暂存数据）
+      await databaseService.saveTrainingHistoryData(
+        currentSaveId,
+        allTrainingHistory,
+        existingPendingPairs,
+        existingPendingAttrs,
+        existingOriginalChars,
+      );
+      console.log(`✅ 已保存暂存属性变化到数据库 (${characterName})`);
+    } catch (error) {
+      console.error('保存暂存属性变化失败:', error);
+      // 不抛出错误，避免影响主流程
+    }
+  }
+
+  /**
+   * 清除暂存的属性变化（当属性变化被应用时）
+   * @param characterName 角色名称
+   * @param saveId 存档ID
+   */
+  static async clearPendingAttributeChanges(characterName: string, saveId?: string): Promise<void> {
+    try {
+      const currentSaveId = saveId || databaseService.getCurrentSaveId();
+      if (!currentSaveId) {
+        return;
+      }
+
+      // 获取数据库中已有的所有数据
+      const existingData = await databaseService.loadTrainingHistoryData(currentSaveId);
+      const allTrainingHistory = existingData || {};
+      const existingPendingPairs = existingData?.pendingDialoguePairs || {};
+      const existingPendingAttrs = existingData?.pendingAttributeChanges || {};
+      const existingOriginalChars = existingData?.originalCharacters || {};
+
+      // 清除暂存的属性变化
+      existingPendingAttrs[characterName] = null;
+
+      // 保存回数据库（包括所有暂存数据）
+      await databaseService.saveTrainingHistoryData(
+        currentSaveId,
+        allTrainingHistory,
+        existingPendingPairs,
+        existingPendingAttrs,
+        existingOriginalChars,
+      );
+      console.log(`✅ 已清除暂存属性变化 (${characterName})`);
+    } catch (error) {
+      console.error('清除暂存属性变化失败:', error);
+      // 不抛出错误，避免影响主流程
+    }
+  }
+
+  /**
+   * 获取暂存的属性变化
+   * @param characterName 角色名称
+   * @param saveId 存档ID
+   * @returns 暂存的属性变化，如果没有则返回null
+   */
+  static async getPendingAttributeChanges(
+    characterName: string,
+    saveId?: string,
+  ): Promise<{ loyalty: number; stamina: number; character: any } | null> {
+    try {
+      const currentSaveId = saveId || databaseService.getCurrentSaveId();
+      if (!currentSaveId) {
+        return null;
+      }
+
+      const existingData = await databaseService.loadTrainingHistoryData(currentSaveId);
+      if (existingData?.pendingAttributeChanges?.[characterName]) {
+        return existingData.pendingAttributeChanges[characterName];
+      }
+      return null;
+    } catch (error) {
+      console.error('获取暂存属性变化失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 保存原始人物属性到数据库（用于重新生成时恢复）
+   * @param characterName 角色名称
+   * @param character 原始人物对象
+   * @param saveId 存档ID
+   */
+  static async saveOriginalCharacter(characterName: string, character: any, saveId?: string): Promise<void> {
+    try {
+      const currentSaveId = saveId || databaseService.getCurrentSaveId();
+      if (!currentSaveId) {
+        console.log('ℹ️ 没有当前存档ID，跳过保存原始人物属性');
+        return;
+      }
+
+      // 获取数据库中已有的所有数据
+      const existingData = await databaseService.loadTrainingHistoryData(currentSaveId);
+      const allTrainingHistory = existingData || {};
+      const existingPendingPairs = existingData?.pendingDialoguePairs || {};
+      const existingPendingAttrs = existingData?.pendingAttributeChanges || {};
+      const existingOriginalChars = existingData?.originalCharacters || {};
+
+      // 更新原始人物属性
+      existingOriginalChars[characterName] = character;
+
+      // 保存回数据库（包括所有暂存数据）
+      await databaseService.saveTrainingHistoryData(
+        currentSaveId,
+        allTrainingHistory,
+        existingPendingPairs,
+        existingPendingAttrs,
+        existingOriginalChars,
+      );
+      console.log(`✅ 已保存原始人物属性到数据库 (${characterName})`);
+    } catch (error) {
+      console.error('保存原始人物属性失败:', error);
+      // 不抛出错误，避免影响主流程
+    }
+  }
+
+  /**
+   * 获取原始人物属性
+   * @param characterName 角色名称
+   * @param saveId 存档ID
+   * @returns 原始人物属性，如果没有则返回null
+   */
+  static async getOriginalCharacter(characterName: string, saveId?: string): Promise<any | null> {
+    try {
+      const currentSaveId = saveId || databaseService.getCurrentSaveId();
+      if (!currentSaveId) {
+        return null;
+      }
+
+      const existingData = await databaseService.loadTrainingHistoryData(currentSaveId);
+      if (existingData?.originalCharacters?.[characterName]) {
+        return existingData.originalCharacters[characterName];
+      }
+      return null;
+    } catch (error) {
+      console.error('获取原始人物属性失败:', error);
+      return null;
     }
   }
 
@@ -245,7 +620,7 @@ export class TrainingRecordManager {
   /**
    * 解析调教记录
    */
-  private static parseTrainingHistory(content: string): HistoryRecord[] {
+  static parseTrainingHistory(content: string): HistoryRecord[] {
     console.log('🔍 [解析调教记录] 开始解析');
     console.log('📄 内容长度:', content?.length || 0);
 
@@ -357,6 +732,51 @@ export class TrainingRecordManager {
       .map(line => line.trim()) // 去除每行首尾空白
       .filter(line => line.length > 0) // 删除空行
       .join('\n\n'); // 用双换行连接，形成段落分隔
+  }
+
+  /**
+   * 验证并转换历史记录格式（兼容旧格式）
+   * @param records 可能是 HistoryRecord[] 或其他格式的数据
+   * @returns 验证后的 HistoryRecord[]
+   */
+  private static validateAndConvertHistoryRecords(records: any[]): HistoryRecord[] {
+    if (!Array.isArray(records)) {
+      console.warn('⚠️ 调教记录数据格式错误：不是数组', records);
+      return [];
+    }
+
+    const validatedRecords: HistoryRecord[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
+
+      // 验证必需字段
+      if (!record || typeof record !== 'object') {
+        console.warn(`⚠️ 跳过无效的记录 #${i}:`, record);
+        continue;
+      }
+
+      // 构建标准格式的 HistoryRecord
+      const validatedRecord: HistoryRecord = {
+        gameTime: record.gameTime || '未知时间',
+        sender: record.sender === '{{user}}' ? 'user' : record.sender || undefined,
+        content: record.content || '',
+        timestamp: typeof record.timestamp === 'number' ? record.timestamp : Date.now() + i,
+      };
+
+      // 确保 content 不为空
+      if (!validatedRecord.content || validatedRecord.content.trim().length === 0) {
+        console.warn(`⚠️ 跳过内容为空的记录 #${i}`);
+        continue;
+      }
+
+      validatedRecords.push(validatedRecord);
+    }
+
+    // 按时间戳排序
+    validatedRecords.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    return validatedRecords;
   }
 
   /**

@@ -1,5 +1,7 @@
+import { databaseService } from '../存档管理/数据库服务';
 import { WorldbookHelper } from './世界书助手';
-import type { WorldbookEntry } from './世界书类型定义';
+import type { HistoryRecord, WorldbookEntry } from './世界书类型定义';
+import { TrainingRecordManager } from './调教记录管理器';
 
 /**
  * 计算文本的粗略token数量（英文约1:1，中文约1:2）
@@ -446,6 +448,7 @@ ${content}
       console.log('📝 开始生成摘要...');
 
       // 为每个条目生成总结（使用AI）
+      // 注意：不在这里保存调教记录，而是在确认总结时再保存（确保使用正确的存档ID）
       console.log(`🤖 开始使用AI总结 ${filteredEntries.length} 个条目...`);
       const summaries = await this.batchSummarizeEntries(filteredEntries);
 
@@ -472,6 +475,106 @@ ${content}
   }
 
   /**
+   * 总结前，先保存所有需要总结的调教记录到数据库
+   */
+  private static async saveTrainingHistoryBeforeSummary(entries: WorldbookEntry[]): Promise<void> {
+    try {
+      const currentSaveId = databaseService.getCurrentSaveId();
+      if (!currentSaveId) {
+        console.log('ℹ️ 没有当前存档ID，跳过保存调教记录到数据库');
+        return;
+      }
+
+      console.log(`💾 [确认总结] 保存调教记录到数据库，当前存档ID: ${currentSaveId}`);
+
+      // 筛选出character_story_history类型的条目
+      const characterHistoryEntries = entries.filter(entry => entry.extra?.entry_type === 'character_story_history');
+
+      if (characterHistoryEntries.length === 0) {
+        console.log('ℹ️ 没有需要保存的调教记录');
+        return;
+      }
+
+      console.log(`💾 总结前保存 ${characterHistoryEntries.length} 个角色的调教记录到数据库...`);
+
+      // 获取数据库中已有的所有数据（包括所有暂存数据）
+      const existingDbData = await databaseService.loadTrainingHistoryData(currentSaveId);
+      const allTrainingHistory: Record<string, HistoryRecord[]> = existingDbData || {};
+      const existingPendingPairs: Record<string, { userInput: string; aiResponse: string } | null> = {};
+      const existingPendingAttrs: Record<string, { loyalty: number; stamina: number; character: any } | null> = {};
+      const existingOriginalChars: Record<string, any | null> = {};
+
+      if (existingDbData?.pendingDialoguePairs) {
+        Object.assign(existingPendingPairs, existingDbData.pendingDialoguePairs);
+      }
+      if (existingDbData?.pendingAttributeChanges) {
+        Object.assign(existingPendingAttrs, existingDbData.pendingAttributeChanges);
+      }
+      if (existingDbData?.originalCharacters) {
+        Object.assign(existingOriginalChars, existingDbData.originalCharacters);
+      }
+
+      // 为每个角色保存调教记录
+      for (const entry of characterHistoryEntries) {
+        const characterId = entry.extra?.character_id || '';
+        const characterName = entry.extra?.character_name || entry.name || '未知人物';
+
+        if (!characterId) {
+          console.warn(`⚠️ 跳过没有character_id的条目: ${entry.name}`);
+          continue;
+        }
+
+        // 从世界书中解析调教记录
+        const records = TrainingRecordManager.parseTrainingHistory(entry.content || '');
+        if (records.length > 0) {
+          allTrainingHistory[characterName] = records;
+          console.log(`✅ 已保存 ${characterName} 的 ${records.length} 条调教记录到数据库`);
+
+          // 如果有暂存的对话对，也包含在内（但不清除，保持暂存状态）
+          if (existingPendingPairs[characterName]) {
+            console.log(`ℹ️ ${characterName} 有暂存的对话对，将一并保存`);
+          }
+        } else {
+          console.log(`ℹ️ ${characterName} 没有调教记录或已被总结压缩`);
+        }
+      }
+
+      // 保存回数据库（包括所有暂存数据）
+      if (
+        Object.keys(allTrainingHistory).length > 0 ||
+        Object.keys(existingPendingPairs).length > 0 ||
+        Object.keys(existingPendingAttrs).length > 0 ||
+        Object.keys(existingOriginalChars).length > 0
+      ) {
+        await databaseService.saveTrainingHistoryData(
+          currentSaveId,
+          allTrainingHistory,
+          existingPendingPairs,
+          existingPendingAttrs,
+          existingOriginalChars,
+        );
+        const pendingPairCount = Object.values(existingPendingPairs).filter(v => v !== null).length;
+        const pendingAttrCount = Object.values(existingPendingAttrs).filter(v => v !== null).length;
+        const originalCharCount = Object.values(existingOriginalChars).filter(v => v !== null).length;
+
+        const extraInfo: string[] = [];
+        if (pendingPairCount > 0) extraInfo.push(`${pendingPairCount} 个暂存对话对`);
+        if (pendingAttrCount > 0) extraInfo.push(`${pendingAttrCount} 个暂存属性变化`);
+        if (originalCharCount > 0) extraInfo.push(`${originalCharCount} 个原始人物属性`);
+
+        if (extraInfo.length > 0) {
+          console.log(`✅ 总结前已将所有调教记录保存到数据库，包含 ${extraInfo.join('、')}`);
+        } else {
+          console.log(`✅ 总结前已将所有调教记录保存到数据库`);
+        }
+      }
+    } catch (error) {
+      console.error('保存调教记录到数据库失败:', error);
+      // 不抛出错误，避免影响总结流程
+    }
+  }
+
+  /**
    * 应用总结到世界书
    * @param worldbookName 世界书名称
    * @param summaries 总结内容Map，key为entry UID，value为总结内容
@@ -481,7 +584,11 @@ ${content}
     summaries: Map<number, { summary: string; incremental: boolean; entryName?: string; entryType?: string }>,
   ): Promise<void> {
     try {
+      // 确认总结时，先保存所有需要总结的调教记录到数据库（此时存档ID是正确的）
       const worldbook = await WorldbookHelper.get(worldbookName);
+      const entriesToSummarize = worldbook.filter(entry => summaries.has(entry.uid));
+      await this.saveTrainingHistoryBeforeSummary(entriesToSummarize);
+
       let updatedCount = 0;
 
       for (let i = 0; i < worldbook.length; i++) {

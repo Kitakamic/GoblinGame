@@ -11,7 +11,7 @@ import type { Location } from '../探索/类型/探索类型';
 
 export const GAME_VERSION = '1.0.0';
 export const DATABASE_NAME = 'GoblinNestGame';
-export const DATABASE_VERSION = 4;
+export const DATABASE_VERSION = 5; // 升级版本以创建 trainingHistoryData 存储
 
 // ==================== 初始数据配置 ====================
 

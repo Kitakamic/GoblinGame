@@ -415,7 +415,7 @@ export class ContinentExploreService {
   }
 
   // 基于区域征服自动计算大陆征服进度
-  public calculateContinentProgressFromRegions(continentName: string): void {
+  public calculateContinentProgressFromRegions(continentName: string, skipSave: boolean = false): void {
     try {
       const continent = this.continents.value.find(c => c.name === continentName);
       if (!continent) {
@@ -459,7 +459,10 @@ export class ContinentExploreService {
       // 检查是否可以解锁下一个大陆
       this.checkNextContinentUnlock(continentName);
 
-      this.saveExploreData();
+      // 只有在不跳过保存时才保存
+      if (!skipSave) {
+        this.saveExploreData();
+      }
     } catch (error) {
       console.error('计算大陆征服进度失败:', error);
     }
@@ -608,7 +611,7 @@ export class ContinentExploreService {
   }
 
   // 基于据点征服自动计算区域征服进度
-  public calculateRegionProgressFromLocations(regionName: string): void {
+  public calculateRegionProgressFromLocations(regionName: string, skipSave: boolean = false): void {
     try {
       const region = this.findRegionByName(regionName);
       if (!region) {
@@ -646,10 +649,13 @@ export class ContinentExploreService {
         console.log(`区域 ${region.name} 星级已达标但首都 ${region.capital} 未征服，无法完全征服区域`);
       }
 
-      // 更新对应的大陆征服进度
-      this.calculateContinentProgressFromRegions(region.continentName);
+      // 更新对应的大陆征服进度（也跳过保存）
+      this.calculateContinentProgressFromRegions(region.continentName, skipSave);
 
-      this.saveExploreData();
+      // 只有在不跳过保存时才保存
+      if (!skipSave) {
+        this.saveExploreData();
+      }
     } catch (error) {
       console.error('计算区域征服进度失败:', error);
     }
@@ -700,6 +706,38 @@ export class ContinentExploreService {
   // 根据区域征服增加行动力上限
   private addActionPointsFromRegionConquest(): void {
     try {
+      // 计算当前实际已征服的区域数量
+      let actualConqueredRegions = 0;
+      const conqueredRegionNames: string[] = [];
+      this.continents.value.forEach(continent => {
+        continent.regions.forEach(region => {
+          if (region.isConquered) {
+            actualConqueredRegions++;
+            conqueredRegionNames.push(`${continent.name} - ${region.name}`);
+          }
+        });
+      });
+
+      // 调试日志：显示所有已征服的区域
+      if (conqueredRegionNames.length > 0) {
+        console.log(
+          `[addActionPointsFromRegionConquest] 已征服的区域 (${actualConqueredRegions}个):`,
+          conqueredRegionNames,
+        );
+      }
+
+      // 获取存档中记录的征服区域数
+      const savedConqueredRegions = modularSaveManager.resources.value.conqueredRegions;
+
+      // 只有在实际征服区域数大于存档记录的征服区域数时，才增加行动力上限
+      // 这确保在重新计算时不会重复增加
+      if (actualConqueredRegions <= savedConqueredRegions) {
+        console.log(
+          `[addActionPointsFromRegionConquest] 跳过增加行动力上限: 实际征服区域数 ${actualConqueredRegions} <= 存档记录 ${savedConqueredRegions}`,
+        );
+        return;
+      }
+
       // 每征服一个区域，增加1点行动力上限，但上限最高为10
       const currentMax = modularSaveManager.resources.value.maxActionPoints;
       const MAX_ACTION_POINTS_LIMIT = 10;
@@ -707,19 +745,30 @@ export class ContinentExploreService {
       // 如果已经达到上限，不再增加
       if (currentMax >= MAX_ACTION_POINTS_LIMIT) {
         console.log(`行动力上限已达到最大值 ${MAX_ACTION_POINTS_LIMIT}，无法继续增加`);
+        // 即使不增加上限，也要更新征服区域计数以保持同步
+        modularSaveManager.setResource('conqueredRegions', actualConqueredRegions);
         return;
       }
 
-      const newMax = Math.min(currentMax + 1, MAX_ACTION_POINTS_LIMIT);
+      // 计算需要增加的行动力上限数量（基于新征服的区域数）
+      const newConqueredRegions = actualConqueredRegions - savedConqueredRegions;
+      if (newConqueredRegions <= 0) {
+        console.log(`[addActionPointsFromRegionConquest] 没有新征服的区域，跳过增加行动力上限`);
+        return;
+      }
+
+      // 根据新征服的区域数增加行动力上限（最多增加newConqueredRegions个）
+      const newMax = Math.min(currentMax + newConqueredRegions, MAX_ACTION_POINTS_LIMIT);
 
       // 更新最大行动力
       modularSaveManager.setResource('maxActionPoints', newMax);
 
-      // 更新征服区域计数
-      const currentRegions = modularSaveManager.resources.value.conqueredRegions;
-      modularSaveManager.setResource('conqueredRegions', currentRegions + 1);
+      // 更新征服区域计数为实际征服的区域数
+      modularSaveManager.setResource('conqueredRegions', actualConqueredRegions);
 
-      console.log(`征服区域增加行动力上限: ${currentMax} -> ${newMax} (已征服区域: ${currentRegions + 1})`);
+      console.log(
+        `[addActionPointsFromRegionConquest] 征服区域增加行动力上限: ${currentMax} -> ${newMax} (新征服区域: ${newConqueredRegions}, 总征服区域: ${actualConqueredRegions})`,
+      );
     } catch (error) {
       console.error('增加行动力上限失败:', error);
     }
@@ -824,15 +873,43 @@ export class ContinentExploreService {
     try {
       console.log('🔄 重新计算所有区域征服进度...');
 
+      // 临时禁用 watch 监听器，避免每次数据变化都触发保存
+      // 注意：由于 watch 无法临时禁用，我们需要在最后统一保存
+
+      // 在重新计算前，记录已征服的区域
+      const beforeConqueredRegions: string[] = [];
       this.continents.value.forEach(continent => {
         continent.regions.forEach(region => {
-          this.calculateRegionProgressFromLocations(region.name);
+          if (region.isConquered) {
+            beforeConqueredRegions.push(`${continent.name} - ${region.name}`);
+          }
         });
-        // 重新计算大陆征服进度
-        this.calculateContinentProgressFromRegions(continent.name);
+      });
+      console.log(`[recalculateAllRegionProgress] 重新计算前已征服的区域:`, beforeConqueredRegions);
+
+      // 批量计算所有区域的征服进度（跳过每次保存）
+      this.continents.value.forEach(continent => {
+        continent.regions.forEach(region => {
+          this.calculateRegionProgressFromLocations(region.name, true); // skipSave = true
+        });
+        // 重新计算大陆征服进度（跳过每次保存）
+        this.calculateContinentProgressFromRegions(continent.name, true); // skipSave = true
       });
 
-      console.log('✅ 所有区域征服进度重新计算完成');
+      // 在重新计算后，记录已征服的区域
+      const afterConqueredRegions: string[] = [];
+      this.continents.value.forEach(continent => {
+        continent.regions.forEach(region => {
+          if (region.isConquered) {
+            afterConqueredRegions.push(`${continent.name} - ${region.name}`);
+          }
+        });
+      });
+      console.log(`[recalculateAllRegionProgress] 重新计算后已征服的区域:`, afterConqueredRegions);
+
+      // 所有计算完成后，统一保存一次
+      this.saveExploreData();
+      console.log('✅ 所有区域征服进度重新计算完成，数据已保存');
     } catch (error) {
       console.error('重新计算区域征服进度失败:', error);
     }

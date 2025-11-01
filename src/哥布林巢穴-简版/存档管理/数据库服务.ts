@@ -66,6 +66,13 @@ class DatabaseService {
           worldbookStore.createIndex('saveId', 'id', { unique: true });
           console.log('✅ 创建 worldbookData 对象存储');
         }
+
+        // 创建调教记录数据存储
+        if (!db.objectStoreNames.contains('trainingHistoryData')) {
+          const trainingHistoryStore = db.createObjectStore('trainingHistoryData', { keyPath: 'id' });
+          trainingHistoryStore.createIndex('saveId', 'id', { unique: true });
+          console.log('✅ 创建 trainingHistoryData 对象存储');
+        }
       };
     });
   }
@@ -370,6 +377,211 @@ class DatabaseService {
       console.log(`已删除存档 ${saveId} 的世界书数据`);
     } catch (error) {
       console.error('删除世界书数据失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 保存调教记录数据到数据库
+   *
+   * 数据格式说明：
+   * - 顶层格式：{ [characterName]: HistoryRecord[] }
+   * - HistoryRecord 格式：
+   *   {
+   *     gameTime: string,    // 游戏时间，如 "帝国历1074年1月1日"
+   *     sender?: string,     // 发送者，'user' 表示用户消息，其他为角色名
+   *     content: string,      // 消息内容
+   *     timestamp: number     // 时间戳（毫秒），用于排序
+   *   }
+   * - pendingDialoguePairs 格式（可选）：
+   *   {
+   *     [characterName]: {
+   *       userInput: string,
+   *       aiResponse: string
+   *     } | null
+   *   }
+   *
+   * 示例：
+   * {
+   *   "艾莉丝": [
+   *     {
+   *       gameTime: "帝国历1074年1月1日",
+   *       sender: "user",
+   *       content: "你好",
+   *       timestamp: 1704067200000
+   *     },
+   *     {
+   *       gameTime: "帝国历1074年1月1日",
+   *       sender: "艾莉丝",
+   *       content: "你好...",
+   *       timestamp: 1704067201000
+   *     }
+   *   ],
+   *   pendingDialoguePairs: {
+   *     "艾莉丝": {
+   *       userInput: "观察她的情况",
+   *       aiResponse: "她抬起头..."
+   *     }
+   *   }
+   * }
+   *
+   * @param saveId 存档ID
+   * @param trainingHistoryData 调教记录数据，格式为 { [characterName]: HistoryRecord[] }
+   * @param pendingDialoguePairs 暂存的对话对（可选），格式为 { [characterName]: { userInput: string, aiResponse: string } | null }
+   * @param pendingAttributeChanges 暂存的属性变化（可选），格式为 { [characterName]: { loyalty: number, stamina: number, character: Character } | null }
+   * @param originalCharacters 原始人物属性（可选），格式为 { [characterName]: Character | null }
+   */
+  async saveTrainingHistoryData(
+    saveId: string,
+    trainingHistoryData: Record<string, any[]>,
+    pendingDialoguePairs?: Record<string, { userInput: string; aiResponse: string } | null>,
+    pendingAttributeChanges?: Record<string, { loyalty: number; stamina: number; character: any } | null>,
+    originalCharacters?: Record<string, any | null>,
+  ): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      // 检查对象存储是否存在，如果不存在则尝试重新初始化
+      if (!this.db.objectStoreNames.contains('trainingHistoryData')) {
+        console.warn('⚠️ trainingHistoryData 对象存储不存在，尝试重新初始化数据库...');
+        // 关闭当前连接
+        this.db.close();
+        this.db = null;
+        // 重新初始化（会触发 onupgradeneeded）
+        await this.init();
+      }
+
+      // 构建完整的数据对象，包含所有暂存数据
+      // 使用 toPlain 去除 Vue Proxy，确保可以序列化到 IndexedDB
+      const fullData: any = {
+        ...this.toPlain(trainingHistoryData),
+      };
+
+      // 处理暂存数据，去除 Vue Proxy
+      if (pendingDialoguePairs) {
+        const plainPairs: Record<string, { userInput: string; aiResponse: string } | null> = {};
+        for (const [key, value] of Object.entries(pendingDialoguePairs)) {
+          plainPairs[key] = value ? this.toPlain(value) : null;
+        }
+        fullData.pendingDialoguePairs = plainPairs;
+      }
+
+      if (pendingAttributeChanges) {
+        const plainAttrs: Record<string, { loyalty: number; stamina: number; character: any } | null> = {};
+        for (const [key, value] of Object.entries(pendingAttributeChanges)) {
+          if (value) {
+            plainAttrs[key] = {
+              loyalty: value.loyalty,
+              stamina: value.stamina,
+              character: this.toPlain(value.character), // character 对象可能是 Vue Proxy
+            };
+          } else {
+            plainAttrs[key] = null;
+          }
+        }
+        fullData.pendingAttributeChanges = plainAttrs;
+      }
+
+      if (originalCharacters) {
+        const plainChars: Record<string, any | null> = {};
+        for (const [key, value] of Object.entries(originalCharacters)) {
+          plainChars[key] = value ? this.toPlain(value) : null;
+        }
+        fullData.originalCharacters = plainChars;
+      }
+
+      await this.putData('trainingHistoryData', {
+        id: saveId,
+        data: fullData,
+        savedAt: new Date(),
+      });
+
+      const pendingPairCount = pendingDialoguePairs
+        ? Object.values(pendingDialoguePairs).filter(v => v !== null).length
+        : 0;
+      const pendingAttrCount = pendingAttributeChanges
+        ? Object.values(pendingAttributeChanges).filter(v => v !== null).length
+        : 0;
+      const originalCharCount = originalCharacters
+        ? Object.values(originalCharacters).filter(v => v !== null).length
+        : 0;
+
+      const extraInfo: string[] = [];
+      if (pendingPairCount > 0) extraInfo.push(`${pendingPairCount} 个暂存对话对`);
+      if (pendingAttrCount > 0) extraInfo.push(`${pendingAttrCount} 个暂存属性变化`);
+      if (originalCharCount > 0) extraInfo.push(`${originalCharCount} 个原始人物属性`);
+
+      if (extraInfo.length > 0) {
+        console.log(`调教记录数据已保存到存档 ${saveId}，包含 ${extraInfo.join('、')}`);
+      } else {
+        console.log(`调教记录数据已保存到存档 ${saveId}`);
+      }
+    } catch (error) {
+      console.error('保存调教记录数据失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 从数据库读取调教记录数据
+   *
+   * 返回格式：{ [characterName]: HistoryRecord[], pendingDialoguePairs?: ..., pendingAttributeChanges?: ..., originalCharacters?: ... }
+   *
+   * 在对话界面解析时：
+   * 1. 通过 characterName 获取该角色的记录数组
+   * 2. 遍历数组，根据 sender 字段判断是用户消息还是AI消息
+   * 3. sender === 'user' 或 sender === '{{user}}' 表示用户消息
+   * 4. 其他 sender 值为角色名，表示AI消息
+   * 5. 使用 timestamp 字段进行排序
+   * 6. 如果有 pendingDialoguePairs，也会返回暂存的对话对
+   * 7. 如果有 pendingAttributeChanges，也会返回暂存的属性变化
+   * 8. 如果有 originalCharacters，也会返回原始人物属性
+   *
+   * @param saveId 存档ID
+   * @returns 调教记录数据，格式为 { [characterName]: HistoryRecord[], pendingDialoguePairs?: ..., pendingAttributeChanges?: ..., originalCharacters?: ... }，如果没有则返回null
+   */
+  async loadTrainingHistoryData(saveId: string): Promise<
+    | (Record<string, any[]> & {
+        pendingDialoguePairs?: Record<string, { userInput: string; aiResponse: string } | null>;
+        pendingAttributeChanges?: Record<string, { loyalty: number; stamina: number; character: any } | null>;
+        originalCharacters?: Record<string, any | null>;
+      })
+    | null
+  > {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      // 检查对象存储是否存在，如果不存在则返回null（兼容旧数据库）
+      if (!this.db.objectStoreNames.contains('trainingHistoryData')) {
+        console.warn('⚠️ trainingHistoryData 对象存储不存在，可能需要升级数据库版本');
+        return null;
+      }
+
+      const result = await this.getData('trainingHistoryData', saveId);
+      return result ? result.data : null;
+    } catch (error) {
+      // 如果是 NotFoundError，说明对象存储不存在，返回null
+      if (error instanceof Error && error.name === 'NotFoundError') {
+        console.warn('⚠️ trainingHistoryData 对象存储不存在，返回空数据');
+        return null;
+      }
+      console.error('读取调教记录数据失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 删除存档的调教记录数据
+   * @param saveId 存档ID
+   */
+  async deleteTrainingHistoryData(saveId: string): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+
+    try {
+      await this.deleteData('trainingHistoryData', saveId);
+      console.log(`已删除存档 ${saveId} 的调教记录数据`);
+    } catch (error) {
+      console.error('删除调教记录数据失败:', error);
       throw error;
     }
   }
