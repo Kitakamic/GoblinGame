@@ -321,6 +321,15 @@ class DatabaseService {
   }
 
   /**
+   * 清除当前存档ID（从酒馆变量中删除）
+   */
+  clearCurrentSaveId(): void {
+    const currentVars = getVariables({ type: 'global' }) || {};
+    delete currentVars.currentSaveId;
+    replaceVariables(currentVars, { type: 'global' });
+  }
+
+  /**
    * 获取当前槽位号
    */
   getCurrentSlot(): number | null {

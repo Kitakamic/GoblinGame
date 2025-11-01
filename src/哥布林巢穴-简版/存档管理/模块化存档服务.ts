@@ -89,6 +89,9 @@ export class ModularSaveManager {
       // 确保默认世界书存在
       await this.ensureDefaultWorldbook();
 
+      // 初始化默认slot（从隐藏的初始化槽位slot_init读取，如果不存在则创建）
+      await this.initializeDefaultSlot();
+
       console.log('模块化存档管理器初始化成功');
     } catch (error) {
       console.error('模块化存档管理器初始化失败，尝试强制重新初始化:', error);
@@ -99,11 +102,74 @@ export class ModularSaveManager {
         // 确保默认世界书存在
         await this.ensureDefaultWorldbook();
 
+        // 初始化默认slot
+        await this.initializeDefaultSlot();
+
         console.log('模块化存档管理器强制重新初始化成功');
       } catch (reinitError) {
         console.error('模块化存档管理器强制重新初始化失败:', reinitError);
         throw reinitError;
       }
+    }
+  }
+
+  /**
+   * 初始化默认slot（从隐藏的初始化槽位slot_init读取）
+   */
+  private async initializeDefaultSlot(): Promise<void> {
+    try {
+      const INIT_SLOT_ID = 'slot_init'; // 隐藏的初始化槽位，不显示给玩家
+
+      console.log('🔄 [初始化默认slot] 开始处理初始化槽位...');
+
+      // 检查是否存在初始化槽位
+      let initGameData: ModularGameData | null = null;
+      try {
+        initGameData = await databaseService.loadSave(INIT_SLOT_ID);
+        if (initGameData) {
+          console.log('✅ [初始化默认slot] 找到初始化槽位');
+        } else {
+          throw new Error('初始化槽位数据为空');
+        }
+      } catch (error) {
+        console.log('ℹ️ [初始化默认slot] 初始化槽位不存在，创建新的初始化数据');
+        // 如果不存在，创建新的初始化游戏数据
+        initGameData = createFullGameData();
+
+        // 保存到初始化槽位
+        await databaseService.saveGameData(INIT_SLOT_ID, initGameData);
+        await databaseService.upsertSaveMeta(INIT_SLOT_ID, '初始化存档');
+        console.log('✅ [初始化默认slot] 已创建初始化槽位');
+      }
+
+      // 确保初始化槽位的调教记录是空的（清除可能存在的旧调教记录）
+      try {
+        await databaseService.deleteTrainingHistoryData(INIT_SLOT_ID);
+        console.log('✅ [初始化默认slot] 已清除初始化槽位的调教记录');
+      } catch (error) {
+        // 如果删除失败（可能是因为不存在），不影响后续流程
+        console.log('ℹ️ [初始化默认slot] 初始化槽位没有调教记录或清除失败（可忽略）');
+      }
+
+      // 加载初始化数据到当前游戏数据（仅加载到内存，不保存到slot_0）
+      // slot_0 会在自动存档时自动覆盖，自动保存时会自动设置currentSaveId为slot_0
+      if (initGameData) {
+        // 清除currentSaveId，确保在自动保存之前不会从旧存档读取调教记录
+        databaseService.clearCurrentSaveId();
+
+        // 设置当前游戏数据
+        this.currentGameData = initGameData;
+
+        // 同步资源状态到Vue响应式状态
+        this.syncResourcesToReactive();
+
+        console.log('✅ [初始化默认slot] 已从初始化槽位加载数据到内存，已清除currentSaveId');
+      }
+    } catch (error) {
+      console.error('初始化默认slot失败:', error);
+      // 如果失败，至少创建新游戏数据
+      this.currentGameData = createFullGameData();
+      this.syncResourcesToReactive();
     }
   }
 
@@ -115,8 +181,13 @@ export class ModularSaveManager {
       const saves = await databaseService.getAllSaves();
       const slots: ModularSaveSlot[] = [];
 
-      // 为每个存档创建槽位信息
+      // 为每个存档创建槽位信息（排除隐藏的初始化槽位slot_init）
       for (const save of saves) {
+        // 跳过隐藏的初始化槽位，不显示给玩家
+        if (save.id === 'slot_init') {
+          continue;
+        }
+
         const slotIdx = this.deriveSlotFromId(save.id);
         const gameData = await databaseService.loadSave(save.id);
         slots.push({
