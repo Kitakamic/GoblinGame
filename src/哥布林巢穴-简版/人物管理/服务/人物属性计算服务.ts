@@ -849,6 +849,7 @@ export class CharacterAttributeCalculator {
         title: parsedData.identity,
         rating,
         avatar: parsedData.avatar || '',
+        // 初始头像值将在首次打开头像编辑界面时自动保存（不在这里设置）
         favorite: false,
 
         // 状态信息

@@ -175,6 +175,12 @@ export interface Character {
   corruptedAvatar?: string;
   /** 完全堕落头像 */
   fullyCorruptedAvatar?: string;
+  /** 初始头像（生成时的头像，用于恢复） */
+  originalAvatar?: string;
+  /** 初始半堕落头像（生成时的头像，用于恢复） */
+  originalCorruptedAvatar?: string;
+  /** 初始完全堕落头像（生成时的头像，用于恢复） */
+  originalFullyCorruptedAvatar?: string;
 
   // ========== 状态信息 ==========
   /** 当前状态 */
