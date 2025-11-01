@@ -854,6 +854,47 @@ export class PictureResourceMappingService {
   }
 
   /**
+   * 从图片URL中提取图片ID
+   * @param imageUrl 图片URL（例如：https://kitakamis.online/portraits/00001.png）
+   * @returns 图片ID（例如：1），如果URL格式不正确则返回null
+   */
+  public extractPictureIdFromUrl(imageUrl: string): string | null {
+    if (!imageUrl) return null;
+
+    // 匹配格式：https://kitakamis.online/portraits/XXXXX.png
+    const match = imageUrl.match(/portraits\/(\d+)\.png$/);
+    if (match && match[1]) {
+      // 返回去掉前导零的ID（例如：00001 -> 1）
+      return String(parseInt(match[1], 10));
+    }
+
+    return null;
+  }
+
+  /**
+   * 根据图片URL获取图片资源的tags（提示词）
+   * @param imageUrl 图片URL
+   * @returns 图片资源的tags（提示词），如果不存在则返回null
+   */
+  public getTagsFromImageUrl(imageUrl: string): string | null {
+    const pictureId = this.extractPictureIdFromUrl(imageUrl);
+    if (!pictureId) return null;
+
+    const resource = this.getPictureResourceById(pictureId);
+    return resource?.prompt || null;
+  }
+
+  /**
+   * 根据图片ID获取图片资源的tags（提示词）
+   * @param pictureId 图片ID
+   * @returns 图片资源的tags（提示词），如果不存在则返回null
+   */
+  public getTagsById(pictureId: string): string | null {
+    const resource = this.getPictureResourceById(pictureId);
+    return resource?.prompt || null;
+  }
+
+  /**
    * 获取所有种族列表
    * @returns 种族列表
    */
