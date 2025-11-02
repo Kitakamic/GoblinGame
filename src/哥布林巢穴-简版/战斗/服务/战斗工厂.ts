@@ -47,19 +47,22 @@ export class BattleFactory {
   public static createBattleUnitFromCharacter(character: any): BattleUnit | null {
     if (!character || !character.attributes) return null;
 
+    // 计算人物等级（优先使用 level 字段，如果没有则使用 offspring/10 计算，都没有则返回1）
+    const characterLevel = character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1;
+
     return {
       id: character.name, // 使用名称作为ID
       name: character.name,
       type: character.unitType || 'physical',
-      level: Math.floor(character.offspring / 10),
+      level: characterLevel,
       attributes: {
         attack: character.attributes.attack || 0,
         defense: character.attributes.defense || 0,
         intelligence: character.attributes.intelligence || 0,
         speed: character.attributes.speed || 0,
       },
-      maxHealth: character.attributes.health || Math.floor(character.offspring / 10) * 10,
-      currentHealth: character.attributes.health || Math.floor(character.offspring / 10) * 10,
+      maxHealth: character.attributes.health || characterLevel * 10,
+      currentHealth: character.attributes.health || characterLevel * 10,
       isAlive: true,
       avatar: character.avatar, // 添加avatar字段
       fallbackAvatar:

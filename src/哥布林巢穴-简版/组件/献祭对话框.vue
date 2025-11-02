@@ -12,7 +12,7 @@
           <select v-model="selectedCharacterId" class="character-select">
             <option v-for="character in upgradableCharacters" :key="character.id" :value="character.id">
               {{ character.name }} ({{ character.title || '无称号' }}) - 等级
-              {{ character.level ?? Math.floor(character.offspring / 10) ?? 1 }}
+              {{ character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1 }}
             </option>
           </select>
         </div>

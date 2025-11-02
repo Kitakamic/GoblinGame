@@ -103,7 +103,7 @@
               >
                 <span style="font-size: 10px">LV.</span>
                 <span style="font-size: 11px; font-weight: 700">{{
-                  captain.level || Math.floor(captain.offspring / 10)
+                  captain.level ?? Math.floor((captain.offspring ?? 0) / 10) ?? 1
                 }}</span>
               </div>
             </div>
@@ -174,7 +174,9 @@
                   <span>{{ captain.attributes.speed }}</span>
                 </div>
               </div>
-              <div class="captain-level">等级 {{ captain.level || Math.floor(captain.offspring / 10) }}</div>
+              <div class="captain-level">
+                等级 {{ captain.level ?? Math.floor((captain.offspring ?? 0) / 10) ?? 1 }}
+              </div>
             </div>
             <div v-if="captain.isUsed" class="used-badge">已加入</div>
           </div>
@@ -417,7 +419,7 @@ const initializeCaptains = () => {
     id: character.id,
     name: character.name,
     avatar: character.avatar || '👤',
-    level: character.level || Math.floor(character.offspring / 10), // 优先使用实际等级，后备使用计算等级
+    level: character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1, // 优先使用实际等级，后备使用计算等级
     offspring: character.offspring || 0,
     attributes: {
       attack: character.attributes.attack,
@@ -623,7 +625,8 @@ const getMaxTroopCount = (type: string) => {
   if (!currentConfigCaptain.value) return 0;
 
   const captain = currentConfigCaptain.value;
-  const level = captain.level || 0;
+  // 优先使用 level 字段，如果没有则使用 offspring/10 计算，都没有则返回1
+  const level = captain.level ?? Math.floor((captain.offspring ?? 0) / 10) ?? 1;
   const rating = captain.rating || 'C';
 
   // 根据类型判断是普通哥布林还是特殊哥布林
@@ -691,9 +694,17 @@ const getMaxTroopCount = (type: string) => {
 };
 
 const getRemainingLevelsForType = (type: string) => {
-  if (!currentConfigCaptain.value?.troops) return currentConfigCaptain.value?.level || 0;
+  if (!currentConfigCaptain.value?.troops) {
+    const captain = currentConfigCaptain.value;
+    // 优先使用 level 字段，如果没有则使用 offspring/10 计算，都没有则返回1
+    const captainLevel = captain?.level ?? Math.floor((captain?.offspring ?? 0) / 10) ?? 1;
+    return captainLevel;
+  }
 
   const troops = currentConfigCaptain.value.troops;
+  const captain = currentConfigCaptain.value;
+  // 优先使用 level 字段，如果没有则使用 offspring/10 计算，都没有则返回1
+  const captainLevel = captain.level ?? Math.floor((captain.offspring ?? 0) / 10) ?? 1;
   let usedLevels = 0;
   Object.keys(troops).forEach(troopType => {
     if (troopType !== type) {
@@ -701,7 +712,7 @@ const getRemainingLevelsForType = (type: string) => {
     }
   });
 
-  return Math.max(0, (currentConfigCaptain.value.level || 0) - usedLevels);
+  return Math.max(0, captainLevel - usedLevels);
 };
 
 const setTroopCount = (type: string, count: number) => {
@@ -867,7 +878,7 @@ const getCaptainTotalHealthForCard = (captain: Captain) => {
   // 优先使用原始属性，如果没有则使用当前属性（可能是已经加成的）
   // 确保不会重复叠加
   const baseAttributes = captain.originalAttributes || captain.attributes;
-  const baseHealth = baseAttributes?.health || (captain.level || Math.floor(captain.offspring / 10)) * 10;
+  const baseHealth = baseAttributes?.health || (captain.level ?? Math.floor((captain.offspring ?? 0) / 10) ?? 1) * 10;
   let bonusHealth = 0;
 
   if (captain.troops) {
@@ -1233,7 +1244,7 @@ const refreshData = () => {
     if (captain) {
       const character = availableCharacters.value.find(char => char.id === captain.id);
       if (character) {
-        captain.level = character.level || Math.floor(character.offspring / 10);
+        captain.level = character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1;
         captain.rating = character.rating || 'C';
         console.log(`更新队长 ${captain.name} 等级: ${captain.level}, 评级: ${captain.rating}`);
       }
@@ -1326,7 +1337,7 @@ const performAutoAssignment = () => {
       };
 
       // 获取队长等级和评级
-      const captainLevel = captain.level || Math.floor(captain.offspring / 10);
+      const captainLevel = captain.level ?? Math.floor((captain.offspring ?? 0) / 10) ?? 1;
       const captainRating = captain.rating || 'C';
 
       console.log(`队长 ${captain.name} 等级: ${captainLevel}, 评级: ${captainRating}`);

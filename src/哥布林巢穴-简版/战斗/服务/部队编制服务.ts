@@ -38,8 +38,8 @@ export class FormationService {
           const captain = character;
           const troops = character.troopDeployment;
 
-          // 计算人物等级（基于后代数量）
-          const characterLevel = Math.floor(character.offspring / 10);
+          // 计算人物等级（优先使用 level 字段，如果没有则使用 offspring/10 计算，都没有则返回1）
+          const characterLevel = character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1;
 
           // 评级加成系数（暂时不使用，与部队编制界面保持一致）
           // const ratingBonusMultiplier = this.getRatingBonusMultiplier(character.rating);
@@ -335,7 +335,7 @@ export class FormationService {
               id: character.id,
               name: character.name,
               avatar: character.avatar || '',
-              level: Math.floor(character.offspring / 10),
+              level: character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1,
               offspring: character.offspring,
               attributes: character.attributes,
               description: character.title || '',

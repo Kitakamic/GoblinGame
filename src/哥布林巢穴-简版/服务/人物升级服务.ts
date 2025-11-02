@@ -53,7 +53,8 @@ export class CharacterLevelUpService {
         };
       }
 
-      const currentLevel = character.level || 1;
+      // 优先使用 level 字段，如果没有则使用 offspring/10 计算，都没有则返回1
+      const currentLevel = character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1;
 
       // 计算可以升多少级（每种类型独立计算，叠加总和）
       // 固定数量要求：普通哥布林100只/级，哥布林战士20只/级，哥布林萨满10只/级，哥布林圣骑士5只/级
@@ -174,7 +175,7 @@ export class CharacterLevelUpService {
       }
 
       // 优先使用 level 字段，如果没有则使用 offspring/10 计算，都没有则返回1
-      return character.level ?? Math.floor(character.offspring / 10) ?? 1;
+      return character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1;
     } catch (error) {
       console.error('获取人物等级失败:', error);
       return 1;

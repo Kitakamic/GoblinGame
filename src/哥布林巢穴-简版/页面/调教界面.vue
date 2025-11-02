@@ -39,7 +39,7 @@
           <!-- 等级标签 -->
           <div class="character-level-badge">
             <span class="level-icon">LV.</span>
-            <span class="level-value">{{ character.level ?? Math.floor(character.offspring / 10) ?? 1 }}</span>
+            <span class="level-value">{{ character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1 }}</span>
           </div>
         </div>
 

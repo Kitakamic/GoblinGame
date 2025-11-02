@@ -1025,7 +1025,9 @@ const processCharacterTurn = () => {
         character.offspring += breedingResult.totalOffspring;
 
         // 更新角色等级（基于后代数量）
-        character.level = Math.floor(character.offspring / 10);
+        // 如果人物通过献祭升级到了更高等级，则保持献祭等级，否则使用后代数量计算
+        const calculatedLevel = Math.floor(character.offspring / 10);
+        character.level = Math.max(character.level ?? 0, calculatedLevel);
 
         // 生育消耗生育值（完全基于生育数量和评级）
         const getRatingFertilityMultiplier = (rating: string) => {
