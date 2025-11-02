@@ -3400,8 +3400,11 @@ watch(
   border-radius: 12px;
   padding: 20px;
   max-width: 500px;
+  max-height: 90vh;
   width: 90%;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
 
   .modal-header {
     display: flex;
@@ -3437,6 +3440,39 @@ watch(
   }
 
   .modal-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    min-height: 0;
+
+    /* 自定义滚动条样式 */
+    &::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 5px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, rgba(205, 133, 63, 0.6), rgba(139, 90, 43, 0.5));
+      border-radius: 5px;
+      border: 2px solid rgba(0, 0, 0, 0.2);
+
+      &:hover {
+        background: linear-gradient(135deg, rgba(205, 133, 63, 0.8), rgba(139, 90, 43, 0.7));
+      }
+
+      &:active {
+        background: linear-gradient(135deg, rgba(255, 180, 100, 0.9), rgba(205, 133, 63, 0.8));
+      }
+    }
+
+    /* Firefox 滚动条样式 */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(205, 133, 63, 0.6) rgba(0, 0, 0, 0.3);
+
     .avatar-options {
       display: flex;
       flex-direction: column;
