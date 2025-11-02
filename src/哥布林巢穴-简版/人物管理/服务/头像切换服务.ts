@@ -14,14 +14,23 @@ export class AvatarSwitchService {
   static getAvatarByCorruptionLevel(character: Character): string {
     const loyalty = character.loyalty;
 
+    // 完全堕落状态（100%）：如果已经切换到完全堕落头像，则保持；否则检查是否应该使用完全堕落头像
+    if (loyalty >= 100) {
+      // 如果当前头像已经是完全堕落头像（通过比较 URL 判断），则保持
+      if (character.avatar === character.fullyCorruptedAvatar && character.fullyCorruptedAvatar) {
+        return character.avatar || '';
+      }
+      // 否则，如果存在完全堕落头像，使用完全堕落头像；否则回退到正常头像
+      return character.fullyCorruptedAvatar || character.avatar || '';
+    }
+
     // 半堕落（50%及以上，但小于100%）
     if (loyalty >= 50 && loyalty < 100) {
       // 如果有半堕落头像则使用，否则回退到正常头像
       return character.corruptedAvatar || character.avatar || '';
     }
 
-    // 正常状态（50%以下）和完全堕落状态（100%）都显示正常头像
-    // 完全堕落头像需要通过堕落按钮手动切换
+    // 正常状态（50%以下）显示正常头像
     return character.avatar || '';
   }
 
@@ -64,6 +73,18 @@ export class AvatarSwitchService {
    * @returns 更新后的人物对象
    */
   static updateCharacterAvatar(character: Character): Character {
+    // 如果人物已经处于完全堕落状态（loyalty >= 100）且当前头像已经是完全堕落头像，则不更新
+    // 避免将已经完全堕落的头像切换回半堕落或正常头像
+    if (character.loyalty >= 100) {
+      // 检查当前头像是否已经是完全堕落头像
+      const isCurrentlyFullyCorrupted =
+        character.avatar === character.fullyCorruptedAvatar && character.fullyCorruptedAvatar;
+      if (isCurrentlyFullyCorrupted) {
+        // 如果已经是完全堕落头像，保持现状，不更新
+        return character;
+      }
+    }
+
     // 获取对应堕落值的头像（已包含回退逻辑）
     const newAvatar = this.getAvatarByCorruptionLevel(character);
 
@@ -85,7 +106,22 @@ export class AvatarSwitchService {
     previousLoyalty: number,
   ): { character: Character; switched: boolean; level: string } {
     const switched = this.shouldSwitchAvatar(character, previousLoyalty);
-    const updatedCharacter = this.updateCharacterAvatar(character);
+
+    // 如果人物已经处于完全堕落状态且当前头像已经是完全堕落头像，则不更新头像
+    // 避免将已经完全堕落的头像切换回半堕落或正常头像
+    let updatedCharacter: Character;
+    if (
+      character.loyalty >= 100 &&
+      character.avatar === character.fullyCorruptedAvatar &&
+      character.fullyCorruptedAvatar
+    ) {
+      // 如果已经是完全堕落头像，保持现状，不更新
+      updatedCharacter = character;
+    } else {
+      // 否则正常更新头像
+      updatedCharacter = this.updateCharacterAvatar(character);
+    }
+
     const level = this.getCorruptionLevel(character.loyalty);
 
     return {

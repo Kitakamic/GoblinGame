@@ -488,8 +488,27 @@ const confirmTroopConfig = () => {
     const speedBonus = getAttributeBonus('speed');
     const healthBonus = getAttributeBonus('health');
 
-    // 获取原始属性（如果之前保存过原始属性，使用原始属性；否则使用当前属性作为原始属性）
-    const baseAttributes = currentConfigCaptain.value.originalAttributes || currentConfigCaptain.value.attributes;
+    // 获取原始属性
+    // 优先使用已保存的原始属性
+    // 如果没有，从人物数据中获取原始属性（确保不会重复叠加）
+    let baseAttributes = currentConfigCaptain.value.originalAttributes;
+
+    if (!baseAttributes) {
+      // 从人物数据中获取原始属性
+      const character = availableCharacters.value.find(char => char.id === currentConfigCaptain.value!.id);
+      if (character) {
+        baseAttributes = {
+          attack: character.attributes.attack,
+          defense: character.attributes.defense,
+          intelligence: character.attributes.intelligence,
+          speed: character.attributes.speed,
+          health: character.attributes.health,
+        };
+      } else {
+        // 如果找不到人物数据，使用当前属性（可能是原始属性）
+        baseAttributes = currentConfigCaptain.value.attributes;
+      }
+    }
 
     // 创建带有属性加成的队长数据
     const updatedCaptain = {
@@ -845,8 +864,10 @@ const getCaptainBaseAttribute = (attribute: string) => {
 // 获取部队卡显示的总血量
 const getCaptainTotalHealthForCard = (captain: Captain) => {
   if (!captain) return 0;
-  // 使用人物的实际血量属性，如果没有则使用等级 * 10 作为后备
-  const baseHealth = captain.attributes?.health || (captain.level || Math.floor(captain.offspring / 10)) * 10;
+  // 优先使用原始属性，如果没有则使用当前属性（可能是已经加成的）
+  // 确保不会重复叠加
+  const baseAttributes = captain.originalAttributes || captain.attributes;
+  const baseHealth = baseAttributes?.health || (captain.level || Math.floor(captain.offspring / 10)) * 10;
   let bonusHealth = 0;
 
   if (captain.troops) {
