@@ -192,9 +192,46 @@ export class ChainOfThoughtManager {
   }
 
   /**
-   * 获取指定模式的思维链
+   * 获取指定模式的思维链（优先使用自定义格式）
    */
   static getChain(mode: ChainOfThoughtMode): string {
+    // 先尝试从全局变量读取自定义格式
+    try {
+      const globalVars = getVariables({ type: 'global' });
+      const customChainKey = `chain_of_thought_${mode}`;
+      if (typeof globalVars[customChainKey] === 'string' && globalVars[customChainKey].trim()) {
+        console.log(`使用自定义思维链格式: ${mode}`);
+        return globalVars[customChainKey];
+      }
+    } catch (error) {
+      console.warn('读取自定义思维链格式失败，使用默认格式:', error);
+    }
+
+    // 如果没有自定义格式，使用默认格式
+    switch (mode) {
+      case ChainOfThoughtMode.LOCATION_GENERATION:
+        return this.getLocationGenerationChain();
+      case ChainOfThoughtMode.CHARACTER_GENERATION:
+        return this.getCharacterGenerationChain();
+      case ChainOfThoughtMode.PRE_BATTLE_DIALOGUE:
+        return this.getPreBattleDialogueChain();
+      case ChainOfThoughtMode.BATTLE_SUMMARY:
+        return this.getBattleSummaryChain();
+      case ChainOfThoughtMode.CHARACTER_TRAINING:
+        return this.getCharacterTrainingChain();
+      case ChainOfThoughtMode.RANDOM_EVENT:
+        return this.getRandomEventChain();
+      case ChainOfThoughtMode.STORY_SUMMARY:
+        return this.getStorySummaryChain();
+      default:
+        return '';
+    }
+  }
+
+  /**
+   * 获取指定模式的默认思维链（用于显示和恢复）
+   */
+  static getDefaultChain(mode: ChainOfThoughtMode): string {
     switch (mode) {
       case ChainOfThoughtMode.LOCATION_GENERATION:
         return this.getLocationGenerationChain();

@@ -60,6 +60,69 @@
         <!-- 分隔线 -->
         <div class="divider"></div>
 
+        <!-- 思维链格式自定义 -->
+        <div class="settings-section">
+          <h4 class="section-title">思维链格式自定义</h4>
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">自定义思维链格式</span>
+              <span class="label-desc">可以自定义所有思维链模式的提示词格式，留空则使用默认格式</span>
+            </label>
+            <select v-model="selectedChainMode" class="format-select" @change="loadChainFormat">
+              <option :value="ChainOfThoughtMode.LOCATION_GENERATION">据点生成思维链</option>
+              <option :value="ChainOfThoughtMode.CHARACTER_GENERATION">人物生成思维链</option>
+              <option :value="ChainOfThoughtMode.PRE_BATTLE_DIALOGUE">战前对话思维链</option>
+              <option :value="ChainOfThoughtMode.BATTLE_SUMMARY">战斗总结思维链</option>
+              <option :value="ChainOfThoughtMode.CHARACTER_TRAINING">人物调教思维链</option>
+              <option :value="ChainOfThoughtMode.RANDOM_EVENT">随机事件思维链</option>
+              <option :value="ChainOfThoughtMode.STORY_SUMMARY">剧情总结思维链</option>
+            </select>
+          </div>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">{{ getCurrentChainModeName() }}</span>
+              <span class="label-desc">支持多行文本，留空则使用默认格式</span>
+            </label>
+            <textarea
+              v-model="currentChainFormat"
+              class="chain-textarea"
+              rows="12"
+              placeholder="输入自定义思维链格式..."
+            ></textarea>
+          </div>
+
+          <div class="setting-item" style="display: flex; gap: 8px">
+            <button class="chain-action-button" @click="saveChainFormat">💾 保存当前格式</button>
+            <button class="chain-action-button secondary" @click="loadDefaultChainFormat">👁️ 查看默认格式</button>
+          </div>
+
+          <!-- 分隔线 -->
+          <div class="divider" style="margin: 16px 0"></div>
+
+          <!-- 导入导出功能 -->
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">导入/导出思维链格式</span>
+              <span class="label-desc">可以将您的自定义思维链格式导出为文件分享，或从文件导入他人的格式</span>
+            </label>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap">
+              <button class="chain-action-button" @click="exportChainFormats">📤 导出为文件</button>
+              <button class="chain-action-button secondary" @click="triggerChainFileImport">📥 从文件导入</button>
+              <input
+                ref="chainFileInput"
+                type="file"
+                accept=".json"
+                style="display: none"
+                @change="handleChainFileImport"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 分隔线 -->
+        <div class="divider"></div>
+
         <!-- 玩家角色设置 -->
         <div class="settings-section">
           <h4 class="section-title">玩家角色设置</h4>
@@ -149,6 +212,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
+import { ChainOfThoughtManager, ChainOfThoughtMode } from '../世界书管理/思维链管理器';
 import { modularSaveManager } from '../存档管理/模块化存档服务';
 import { ConfirmService } from '../服务/确认框服务';
 
@@ -171,6 +235,13 @@ const heroGenerationModifier = ref(0);
 
 // 人物生成格式
 const characterFormat = ref('json');
+
+// 思维链格式自定义
+const selectedChainMode = ref<ChainOfThoughtMode>(ChainOfThoughtMode.LOCATION_GENERATION);
+const currentChainFormat = ref('');
+
+// 文件导入相关
+const chainFileInput = ref<HTMLInputElement | null>(null);
 
 // 玩家角色信息
 const playerName = ref('哥布林之王');
@@ -211,6 +282,9 @@ const loadSettings = () => {
 
     // 加载玩家角色信息
     loadPlayerInfo();
+
+    // 加载思维链格式
+    loadChainFormat();
 
     console.log('📋 已加载游戏设置:', {
       enableStream: enableStream.value,
@@ -278,6 +352,272 @@ const updateCharacterFormat = () => {
     console.log('💾 人物生成格式已保存:', characterFormat.value);
   } catch (error) {
     console.error('保存人物生成格式失败:', error);
+  }
+};
+
+// 获取当前思维链模式名称
+const getCurrentChainModeName = (): string => {
+  const modeNames: Record<ChainOfThoughtMode, string> = {
+    [ChainOfThoughtMode.LOCATION_GENERATION]: '据点生成思维链',
+    [ChainOfThoughtMode.CHARACTER_GENERATION]: '人物生成思维链',
+    [ChainOfThoughtMode.PRE_BATTLE_DIALOGUE]: '战前对话思维链',
+    [ChainOfThoughtMode.BATTLE_SUMMARY]: '战斗总结思维链',
+    [ChainOfThoughtMode.CHARACTER_TRAINING]: '人物调教思维链',
+    [ChainOfThoughtMode.RANDOM_EVENT]: '随机事件思维链',
+    [ChainOfThoughtMode.STORY_SUMMARY]: '剧情总结思维链',
+  };
+  return modeNames[selectedChainMode.value] || '未知模式';
+};
+
+// 加载思维链格式
+const loadChainFormat = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const customChainKey = `chain_of_thought_${selectedChainMode.value}`;
+    // 检查是否有自定义格式（包括空字符串，表示用户明确清空了）
+    if (customChainKey in globalVars && typeof globalVars[customChainKey] === 'string') {
+      currentChainFormat.value = globalVars[customChainKey];
+    } else {
+      // 如果没有自定义格式，加载默认格式用于显示
+      currentChainFormat.value = ChainOfThoughtManager.getDefaultChain(selectedChainMode.value);
+    }
+  } catch (error) {
+    console.error('加载思维链格式失败:', error);
+    currentChainFormat.value = ChainOfThoughtManager.getDefaultChain(selectedChainMode.value);
+  }
+};
+
+// 保存思维链格式
+const saveChainFormat = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const customChainKey = `chain_of_thought_${selectedChainMode.value}`;
+
+    if (currentChainFormat.value.trim()) {
+      globalVars[customChainKey] = currentChainFormat.value.trim();
+      console.log(`💾 已保存自定义思维链格式: ${getCurrentChainModeName()}`);
+    } else {
+      // 如果为空，删除自定义格式，使用默认格式
+      delete globalVars[customChainKey];
+      console.log(`💾 已清空自定义思维链格式，将使用默认格式: ${getCurrentChainModeName()}`);
+    }
+
+    replaceVariables(globalVars, { type: 'global' });
+  } catch (error) {
+    console.error('保存思维链格式失败:', error);
+  }
+};
+
+// 查看默认思维链格式（临时显示，不保存）
+const loadDefaultChainFormat = () => {
+  currentChainFormat.value = ChainOfThoughtManager.getDefaultChain(selectedChainMode.value);
+  console.log(
+    `👁️ 已加载默认思维链格式用于查看: ${getCurrentChainModeName()}（只是临时显示，需要点击"保存当前格式"才会应用）`,
+  );
+};
+
+// 导出思维链格式为文件（导出所有格式，包括默认格式）
+const exportChainFormats = async () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const chains: Record<string, string> = {};
+    const allModes = Object.values(ChainOfThoughtMode);
+
+    // 收集所有格式（包括默认格式）
+    for (const mode of allModes) {
+      const customChainKey = `chain_of_thought_${mode}`;
+      // 如果有自定义格式，使用自定义格式；否则使用默认格式
+      if (customChainKey in globalVars && typeof globalVars[customChainKey] === 'string') {
+        chains[mode] = globalVars[customChainKey];
+      } else {
+        // 使用默认格式
+        chains[mode] = ChainOfThoughtManager.getDefaultChain(mode);
+      }
+    }
+
+    // 构建导出数据
+    const exportData = {
+      version: '1.0',
+      description: '哥布林巢穴思维链格式（包含所有模式）',
+      chains,
+      exportedAt: new Date().toISOString(),
+    };
+
+    // 转换为JSON字符串
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    // 创建下载链接
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `思维链格式_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // 释放URL对象
+    URL.revokeObjectURL(url);
+
+    const customCount = Object.values(ChainOfThoughtMode).filter(
+      mode => `chain_of_thought_${mode}` in globalVars && typeof globalVars[`chain_of_thought_${mode}`] === 'string',
+    ).length;
+
+    await ConfirmService.showSuccess(
+      `已导出所有 ${Object.keys(chains).length} 个思维链格式`,
+      '导出成功',
+      `包含 ${customCount} 个自定义格式和 ${Object.keys(chains).length - customCount} 个默认格式。文件已保存到您的下载文件夹。`,
+    );
+
+    console.log('✅ 思维链格式已导出:', exportData);
+  } catch (error) {
+    console.error('导出思维链格式失败:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await ConfirmService.showDanger(`导出失败：${errorMessage}`, '导出失败', '请重试或检查文件权限。');
+  }
+};
+
+// 触发文件选择
+const triggerChainFileImport = () => {
+  chainFileInput.value?.click();
+};
+
+// 处理文件导入
+const handleChainFileImport = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) return;
+
+  try {
+    // 读取文件内容
+    const text = await file.text();
+    let importData: any;
+
+    try {
+      importData = JSON.parse(text);
+    } catch (parseError) {
+      await ConfirmService.showWarning('JSON格式错误', '导入失败', '文件不是有效的JSON格式，请检查文件是否正确。');
+      target.value = '';
+      return;
+    }
+
+    // 验证数据格式
+    if (!importData.chains || typeof importData.chains !== 'object') {
+      await ConfirmService.showWarning('数据格式错误', '导入失败', '文件中没有找到思维链格式数据。');
+      target.value = '';
+      return;
+    }
+
+    // 检查有哪些可用的思维链格式（包括默认格式）
+    const availableChains = Object.keys(importData.chains).filter((mode: string) => {
+      return Object.values(ChainOfThoughtMode).includes(mode as ChainOfThoughtMode);
+    });
+
+    if (availableChains.length === 0) {
+      await ConfirmService.showWarning('没有有效格式', '导入失败', '文件中没有找到有效的思维链格式模式。');
+      target.value = '';
+      return;
+    }
+
+    // 获取模式名称映射
+    const modeNames: Record<ChainOfThoughtMode, string> = {
+      [ChainOfThoughtMode.LOCATION_GENERATION]: '据点生成思维链',
+      [ChainOfThoughtMode.CHARACTER_GENERATION]: '人物生成思维链',
+      [ChainOfThoughtMode.PRE_BATTLE_DIALOGUE]: '战前对话思维链',
+      [ChainOfThoughtMode.BATTLE_SUMMARY]: '战斗总结思维链',
+      [ChainOfThoughtMode.CHARACTER_TRAINING]: '人物调教思维链',
+      [ChainOfThoughtMode.RANDOM_EVENT]: '随机事件思维链',
+      [ChainOfThoughtMode.STORY_SUMMARY]: '剧情总结思维链',
+    };
+
+    // 检查是否有缺失的格式
+    const allModes = Object.values(ChainOfThoughtMode);
+    const missingModes = allModes.filter(mode => !availableChains.includes(mode));
+    if (missingModes.length > 0) {
+      const missingNames = missingModes.map(mode => modeNames[mode]).join('、');
+      console.log(`⚠️ 文件中缺少以下格式，将使用默认格式：${missingNames}`);
+    }
+
+    // 让用户确认导入哪些格式
+    const chainNames = availableChains
+      .map((mode: string) => `• ${modeNames[mode as ChainOfThoughtMode] || mode}`)
+      .join('\n');
+
+    const confirmed = await ConfirmService.showConfirm({
+      title: '确认导入',
+      message: `文件包含 ${availableChains.length} 个思维链格式${missingModes.length > 0 ? `，缺少 ${missingModes.length} 个格式将使用默认值` : ''}`,
+      details: `将要导入以下格式：\n${chainNames}${missingModes.length > 0 ? `\n\n缺少的格式（将使用默认值）：\n${missingModes.map(mode => `• ${modeNames[mode]}`).join('\n')}` : ''}\n\n⚠️ 注意：这将覆盖您现有的对应格式。\n\n是否继续导入？`,
+      type: 'info',
+    });
+
+    if (!confirmed) {
+      target.value = '';
+      return;
+    }
+
+    // 导入数据（导入所有格式：文件中的格式 + 文件中缺少的格式使用默认格式）
+    const globalVars = getVariables({ type: 'global' });
+    let importedCount = 0;
+
+    // 导入文件中包含的格式
+    for (const mode of availableChains) {
+      const chainContent = importData.chains[mode];
+      if (typeof chainContent === 'string' && chainContent.trim()) {
+        const customChainKey = `chain_of_thought_${mode}`;
+        globalVars[customChainKey] = chainContent.trim();
+        importedCount++;
+      }
+    }
+
+    // 如果文件缺少某些格式，使用默认格式填充（导入所有格式）
+    let defaultCount = 0;
+    if (missingModes.length > 0) {
+      for (const mode of missingModes) {
+        // 使用默认格式（删除自定义格式，让系统使用默认格式）
+        const customChainKey = `chain_of_thought_${mode}`;
+        // 删除自定义格式，这样系统就会使用默认格式
+        if (customChainKey in globalVars) {
+          delete globalVars[customChainKey];
+        }
+        // 注意：我们不保存默认格式，因为默认格式不需要保存到全局变量中
+        // 系统会自动使用默认格式
+        defaultCount++;
+      }
+    }
+
+    if (importedCount > 0) {
+      replaceVariables(globalVars, { type: 'global' });
+      // 重新加载当前显示的格式
+      loadChainFormat();
+
+      const successMessage =
+        defaultCount > 0
+          ? `已成功导入 ${importedCount} 个自定义格式，${defaultCount} 个格式使用默认值`
+          : `已成功导入 ${importedCount} 个思维链格式`;
+
+      await ConfirmService.showSuccess(
+        successMessage,
+        '导入成功',
+        '格式已应用到您的设置中，您可以继续编辑或使用它们。',
+      );
+
+      console.log('✅ 思维链格式已导入:', {
+        importedCount,
+        defaultCount,
+        chains: availableChains,
+        missingModes: missingModes.length > 0 ? missingModes : [],
+      });
+    } else {
+      await ConfirmService.showWarning('导入失败', '没有有效内容', '文件中没有找到有效的思维链格式内容。');
+    }
+  } catch (error) {
+    console.error('导入思维链格式失败:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await ConfirmService.showDanger(`导入失败：${errorMessage}`, '导入失败', '请检查文件是否正确或重试。');
+  } finally {
+    // 清空input，允许重复选择同一文件
+    target.value = '';
   }
 };
 
@@ -537,6 +877,11 @@ watch(
     }
   },
 );
+
+// 监听选择的思维链模式变化
+watch(selectedChainMode, () => {
+  loadChainFormat();
+});
 
 // 初始化
 onMounted(() => {
@@ -977,6 +1322,70 @@ onMounted(() => {
     cursor: not-allowed;
     background: linear-gradient(135deg, #6b7280, #4b5563);
     border-color: rgba(107, 114, 128, 0.5);
+  }
+}
+
+.chain-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(40, 40, 40, 0.8);
+  border: 2px solid rgba(205, 133, 63, 0.4);
+  border-radius: 8px;
+  color: #f0e6d2;
+  font-size: 13px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: all 0.2s ease;
+  min-height: 200px;
+
+  &::placeholder {
+    color: #6b7280;
+  }
+
+  &:hover {
+    border-color: rgba(205, 133, 63, 0.6);
+    background: rgba(40, 40, 40, 0.95);
+  }
+
+  &:focus {
+    border-color: rgba(255, 120, 60, 0.6);
+    box-shadow: 0 0 0 3px rgba(255, 120, 60, 0.1);
+  }
+}
+
+.chain-action-button {
+  flex: 1;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  border: 2px solid rgba(99, 102, 241, 0.5);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: linear-gradient(135deg, #7578f6, #5f56e5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &.secondary {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    border-color: rgba(107, 114, 128, 0.5);
+
+    &:hover {
+      background: linear-gradient(135deg, #7c8289, #5b616b);
+      box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+    }
   }
 }
 </style>
