@@ -39,7 +39,7 @@
           <!-- 等级标签 -->
           <div class="character-level-badge">
             <span class="level-icon">LV.</span>
-            <span class="level-value">{{ Math.floor(character.offspring / 10) }}</span>
+            <span class="level-value">{{ character.level ?? Math.floor(character.offspring / 10) ?? 1 }}</span>
           </div>
         </div>
 
@@ -2373,6 +2373,16 @@ onActivated(async () => {
   // 每次激活调教界面时更新调教人物数量
   updateTrainingCharactersCount();
   console.log('✅ 调教界面数据刷新完成');
+});
+
+// 监听人物等级更新事件，实时刷新数据
+eventOn('人物等级更新', () => {
+  console.log('🔄 收到人物等级更新事件，刷新调教界面数据');
+  loadTrainingData(true).then(() => {
+    applyFilters();
+    updateTrainingCharactersCount();
+    console.log('✅ 人物等级更新触发的数据刷新完成');
+  });
 });
 
 // 监听路由变化，作为 onActivated 的备用方案

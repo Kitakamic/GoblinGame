@@ -113,6 +113,11 @@
                   </div>
                 </div>
 
+                <!-- 献祭祭坛特殊交互 -->
+                <div v-if="slot.building.id === 'sacrifice_altar'" class="sacrifice-button-container">
+                  <button class="sacrifice-button" @click.stop="openSacrificeDialog(index)">献祭</button>
+                </div>
+
                 <button class="remove-button" title="拆除建筑" @click.stop="removeBuilding(index, 'resource')">
                   ×
                 </button>
@@ -165,6 +170,9 @@
         </div>
       </div>
     </div>
+
+    <!-- 献祭对话框 -->
+    <SacrificeDialog :show="showSacrificeDialog" @close="closeSacrificeDialog" @confirm="handleSacrificeConfirm" />
   </div>
 </template>
 
@@ -172,7 +180,10 @@
 import { computed, onActivated, onMounted, ref, watch } from 'vue';
 import { modularSaveManager } from '../存档管理/模块化存档服务';
 import type { NestModuleData } from '../存档管理/模块化存档类型';
+import { SacrificeService, type SacrificeAmounts } from '../服务/献祭服务';
+import { PlayerLevelService } from '../服务/玩家等级服务';
 import { ConfirmService } from '../服务/确认框服务';
+import SacrificeDialog from '../组件/献祭对话框.vue';
 
 // ==================== 类型定义 ====================
 
@@ -298,6 +309,12 @@ const resourceSlots = ref<BuildingSlot[]>([]);
 // 人物数据
 const characters = ref<any[]>([]);
 
+// ==================== 献祭相关数据 ====================
+
+// 献祭对话框状态
+const showSacrificeDialog = ref(false);
+const currentSacrificeSlotIndex = ref(-1);
+
 // ==================== 建筑数据定义 ====================
 
 /**
@@ -357,6 +374,15 @@ const resourceBuildings: Building[] = [
     category: 'resource',
     effects: [{ type: 'gold_multiplier', icon: '💰', description: '金钱收入+10%' }],
   },
+  {
+    id: 'sacrifice_altar',
+    name: '献祭祭坛',
+    icon: '🔥',
+    description: '献祭哥布林升级人物等级',
+    cost: { gold: 3000, food: 1500 },
+    category: 'resource',
+    effects: [{ type: 'sacrifice', icon: '🔥', description: '献祭哥布林升级等级' }],
+  },
 ];
 
 // ==================== 计算属性 ====================
@@ -384,7 +410,15 @@ const availableBuildings = computed(() => {
     });
   }
 
-  return buildings;
+  // 资源建筑：过滤掉已存在的献祭祭坛（只允许建造1个）
+  return buildings.filter(building => {
+    if (building.id === 'sacrifice_altar') {
+      // 检查是否已经有献祭祭坛
+      const existingAltarCount = resourceSlots.value.filter(slot => slot.building?.id === 'sacrifice_altar').length;
+      return existingAltarCount === 0; // 如果已经有1个或以上，则不显示
+    }
+    return true;
+  });
 });
 
 /**
@@ -633,6 +667,15 @@ const closeMenu = () => {
  * 检查是否可以建设指定建筑
  */
 const canBuild = (building: Building) => {
+  // 检查献祭祭坛是否已存在（只允许建造1个）
+  if (building.id === 'sacrifice_altar') {
+    const existingAltarCount = resourceSlots.value.filter(slot => slot.building?.id === 'sacrifice_altar').length;
+    if (existingAltarCount >= 1) {
+      return false; // 已经有一个献祭祭坛，不能再建造
+    }
+    return canAffordBuilding(building.cost);
+  }
+
   if (building.id === 'breeding') {
     // 繁殖间成本基于现有数量
     const existingBreedingCount = breedingSlots.value.filter(slot => slot.building?.id === 'breeding').length;
@@ -650,6 +693,16 @@ const canBuild = (building: Building) => {
  * 选择建筑进行建设
  */
 const selectBuilding = (building: Building) => {
+  // 检查献祭祭坛是否已存在
+  if (building.id === 'sacrifice_altar') {
+    const existingAltarCount = resourceSlots.value.filter(slot => slot.building?.id === 'sacrifice_altar').length;
+    if (existingAltarCount >= 1) {
+      console.log('献祭祭坛只能建造1个');
+      // 可以在这里显示提示消息
+      return;
+    }
+  }
+
   if (!canBuild(building)) {
     // 显示资源不足提示
     let cost = building.cost;
@@ -920,6 +973,74 @@ onActivated(() => {
   // 同步繁殖间信息，确保显示最新状态
   syncBreedingRoomInfo();
 });
+
+// ==================== 献祭相关方法 ====================
+
+/**
+ * 打开献祭对话框
+ */
+const openSacrificeDialog = (slotIndex: number) => {
+  currentSacrificeSlotIndex.value = slotIndex;
+  showSacrificeDialog.value = true;
+};
+
+/**
+ * 关闭献祭对话框
+ */
+const closeSacrificeDialog = () => {
+  showSacrificeDialog.value = false;
+  currentSacrificeSlotIndex.value = -1;
+};
+
+/**
+ * 处理献祭确认
+ */
+const handleSacrificeConfirm = async (characterId: string, sacrificeAmounts: SacrificeAmounts) => {
+  // 计算献祭总数和提示信息
+  const totalAmount =
+    sacrificeAmounts.normalGoblins +
+    sacrificeAmounts.warriorGoblins +
+    sacrificeAmounts.shamanGoblins +
+    sacrificeAmounts.paladinGoblins;
+  const sacrificeMessage = SacrificeService.getSacrificeMessage(characterId, sacrificeAmounts);
+
+  // 确认献祭
+  const confirmed = await ConfirmService.showWarning(
+    `确定要献祭 ${totalAmount} 个哥布林吗？`,
+    '确认献祭',
+    `将消耗 ${totalAmount} 个哥布林，${sacrificeMessage.message}`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  // 执行献祭
+  const result = SacrificeService.performSacrifice(characterId, sacrificeAmounts);
+
+  if (result.success) {
+    if (result.newLevel > result.oldLevel) {
+      console.log(result.message);
+      // 献祭成功后，更新玩家等级（因为人物等级提升了）
+      PlayerLevelService.updatePlayerLevel();
+      // 触发事件通知调教界面刷新人物数据
+      eventEmit('人物等级更新');
+      // 可以在这里显示成功提示
+    } else {
+      console.log(result.message);
+      // 即使等级没有提升，也更新玩家等级（确保玩家等级是最新的）
+      PlayerLevelService.updatePlayerLevel();
+      // 可以在这里显示提示
+    }
+  } else {
+    console.error(result.message);
+    // 可以在这里显示错误提示
+    return;
+  }
+
+  // 关闭对话框
+  closeSacrificeDialog();
+};
 </script>
 
 <style lang="scss" scoped>
@@ -1538,6 +1659,35 @@ onActivated(() => {
         font-size: 15px;
       }
     }
+  }
+}
+
+// ==================== 献祭祭坛相关样式 ====================
+
+.sacrifice-button-container {
+  margin-top: 4px;
+}
+
+.sacrifice-button {
+  background: linear-gradient(180deg, #dc2626, #b91c1c);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+
+  &:hover {
+    background: linear-gradient(180deg, #ef4444, #dc2626);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
+  }
+
+  &:active {
+    transform: translateY(0);
   }
 }
 </style>

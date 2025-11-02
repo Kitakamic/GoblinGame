@@ -29,7 +29,11 @@ export class PlayerLevelService {
       console.log(`我方人物数量: ${myCharacters.length}`);
       console.log(
         '我方人物详情:',
-        myCharacters.map(c => ({ name: c.name, offspring: c.offspring, level: Math.floor(c.offspring / 10) })),
+        myCharacters.map(c => ({
+          name: c.name,
+          level: c.level ?? Math.floor(c.offspring / 10) ?? 1,
+          offspring: c.offspring,
+        })),
       );
 
       if (myCharacters.length === 0) {
@@ -38,7 +42,10 @@ export class PlayerLevelService {
       }
 
       // 计算所有我方人物的等级，取最高值
-      const levels = myCharacters.map((character: Character) => Math.floor(character.offspring / 10));
+      // 优先使用 level 字段，如果没有则使用 offspring/10 计算，都没有则返回1
+      const levels = myCharacters.map((character: Character) => {
+        return character.level ?? Math.floor(character.offspring / 10) ?? 1;
+      });
       const maxLevel = Math.max(...levels);
       console.log(`计算出的等级: ${levels}, 最高等级: ${maxLevel}`);
 
