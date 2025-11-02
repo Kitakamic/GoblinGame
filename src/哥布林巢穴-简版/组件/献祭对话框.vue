@@ -614,4 +614,206 @@ watch(
     }
   }
 }
+
+// ==================== 移动端响应式样式 ====================
+@media (max-width: 768px) {
+  .sacrifice-dialog-overlay {
+    padding: 10px;
+  }
+
+  .sacrifice-dialog {
+    padding: 16px;
+    max-height: 95vh;
+    border-radius: 12px;
+
+    .dialog-header {
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+
+      h4 {
+        font-size: 18px;
+      }
+
+      .close-dialog {
+        font-size: 24px;
+        width: 36px;
+        height: 36px;
+      }
+    }
+
+    .dialog-content {
+      .character-selection {
+        margin-bottom: 12px;
+
+        .character-label {
+          font-size: 13px;
+          margin-bottom: 6px;
+        }
+
+        .character-select {
+          padding: 12px;
+          font-size: 14px;
+        }
+      }
+
+      .current-level-info {
+        padding: 10px;
+        margin-bottom: 16px;
+
+        p {
+          font-size: 14px;
+
+          strong {
+            font-size: 16px;
+          }
+        }
+      }
+
+      .goblin-selection {
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .goblin-type-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 12px;
+
+        .goblin-type-info {
+          flex-wrap: wrap;
+          gap: 6px;
+
+          .goblin-icon {
+            font-size: 20px;
+          }
+
+          .goblin-name {
+            font-size: 13px;
+            min-width: auto;
+            flex: 0 0 auto;
+          }
+
+          .goblin-available {
+            font-size: 11px;
+            flex: 1;
+            min-width: 0;
+          }
+
+          .goblin-experience {
+            font-size: 11px;
+            margin-left: 0;
+            flex: 0 0 100%;
+          }
+        }
+
+        .goblin-input-group {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          width: 100%;
+
+          .input-button {
+            width: 44px;
+            height: 44px;
+            font-size: 20px;
+            border-radius: 8px;
+            // 增大触摸区域，避免误触
+            min-width: 44px;
+            min-height: 44px;
+            // 添加触摸反馈
+            -webkit-tap-highlight-color: rgba(205, 133, 63, 0.3);
+
+            // 右侧加号按钮特殊处理，确保易于点击
+            &:last-child {
+              margin-left: auto;
+              // 可以添加额外的视觉提示
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            }
+          }
+
+          .goblin-input {
+            flex: 1;
+            min-width: 0;
+            height: 44px;
+            font-size: 16px;
+            padding: 0 8px;
+            // 移动端输入框字体要大一些，方便阅读
+          }
+        }
+      }
+
+      .sacrifice-summary {
+        padding: 10px;
+        margin-bottom: 16px;
+
+        p {
+          font-size: 13px;
+          margin: 6px 0;
+
+          strong {
+            font-size: 15px;
+          }
+
+          &.level-up-preview {
+            strong {
+              font-size: 17px;
+            }
+          }
+        }
+
+        .requirement-item {
+          display: block;
+          margin: 4px 0;
+          font-size: 12px;
+        }
+      }
+    }
+
+    .dialog-actions {
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 16px;
+
+      .cancel-button,
+      .confirm-button {
+        width: 100%;
+        padding: 12px 20px;
+        font-size: 16px;
+        // 移动端按钮要更大，便于点击
+        min-height: 48px;
+      }
+    }
+  }
+}
+
+// ==================== 小屏幕优化（最大宽度480px） ====================
+@media (max-width: 480px) {
+  .sacrifice-dialog {
+    padding: 12px;
+
+    .dialog-header {
+      h4 {
+        font-size: 16px;
+      }
+    }
+
+    .dialog-content {
+      .goblin-type-row {
+        .goblin-input-group {
+          .input-button {
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+          }
+
+          .goblin-input {
+            height: 40px;
+            font-size: 15px;
+          }
+        }
+      }
+    }
+  }
+}
 </style>
