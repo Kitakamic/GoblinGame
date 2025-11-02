@@ -361,39 +361,63 @@ ${basePrompt}`;
         throw new Error('AI回复为空');
       }
 
-      // 应用酒馆正则处理
-      let formattedResponse = formatAsTavernRegexedString(aiResponse, 'ai_output', 'display');
+      // 先检查是否有实际的 <summaryhistory> 标签（在应用酒馆正则之前）
+      // 从最后一个结尾标签往前匹配，匹配到最初的开始标签，这样可以避免匹配到思维链中提到的标签字符串
+      let formattedResponse: string;
 
-      // 提取 <summaryhistory> 标签内的内容（如果存在），移除标签本身和标签前的所有内容
-      // 先尝试匹配完整的标签（带结束标签）
-      const summaryHistoryMatch = formattedResponse.match(/<summaryhistory>([\s\S]*?)<\/summaryhistory>/i);
+      // 找到最后一个 </summaryhistory> 标签的位置
+      const lastEndTagIndex = aiResponse.lastIndexOf('</summaryhistory>');
+      const hasEndTag = lastEndTagIndex !== -1;
 
-      // 如果没有匹配到结束标签，尝试匹配开始标签并提取之后的所有内容
-      if (!summaryHistoryMatch) {
-        const startMatch = formattedResponse.match(/<summaryhistory>/i);
-        if (startMatch) {
-          // 找到开始标签位置，提取之后的所有内容（移除标签前的所有思维链内容）
-          const startIndex = startMatch.index! + startMatch[0].length;
-          formattedResponse = formattedResponse.substring(startIndex).trim();
-          console.log('📦 检测到 <summaryhistory> 标签（无结束标签），已提取标签后的内容，已移除标签前的所有内容');
+      if (hasEndTag) {
+        // 从最后一个结束标签往前搜索第一个 <summaryhistory> 开始标签
+        const beforeEndTag = aiResponse.substring(0, lastEndTagIndex);
+        const lastStartTagIndex = beforeEndTag.lastIndexOf('<summaryhistory>');
+
+        if (lastStartTagIndex !== -1) {
+          // 找到完整的标签对，提取标签内的内容
+          const startContentIndex = lastStartTagIndex + '<summaryhistory>'.length;
+          const endContentIndex = lastEndTagIndex;
+          formattedResponse = aiResponse.substring(startContentIndex, endContentIndex).trim();
+
+          console.log('📦 从最后一个结束标签往前匹配到开始标签，已提取标签内的内容，已移除标签前的所有思维链内容');
+
+          // 清理可能残留的开始和结束标签（如果有嵌套的情况）
+          formattedResponse = formattedResponse.replace(/<summaryhistory>/gi, '').trim();
+          formattedResponse = formattedResponse.replace(/<\/summaryhistory>/gi, '').trim();
+        } else {
+          // 有结束标签但没有开始标签，这种情况不应该发生，回退到正常处理
+          console.log('⚠️ 检测到结束标签但没有开始标签，应用酒馆正则处理');
+          formattedResponse = formatAsTavernRegexedString(aiResponse, 'ai_output', 'display');
         }
       } else {
-        // 匹配到完整标签，只提取标签内的内容（自动移除了标签前的所有内容）
-        formattedResponse = summaryHistoryMatch[1].trim();
-
-        // 递归移除可能存在的嵌套或多余的 <summaryhistory> 标签
-        while (/<summaryhistory>([\s\S]*?)<\/summaryhistory>/i.test(formattedResponse)) {
-          formattedResponse = formattedResponse.replace(/<summaryhistory>([\s\S]*?)<\/summaryhistory>/gi, '$1').trim();
+        // 没有结束标签，检查是否有开始标签且后面有总结格式的内容
+        const startTagMatch = aiResponse.match(/<summaryhistory>/i);
+        if (startTagMatch) {
+          const startIndex = startTagMatch.index! + '<summaryhistory>'.length;
+          const contentAfterTag = aiResponse.substring(startIndex, startIndex + 200); // 检查标签后200字符
+          // 检查是否有总结格式：数字开头或序号格式（1:、2: 等）
+          const hasSummaryFormat = /^\s*\d+[:：]|^\s*\d+\.|^\s*[-*]\s*\d+/m.test(contentAfterTag);
+          if (hasSummaryFormat) {
+            // 确认是真正的标签（后面有总结内容），提取之后的所有内容
+            formattedResponse = aiResponse.substring(startIndex).trim();
+            console.log(
+              '📦 检测到开始标签（无结束标签，但确认是标签），已提取标签后的内容，已移除标签前的所有思维链内容',
+            );
+            // 清理可能残留的开始标签
+            formattedResponse = formattedResponse.replace(/<summaryhistory>/gi, '').trim();
+            formattedResponse = formattedResponse.replace(/<\/summaryhistory>/gi, '').trim();
+          } else {
+            // 开始标签后面没有总结格式，可能是思维链中的提及，正常处理
+            console.log('ℹ️ 检测到开始标签但后面无总结格式内容，可能是思维链提及，应用酒馆正则处理');
+            formattedResponse = formatAsTavernRegexedString(aiResponse, 'ai_output', 'display');
+          }
+        } else {
+          // 完全没有标签，正常应用酒馆正则处理
+          console.log('ℹ️ 未检测到 <summaryhistory> 标签，应用酒馆正则处理');
+          formattedResponse = formatAsTavernRegexedString(aiResponse, 'ai_output', 'display');
         }
-
-        console.log('📦 检测到 <summaryhistory> 标签，已提取并清理标签内内容，已移除标签前的所有内容');
       }
-
-      // 清理标签内可能残留的开始标签（如果有嵌套或未匹配的情况）
-      formattedResponse = formattedResponse.replace(/<summaryhistory>/gi, '').trim();
-
-      // 清理可能的结尾标签残留
-      formattedResponse = formattedResponse.replace(/<\/summaryhistory>/gi, '').trim();
 
       console.log(`✅ AI总结完成: ${formattedResponse.substring(0, 100)}...`);
 
@@ -434,7 +458,7 @@ ${content}
 - 简洁但要包含核心信息
 
 ### 3. **输出格式**
-使用<summaryhistory>标签包裹总结内容，以时间为主干的编年体，直接输出总结性的段落描述
+使用'summaryhistory'xml标签包裹总结内容，以时间为主干的编年体，直接输出总结性的段落描述
 
 ### 4. **关键要求**
 - **用连贯的段落形式**描述征服历史
@@ -475,7 +499,7 @@ ${content}
 - 语言要**庄重史诗**，符合重要历史事件的感觉
 
 ### 4. **输出格式**
-使用<summaryhistory>标签包裹总结内容，章节体，直接输出叙事性的段落描述
+使用'summaryhistory'xml标签包裹总结内容，章节体，直接输出叙事性的段落描述
 
 ### 5. **关键要求**
 - 风格类似编年史
@@ -520,7 +544,7 @@ ${content}
 - 必须体现**剧情细节和互动过程**
 
 ### 4. **输出格式**
-使用<summaryhistory>标签包裹总结所有总结内容，每行格式：序号: [上下文标签] 事件详尽描述
+使用'summaryhistory'xml标签包裹总结所有总结内容，每行格式：序号: [上下文标签] 事件详尽描述
 
 **上下文标签格式：**
 - 完整版：\`(时间: X | 地点: Y | 人物: A,B | 关系: C(D))\`
@@ -551,7 +575,7 @@ ${content}
 
 ${content}
 
-请用中文回复，保留重要的关键信息。使用<summaryhistory>标签包裹总结内容，直接输出总结`;
+请用中文回复，保留重要的关键信息。使用'summaryhistory'xml标签包裹总结内容，直接输出总结`;
   }
 
   /**

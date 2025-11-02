@@ -184,7 +184,7 @@ export class ChainOfThoughtManager {
 - 总结是否可以时间作为主干，事件作为分支，进行梳理？
 - 总结是否涉及重要人物的俘虏信息？是否需要特别强调？
 - 如何总结可以准确概括原始内容的核心且避免冗杂？
-- 标签确认：是否需要xml标签包裹内容？
+- 标签确认：是否需要'summaryhistory'标签包裹内容？
 </think>
 [/Chain of thought]
 `;
