@@ -22,10 +22,10 @@
         class="character-card"
         :class="[getRatingClass(character.rating || 'D'), { selected: selectedCharacter?.id === character.id }]"
         :data-character-id="character.id"
-        @click="openCharacterMenu(character)"
+        @click="handleCharacterCardClick(character)"
       >
         <!-- 人物肖像图片区域 -->
-        <div class="character-portrait">
+        <div class="character-portrait" @dblclick.stop="showEnlargedAvatar(character)">
           <img v-if="character.avatar" :src="character.avatar" :alt="character.name" @error="handleImageError" />
           <div v-else class="default-portrait">
             <span class="portrait-icon">👤</span>
@@ -268,6 +268,31 @@
       @confirm="handleConfirmDialogConfirm"
       @cancel="handleConfirmDialogCancel"
     />
+
+    <!-- 放大头像查看弹窗 -->
+    <div v-if="showEnlargedAvatarModal" class="enlarged-avatar-overlay" @click="closeEnlargedAvatar">
+      <div class="enlarged-avatar-container" @click.stop>
+        <button class="close-enlarged-avatar-btn" @click="closeEnlargedAvatar">×</button>
+        <div class="enlarged-avatar-info">
+          <h3 class="enlarged-character-name">{{ enlargedAvatarCharacter?.name }}</h3>
+          <div v-if="enlargedAvatarCharacter?.title" class="enlarged-character-title">
+            {{ enlargedAvatarCharacter.title }}
+          </div>
+        </div>
+        <div class="enlarged-avatar-image-wrapper">
+          <img
+            v-if="enlargedAvatarCharacter?.avatar"
+            :src="enlargedAvatarCharacter.avatar"
+            :alt="enlargedAvatarCharacter.name"
+            class="enlarged-avatar-image"
+            @error="handleImageError"
+          />
+          <div v-else class="enlarged-avatar-placeholder">
+            <span class="enlarged-portrait-icon">👤</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -370,6 +395,9 @@ const showManualTraining = ref(false);
 const showOutfitModal = ref(false);
 const avatarUrl = ref('');
 const editingCharacter = ref<Character | null>(null);
+// 放大头像相关
+const showEnlargedAvatarModal = ref(false);
+const enlargedAvatarCharacter = ref<Character | null>(null);
 // 文生图相关
 const imagePrompt = ref('');
 const selectedAvatarField = ref<'avatar' | 'corruptedAvatar' | 'fullyCorruptedAvatar'>('avatar');
@@ -689,6 +717,28 @@ const manageWorldbookEntries = async (characters: Character[]) => {
     console.error('管理世界书条目失败:', error);
     // 世界书管理失败（内部处理，不需要前台提示）
   }
+};
+
+// 处理人物卡片点击（区分单击和双击）
+let clickTimer: ReturnType<typeof setTimeout> | null = null;
+let isDoubleClick = false;
+
+const handleCharacterCardClick = (character: Character) => {
+  // 清除之前的定时器
+  if (clickTimer) {
+    clearTimeout(clickTimer);
+    clickTimer = null;
+  }
+
+  // 检查是否是双击
+  isDoubleClick = false;
+  clickTimer = setTimeout(() => {
+    // 延迟执行，如果不是双击，则执行单击操作
+    if (!isDoubleClick) {
+      openCharacterMenu(character);
+    }
+    clickTimer = null;
+  }, 300); // 300ms内如果再次点击，则认为是双击
 };
 
 // 显示人物操作菜单
@@ -2208,6 +2258,29 @@ const handleFertilityClick = (character: Character) => {
   startFertility(character);
 };
 
+// 显示放大头像
+const showEnlargedAvatar = (character: Character) => {
+  // 标记为双击，防止触发单击事件
+  isDoubleClick = true;
+  if (clickTimer) {
+    clearTimeout(clickTimer);
+    clickTimer = null;
+  }
+
+  if (!character.avatar) {
+    toastRef.value?.info('该人物还没有头像', { title: '提示', duration: 2000 });
+    return;
+  }
+  enlargedAvatarCharacter.value = character;
+  showEnlargedAvatarModal.value = true;
+};
+
+// 关闭放大头像弹窗
+const closeEnlargedAvatar = () => {
+  showEnlargedAvatarModal.value = false;
+  enlargedAvatarCharacter.value = null;
+};
+
 // 处理手动调教按钮点击
 const handleManualTrainingClick = (character: Character) => {
   // 检查是否已编制
@@ -3632,6 +3705,138 @@ watch(
   }
 }
 
+// 放大头像弹窗样式
+.enlarged-avatar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.enlarged-avatar-container {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  background: linear-gradient(180deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));
+  border: 2px solid rgba(205, 133, 63, 0.4);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: scaleIn 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.close-enlarged-avatar-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  background: rgba(220, 38, 38, 0.9);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+
+  &:hover {
+    background: rgba(220, 38, 38, 1);
+    transform: scale(1.1);
+  }
+}
+
+.enlarged-avatar-info {
+  text-align: center;
+  margin-bottom: 8px;
+
+  .enlarged-character-name {
+    margin: 0 0 4px 0;
+    color: #ffd7a1;
+    font-size: 24px;
+    font-weight: 700;
+    text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  }
+
+  .enlarged-character-title {
+    color: rgba(255, 215, 161, 0.8);
+    font-size: 16px;
+    font-style: italic;
+  }
+}
+
+.enlarged-avatar-image-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  max-height: calc(90vh - 120px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+
+  .enlarged-avatar-image {
+    width: 100%;
+    height: auto;
+    max-height: calc(90vh - 120px);
+    object-fit: contain;
+    display: block;
+  }
+
+  .enlarged-avatar-placeholder {
+    width: 400px;
+    height: 400px;
+    background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(255, 120, 60, 0.2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+
+    .enlarged-portrait-icon {
+      font-size: 120px;
+      opacity: 0.8;
+    }
+  }
+}
+
 // 响应式设计
 @media (max-width: 1024px) {
   .characters-grid {
@@ -3650,6 +3855,34 @@ watch(
 
   .character-name {
     font-size: 11px;
+  }
+
+  .enlarged-avatar-container {
+    padding: 20px;
+    max-width: 95vw;
+  }
+
+  .enlarged-avatar-info {
+    .enlarged-character-name {
+      font-size: 20px;
+    }
+
+    .enlarged-character-title {
+      font-size: 14px;
+    }
+  }
+
+  .enlarged-avatar-image-wrapper {
+    max-height: calc(90vh - 100px);
+
+    .enlarged-avatar-placeholder {
+      width: 300px;
+      height: 300px;
+
+      .enlarged-portrait-icon {
+        font-size: 80px;
+      }
+    }
   }
 }
 
@@ -3709,6 +3942,34 @@ watch(
 
     .batch-action {
       justify-content: center;
+    }
+  }
+
+  .enlarged-avatar-container {
+    padding: 16px;
+    max-width: 95vw;
+  }
+
+  .enlarged-avatar-info {
+    .enlarged-character-name {
+      font-size: 18px;
+    }
+
+    .enlarged-character-title {
+      font-size: 12px;
+    }
+  }
+
+  .enlarged-avatar-image-wrapper {
+    max-height: calc(90vh - 80px);
+
+    .enlarged-avatar-placeholder {
+      width: 250px;
+      height: 250px;
+
+      .enlarged-portrait-icon {
+        font-size: 60px;
+      }
     }
   }
 }

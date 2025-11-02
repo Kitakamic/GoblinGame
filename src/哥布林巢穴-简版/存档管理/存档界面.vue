@@ -418,8 +418,15 @@ const handleImportFile = async (event: Event) => {
     if (importData.saves && Array.isArray(importData.saves)) {
       // 多存档导入
       let successCount = 0;
+      let skippedCount = 0;
       for (const saveData of importData.saves) {
         if (saveData.slot !== undefined) {
+          // 禁止导入到自动存档（槽位0）
+          if (saveData.slot === 0) {
+            skippedCount++;
+            continue;
+          }
+
           let saveDataString: string;
 
           // 判断是新格式还是旧格式
@@ -448,16 +455,20 @@ const handleImportFile = async (event: Event) => {
           }
         }
       }
-      toast.success(`成功导入 ${successCount} 个存档`);
+      if (skippedCount > 0) {
+        toast.warning(`成功导入 ${successCount} 个存档，已跳过 ${skippedCount} 个自动存档（槽位0不允许导入）`);
+      } else {
+        toast.success(`成功导入 ${successCount} 个存档`);
+      }
     } else {
       // 单存档导入 - 需要选择槽位
-      const slotNumber = prompt('请输入要导入到哪个槽位（0-5）：');
+      const slotNumber = prompt('请输入要导入到哪个槽位（1-5，自动存档槽位0不允许导入）：');
       if (slotNumber === null) {
         return;
       }
       const slot = parseInt(slotNumber);
-      if (isNaN(slot) || slot < 0 || slot > 5) {
-        toast.error('无效的槽位号');
+      if (isNaN(slot) || slot < 1 || slot > 5) {
+        toast.error('无效的槽位号，请输入 1-5（自动存档槽位0不允许导入）');
         return;
       }
 

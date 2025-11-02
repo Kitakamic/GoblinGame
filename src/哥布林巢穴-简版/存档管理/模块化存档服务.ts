@@ -297,7 +297,18 @@ export class ModularSaveManager {
     } catch (error) {
       console.error('获取存档槽位失败:', error);
       this.handleError(error as Error);
-      return [];
+      // 即使出错，也返回空槽位列表，确保界面能看到所有槽位
+      const fallbackSlots: ModularSaveSlot[] = [];
+      for (let i = 0; i <= ModularSaveManager.MAX_SLOTS; i++) {
+        fallbackSlots.push({
+          slot: i,
+          data: null,
+          timestamp: 0,
+          version: ModularSaveManager.CURRENT_VERSION,
+          saveName: i === 0 ? '自动存档' : `槽位 ${i}`,
+        });
+      }
+      return fallbackSlots;
     }
   }
 
@@ -701,6 +712,16 @@ export class ModularSaveManager {
    */
   async importSave(slot: number, saveData: string, saveName?: string): Promise<boolean> {
     try {
+      // 禁止导入到自动存档（槽位0）
+      if (slot === 0) {
+        console.error('不允许导入到自动存档（槽位0）');
+        throw new Error('不允许导入到自动存档（槽位0），自动存档由游戏系统自动管理');
+      }
+
+      if (slot < 1 || slot > ModularSaveManager.MAX_SLOTS) {
+        throw new Error(`无效的槽位编号: ${slot}，有效范围为 1-${ModularSaveManager.MAX_SLOTS}`);
+      }
+
       const parsed = JSON.parse(saveData);
 
       // 判断是否是新的导出格式（包含 worldbookData）
