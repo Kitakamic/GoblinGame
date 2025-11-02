@@ -120,11 +120,7 @@
     </div>
 
     <!-- 自定义输入面板 -->
-    <div
-      v-if="showCustomInputPanel && dialogueConfig.showCustomInput === true"
-      class="custom-input-overlay"
-      @click="closeCustomInputPanel"
-    >
+    <div v-if="showCustomInputPanel && dialogueConfig.showCustomInput === true" class="custom-input-overlay">
       <div class="custom-input-panel" @click.stop>
         <div class="custom-input-header">
           <h3>自定义输入</h3>
@@ -149,7 +145,7 @@
     </div>
 
     <!-- 编辑对话框 -->
-    <div v-if="editingMessageIndex >= 0" class="edit-dialog-overlay" @click="cancelEdit">
+    <div v-if="editingMessageIndex >= 0" class="edit-dialog-overlay">
       <div class="edit-dialog" @click.stop>
         <div class="edit-dialog-header">
           <h3>编辑消息</h3>

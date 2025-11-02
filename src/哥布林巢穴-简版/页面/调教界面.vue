@@ -738,7 +738,7 @@ const handleCharacterCardClick = (character: Character) => {
       openCharacterMenu(character);
     }
     clickTimer = null;
-  }, 300); // 300ms内如果再次点击，则认为是双击
+  }, 150); // 300ms内如果再次点击，则认为是双击
 };
 
 // 显示人物操作菜单

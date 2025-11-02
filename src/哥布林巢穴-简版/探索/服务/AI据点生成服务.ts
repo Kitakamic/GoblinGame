@@ -313,7 +313,7 @@ export class AILocationGenerationService {
 
       // 替换允许种族占位符
       const allowedRaces = this.getAllowedRacesForLocationType(conditions?.type);
-      finalPrompt = finalPrompt.replace('{ALLOWED_RACES}', `**此据点允许种族：${allowedRaces}**`);
+      finalPrompt = finalPrompt.replace('{ALLOWED_RACES}', `${allowedRaces}`);
       console.log(`🎯 [据点生成] 据点类型 "${conditions?.type || '未指定'}" 允许的种族:`, allowedRaces);
 
       // 如果指定了据点类型，添加类型介绍和种族要求

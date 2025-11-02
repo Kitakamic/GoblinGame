@@ -33,7 +33,7 @@
               <div class="stats-card">
                 <div class="stat-item">
                   <span class="icon">⚠️</span>
-                  <div class="value">威胁度 {{ threat }}</div>
+                  <div class="value">威胁度 {{ formatNumber(threat) }}</div>
                 </div>
               </div>
             </div>
@@ -68,35 +68,35 @@
             <div class="resources-grid eight-columns">
               <div class="resource-item">
                 <div class="resource-icon">💰</div>
-                <div class="resource-value">{{ gold }}</div>
+                <div class="resource-value">{{ formatNumber(gold) }}</div>
               </div>
               <div class="resource-item">
                 <div class="resource-icon">🍖</div>
-                <div class="resource-value">{{ food }}</div>
+                <div class="resource-value">{{ formatNumber(food) }}</div>
               </div>
               <div class="resource-item">
                 <div class="resource-icon">🔒</div>
-                <div class="resource-value">{{ slaves }}</div>
+                <div class="resource-value">{{ formatNumber(slaves) }}</div>
               </div>
               <div class="resource-item">
                 <div class="resource-icon">💋</div>
-                <div class="resource-value">{{ trainingCharactersCount }}</div>
+                <div class="resource-value">{{ formatNumber(trainingCharactersCount) }}</div>
               </div>
               <div class="resource-item">
                 <div class="resource-icon">👺</div>
-                <div class="resource-value">{{ normalGoblins }}</div>
+                <div class="resource-value">{{ formatNumber(normalGoblins) }}</div>
               </div>
               <div class="resource-item">
                 <div class="resource-icon">⚔️</div>
-                <div class="resource-value">{{ warriorGoblins }}</div>
+                <div class="resource-value">{{ formatNumber(warriorGoblins) }}</div>
               </div>
               <div class="resource-item">
                 <div class="resource-icon">🔮</div>
-                <div class="resource-value">{{ shamanGoblins }}</div>
+                <div class="resource-value">{{ formatNumber(shamanGoblins) }}</div>
               </div>
               <div class="resource-item">
                 <div class="resource-icon">✨</div>
-                <div class="resource-value">{{ paladinGoblins }}</div>
+                <div class="resource-value">{{ formatNumber(paladinGoblins) }}</div>
               </div>
             </div>
           </section>
@@ -143,7 +143,8 @@
                     <span class="resource-icon">{{ getResourceIcon(change.type) }}</span>
                     <span class="resource-name">{{ getResourceName(change.type) }}</span>
                     <span class="change-amount" :class="change.amount > 0 ? 'positive' : 'negative'"
-                      >{{ change.amount > 0 ? '+' : '' }}{{ change.amount }}</span
+                      >{{ change.amount > 0 ? '+' : change.amount < 0 ? '-' : ''
+                      }}{{ formatNumber(Math.abs(change.amount)) }}</span
                     >
                   </div>
                 </div>
@@ -339,6 +340,29 @@ const trainingCharactersCount = computed(() => resources.value.trainingSlaves);
 // 行动力系统 - 使用真实的资源数据
 const maxActionPoints = computed(() => resources.value.maxActionPoints);
 const currentActionPoints = computed(() => resources.value.actionPoints);
+
+// 格式化数字显示（支持 k, m, b）
+const formatNumber = (num: number | undefined | null): string => {
+  // 处理无效值
+  if (num === undefined || num === null || isNaN(num)) {
+    return '0';
+  }
+
+  // 处理负数（取绝对值格式化，符号由调用者处理）
+  const absNum = Math.abs(num);
+
+  if (absNum >= 1000000000) {
+    // 十亿 (billion)
+    return (absNum / 1000000000).toFixed(1).replace(/\.0$/, '') + 'b';
+  } else if (absNum >= 1000000) {
+    // 百万 (million)
+    return (absNum / 1000000).toFixed(1).replace(/\.0$/, '') + 'm';
+  } else if (absNum >= 1000) {
+    // 千 (thousand)
+    return (absNum / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  return Math.floor(absNum).toString();
+};
 
 // 自动保存机制
 let autoSaveTimer: number | null = null;
