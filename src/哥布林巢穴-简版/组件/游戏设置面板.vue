@@ -67,7 +67,7 @@
           <div class="setting-item">
             <label class="setting-label">
               <span class="label-text">角色名称</span>
-              <span class="label-desc">您的角色在游戏中的显示名称</span>
+              <span class="label-desc">您的角色在游戏中的显示名称（仅显示，实际上剧情还是酒馆的user名）</span>
             </label>
             <input v-model="playerName" type="text" class="text-input" placeholder="输入角色名称" />
           </div>
@@ -75,7 +75,7 @@
           <div class="setting-item">
             <label class="setting-label">
               <span class="label-text">角色头衔</span>
-              <span class="label-desc">您的角色称号或职位</span>
+              <span class="label-desc">您的角色称号或职位（仅显示，人设请在世界设定世界书中进行对应调整）</span>
             </label>
             <input v-model="playerTitle" type="text" class="text-input" placeholder="输入角色头衔" />
           </div>
@@ -99,7 +99,7 @@
 
           <div v-if="playerAvatar" class="setting-item">
             <div class="avatar-preview">
-              <img :src="playerAvatar" alt="玩家头像预览" @error="handleImageError" />
+              <img :src="playerAvatar" alt="玩家头像预览" @error="handleImageError" @load="handleImageLoad" />
             </div>
           </div>
 
@@ -345,6 +345,69 @@ const triggerFileUpload = () => {
   fileInput.value?.click();
 };
 
+// 压缩图片
+const compressImage = (
+  file: File,
+  maxWidth: number = 512,
+  maxHeight: number = 512,
+  quality: number = 0.85,
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          // 计算新尺寸，保持宽高比
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth || height > maxHeight) {
+            const ratio = Math.min(maxWidth / width, maxHeight / height);
+            width = width * ratio;
+            height = height * ratio;
+          }
+
+          // 创建canvas并绘制压缩后的图片
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) {
+            reject(new Error('无法创建Canvas上下文'));
+            return;
+          }
+
+          // 使用高质量渲染
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // 转换为base64，使用JPEG格式以获得更好的压缩率
+          const base64String = canvas.toDataURL('image/jpeg', quality);
+          resolve(base64String);
+        } catch (error) {
+          reject(error);
+        }
+      };
+
+      img.onerror = () => {
+        reject(new Error('图片加载失败'));
+      };
+
+      img.src = e.target?.result as string;
+    };
+
+    reader.onerror = () => {
+      reject(new Error('文件读取失败'));
+    };
+
+    reader.readAsDataURL(file);
+  });
+};
+
 // 处理文件上传
 const handleFileUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -358,11 +421,11 @@ const handleFileUpload = async (event: Event) => {
     return;
   }
 
-  // 检查文件大小（限制为5MB）
-  const maxSize = 5 * 1024 * 1024; // 5MB
+  // 检查文件大小（限制为10MB，压缩后会变小）
+  const maxSize = 10 * 1024 * 1024; // 10MB
   if (file.size > maxSize) {
     await ConfirmService.showWarning(
-      '图片文件过大，请选择小于5MB的图片',
+      '图片文件过大，请选择小于10MB的图片',
       '文件过大',
       `当前文件大小：${(file.size / 1024 / 1024).toFixed(2)}MB`,
     );
@@ -370,23 +433,30 @@ const handleFileUpload = async (event: Event) => {
   }
 
   try {
-    // 将图片转换为Base64
-    const reader = new FileReader();
+    console.log('🖼️ 开始压缩图片...');
 
-    reader.onload = e => {
-      const base64String = e.target?.result as string;
-      playerAvatar.value = base64String;
-      console.log('✅ 本地图片已加载，大小:', (base64String.length / 1024).toFixed(2), 'KB');
-    };
+    // 压缩图片（头像使用512x512，质量0.85）
+    const compressedBase64 = await compressImage(file, 512, 512, 0.85);
 
-    reader.onerror = () => {
-      ConfirmService.showDanger('图片读取失败', '上传失败', '请重试或选择其他图片');
-    };
+    // 检查压缩后的大小（限制为200KB）
+    const maxCompressedSize = 200 * 1024; // 200KB
+    if (compressedBase64.length > maxCompressedSize) {
+      // 如果还是太大，进一步降低质量
+      console.log('⚠️ 图片压缩后仍然较大，进一步降低质量...');
+      const furtherCompressed = await compressImage(file, 512, 512, 0.7);
+      playerAvatar.value = furtherCompressed;
+      console.log('✅ 本地图片已加载（二次压缩），大小:', (furtherCompressed.length / 1024).toFixed(2), 'KB');
+    } else {
+      playerAvatar.value = compressedBase64;
+      console.log('✅ 本地图片已加载（压缩），大小:', (compressedBase64.length / 1024).toFixed(2), 'KB');
+    }
 
-    reader.readAsDataURL(file);
+    // 显示成功提示
+    await ConfirmService.showSuccess('图片已成功加载并压缩', '上传成功');
   } catch (error) {
     console.error('处理图片失败:', error);
-    await ConfirmService.showDanger(`处理失败：${error}`, '上传失败');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await ConfirmService.showDanger(`处理失败：${errorMessage}`, '上传失败', '请重试或选择其他图片');
   } finally {
     // 清空input，允许重复选择同一文件
     if (target) {
@@ -400,6 +470,14 @@ const handleImageError = (event: Event) => {
   const target = event.target as HTMLImageElement;
   target.src = 'https://via.placeholder.com/150?text=Invalid+Image';
   console.warn('图片加载失败，请检查URL是否正确');
+};
+
+// 处理图片加载成功
+const handleImageLoad = (event: Event) => {
+  const target = event.target as HTMLImageElement;
+  // 确保图片正确显示
+  target.style.display = 'block';
+  console.log('✅ 头像预览加载成功');
 };
 
 // 打开文字样式设置

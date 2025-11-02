@@ -25,7 +25,9 @@
               <!-- 队长肖像图片区域 - 占满整个卡片 -->
               <div class="captain-portrait">
                 <img
-                  v-if="captain.avatar && captain.avatar.startsWith('http')"
+                  v-if="
+                    captain.avatar && (captain.avatar.startsWith('http') || captain.avatar.startsWith('data:image'))
+                  "
                   :src="captain.avatar"
                   :alt="captain.name"
                   @error="handleImageError"
@@ -144,12 +146,12 @@
           >
             <div class="captain-avatar">
               <img
-                v-if="captain.avatar && captain.avatar.startsWith('http')"
+                v-if="captain.avatar && (captain.avatar.startsWith('http') || captain.avatar.startsWith('data:image'))"
                 :src="captain.avatar"
                 :alt="captain.name"
                 @error="handleImageError"
               />
-              <span v-else>{{ captain.avatar }}</span>
+              <span v-else>{{ captain.avatar || '👤' }}</span>
             </div>
             <div class="captain-details">
               <h4>{{ captain.name }}</h4>

@@ -50,20 +50,13 @@ export class GameEventLorebookManager {
 
         const existingEntry = currentWorldbook[unifiedEventEntryIndex];
 
-        // 检查是否有 summary 标签（支持<summary>和<summary_N>格式），如果有则插入到 summary 和原始内容之间
+        // 检查是否有 summary 标签（仅支持新格式<summary_N>），如果有则插入到 summary 和原始内容之间
         let updatedContent = '';
-        if (existingEntry.content.includes('<summary>') || /<summary_\d+>/.test(existingEntry.content)) {
-          // 提取所有 summary 部分和原始内容
-          const summaryMatches = existingEntry.content.matchAll(/<summary(?:_\d+)?>([\s\S]*?)<\/summary(?:_\d+)?>/g);
-          const summaries: string[] = [];
-          for (const match of summaryMatches) {
-            summaries.push(match[0]);
-          }
-          const summaryContent = summaries.join('\n\n');
-          const originalContent = existingEntry.content.replace(
-            /<summary(?:_\d+)?>[\s\S]*?<\/summary(?:_\d+)?>\n*/g,
-            '',
-          );
+        if (/<summary_\d+>/.test(existingEntry.content)) {
+          // 提取所有 summary 部分并去重（仅支持新格式<summary_N>）
+          const summaries = WorldbookHelper.extractAndDeduplicateSummaries(existingEntry.content);
+          const summaryContent = WorldbookHelper.combineSummaries(summaries);
+          const originalContent = WorldbookHelper.removeAllSummaries(existingEntry.content);
 
           // 在新记录追加到原始内容后面
           const updatedOriginalContent = originalContent + '\n\n' + newRecordContent;

@@ -32,14 +32,10 @@ export class ConquestRecordManager {
       if (conquestEntryIndex !== -1) {
         const existingContent = worldbook[conquestEntryIndex].content;
 
-        // 提取所有summary部分（支持<summary>和<summary_N>格式）
-        const summaryMatches = existingContent.matchAll(/<summary(?:_\d+)?>([\s\S]*?)<\/summary(?:_\d+)?>/g);
-        const summaries: string[] = [];
-        for (const match of summaryMatches) {
-          summaries.push(match[0]);
-        }
+        // 提取所有summary部分并去重（仅支持新格式<summary_N>）
+        const summaries = WorldbookHelper.extractAndDeduplicateSummaries(existingContent);
         if (summaries.length > 0) {
-          summaryContent = summaries.join('\n\n') + '\n\n';
+          summaryContent = WorldbookHelper.combineSummaries(summaries) + '\n\n';
         }
 
         const parseResult = this.parseExistingConquestRecords(existingContent);

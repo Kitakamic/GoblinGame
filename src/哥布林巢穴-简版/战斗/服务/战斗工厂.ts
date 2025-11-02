@@ -62,7 +62,10 @@ export class BattleFactory {
       currentHealth: character.attributes.health || Math.floor(character.offspring / 10) * 10,
       isAlive: true,
       avatar: character.avatar, // 添加avatar字段
-      fallbackAvatar: character.avatar && !character.avatar.startsWith('http') ? character.avatar : undefined, // 保存emoji作为回退
+      fallbackAvatar:
+        character.avatar && !character.avatar.startsWith('http') && !character.avatar.startsWith('data:image')
+          ? character.avatar
+          : undefined, // 保存emoji作为回退
     };
   }
 
@@ -90,7 +93,11 @@ export class BattleFactory {
       isAlive: true,
       avatar: enemyCharacter.avatar, // 添加avatar字段
       fallbackAvatar:
-        enemyCharacter.avatar && !enemyCharacter.avatar.startsWith('http') ? enemyCharacter.avatar : undefined, // 保存emoji作为回退
+        enemyCharacter.avatar &&
+        !enemyCharacter.avatar.startsWith('http') &&
+        !enemyCharacter.avatar.startsWith('data:image')
+          ? enemyCharacter.avatar
+          : undefined, // 保存emoji作为回退
     };
   }
 

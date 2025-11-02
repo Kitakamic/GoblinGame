@@ -22,12 +22,18 @@
           <!-- 单位肖像图片区域 -->
           <div class="unit-portrait" :title="unit.troops ? '点击查看下辖部队' : ''" @click="showTroopsInfo(unit)">
             <img
-              v-if="unit.avatar && unit.avatar.startsWith('http')"
+              v-if="unit.avatar && (unit.avatar.startsWith('http') || unit.avatar.startsWith('data:image'))"
+              class="unit-avatar-image"
               :src="unit.avatar"
               :alt="unit.name"
               @error="handleImageError"
             />
-            <div v-else class="default-portrait">
+            <div
+              class="default-portrait"
+              :class="{
+                hidden: unit.avatar && (unit.avatar.startsWith('http') || unit.avatar.startsWith('data:image')),
+              }"
+            >
               <span class="portrait-icon">{{ getUnitAvatar(unit) }}</span>
             </div>
 
@@ -173,12 +179,18 @@
           <!-- 单位肖像图片区域 -->
           <div class="unit-portrait" :title="unit.troops ? '点击查看下辖部队' : ''" @click="showTroopsInfo(unit)">
             <img
-              v-if="unit.avatar && unit.avatar.startsWith('http')"
+              v-if="unit.avatar && (unit.avatar.startsWith('http') || unit.avatar.startsWith('data:image'))"
+              class="unit-avatar-image"
               :src="unit.avatar"
               :alt="unit.name"
               @error="handleImageError"
             />
-            <div v-else class="default-portrait">
+            <div
+              class="default-portrait"
+              :class="{
+                hidden: unit.avatar && (unit.avatar.startsWith('http') || unit.avatar.startsWith('data:image')),
+              }"
+            >
               <span class="portrait-icon">{{ getUnitAvatar(unit) }}</span>
             </div>
 
@@ -568,7 +580,7 @@ const canStartDialogue = computed(() => {
 // 方法
 const getUnitAvatar = (unit: BattleUnit) => {
   // 优先使用单位数据中的avatar字段（emoji）
-  if (unit.avatar && !unit.avatar.startsWith('http')) {
+  if (unit.avatar && !unit.avatar.startsWith('http') && !unit.avatar.startsWith('data:image')) {
     return unit.avatar;
   }
 
@@ -903,7 +915,7 @@ const handleImageError = (event: Event) => {
     img.style.display = 'none';
     const defaultPortrait = unitPortrait.querySelector('.default-portrait') as HTMLElement;
     if (defaultPortrait) {
-      defaultPortrait.style.display = 'block';
+      defaultPortrait.classList.remove('hidden');
     }
   }
 };
@@ -2853,12 +2865,25 @@ onUnmounted(() => {
 }
 
 .unit-portrait .default-portrait {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(255, 120, 60, 0.2));
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 1;
+
+  &.hidden {
+    display: none;
+  }
+}
+
+.unit-portrait .unit-avatar-image {
+  position: relative;
+  z-index: 2;
 }
 
 .unit-portrait .default-portrait .portrait-icon {

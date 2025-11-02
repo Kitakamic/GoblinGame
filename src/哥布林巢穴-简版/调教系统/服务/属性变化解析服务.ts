@@ -18,64 +18,119 @@ export class AttributeChangeParseService {
   /**
    * 解析AI输出的属性变化数据
    * 注意：调用此方法前需要先应用酒馆正则处理文本
-   * 支持 [OPTIONS_JSON] 标签格式和 ```json 代码块格式
+   * 支持多种格式：标签格式、代码块格式、纯JSON格式、单独字段格式
    */
   static parseAttributeChanges(processedResponse: string): AttributeChange | null {
     console.log('🔍 开始解析属性变化数据...');
     console.log('📝 已处理的AI回复内容:', processedResponse);
 
     let jsonStr = '';
+    let parseMethod = '';
 
-    try {
-      // 首先尝试匹配 [OPTIONS_JSON] 标签格式
-      const tagMatch = processedResponse.match(/\[OPTIONS_JSON\]([\s\S]*?)\[\/OPTIONS_JSON\]/);
-      if (tagMatch) {
-        const tagContent = tagMatch[1].trim();
-        console.log('📋 提取的标签内容:', tagContent);
+    // ========== 方法1: 尝试匹配 [OPTIONS_JSON] 标签格式 ==========
+    const tagMatch = processedResponse.match(/\[OPTIONS_JSON\]([\s\S]*?)\[\/OPTIONS_JSON\]/);
+    if (tagMatch) {
+      const tagContent = tagMatch[1].trim();
+      console.log('📋 提取的标签内容:', tagContent);
 
-        // 检查标签内容是否包含```json代码块
-        const codeBlockMatch = tagContent.match(/```json\s*([\s\S]*?)\s*```/);
-        if (codeBlockMatch) {
-          // 嵌套格式：标签内包含代码块
-          jsonStr = codeBlockMatch[1].trim();
-          console.log('📋 使用嵌套格式（标签+代码块）提取的JSON字符串:', jsonStr);
-        } else {
-          // 纯标签格式：直接使用标签内容
-          jsonStr = tagContent;
-          console.log('📋 使用纯标签格式提取的JSON字符串:', jsonStr);
-        }
+      // 检查标签内容是否包含```json代码块
+      const codeBlockMatch = tagContent.match(/```json\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        // 嵌套格式：标签内包含代码块
+        jsonStr = codeBlockMatch[1].trim();
+        parseMethod = '嵌套格式（标签+代码块）';
+        console.log('📋 使用嵌套格式（标签+代码块）提取的JSON字符串:', jsonStr);
       } else {
-        // 如果没找到标签格式，尝试匹配独立的```json代码块格式
-        const codeBlockMatch = processedResponse.match(/```json\s*([\s\S]*?)\s*```/);
-        if (codeBlockMatch) {
-          jsonStr = codeBlockMatch[1].trim();
-          console.log('📋 使用独立代码块格式提取的JSON字符串:', jsonStr);
-        } else {
-          console.warn('❌ 未找到OPTIONS_JSON标签或```json代码块');
-          console.log('📄 完整处理后的回复:', processedResponse);
-          return null;
-        }
+        // 纯标签格式：直接使用标签内容
+        jsonStr = tagContent;
+        parseMethod = '纯标签格式';
+        console.log('📋 使用纯标签格式提取的JSON字符串:', jsonStr);
       }
-
-      const data = JSON.parse(jsonStr);
-      console.log('📊 解析的JSON数据:', data);
-
-      if (data.attribute_changes) {
-        console.log('✅ 找到属性变化数据:', data.attribute_changes);
-        return data.attribute_changes as AttributeChange;
-      }
-
-      console.warn('⚠️ JSON数据中未找到attribute_changes字段');
-      console.log('📋 可用字段:', Object.keys(data));
-      return null;
-    } catch (error) {
-      console.error('❌ 解析属性变化数据失败:', error);
-      console.log('📄 处理后的回复:', processedResponse);
-      console.log('🔍 尝试提取的JSON字符串:', jsonStr);
-      console.log('📊 JSON字符串长度:', jsonStr.length);
-      console.log('📊 JSON字符串前100字符:', jsonStr.substring(0, 100));
-      return null;
     }
+
+    // ========== 方法2: 尝试匹配独立的```json代码块格式 ==========
+    if (!jsonStr) {
+      const codeBlockMatch = processedResponse.match(/```json\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        jsonStr = codeBlockMatch[1].trim();
+        parseMethod = '独立代码块格式';
+        console.log('📋 使用独立代码块格式提取的JSON字符串:', jsonStr);
+      }
+    }
+
+    // ========== 方法3: 尝试从大括号开始到结尾的格式（纯JSON） ==========
+    if (!jsonStr) {
+      const braceMatch = processedResponse.match(/\{[\s\S]*\}/);
+      if (braceMatch) {
+        jsonStr = braceMatch[0].trim();
+        parseMethod = '纯JSON格式（大括号到结尾）';
+        console.log('📋 使用纯JSON格式提取的JSON字符串:', jsonStr);
+      }
+    }
+
+    // ========== 尝试解析JSON并提取attribute_changes ==========
+    if (jsonStr) {
+      try {
+        const data = JSON.parse(jsonStr);
+        console.log(`📊 使用${parseMethod}解析的JSON数据:`, data);
+
+        if (data.attribute_changes) {
+          console.log('✅ 找到属性变化数据:', data.attribute_changes);
+          return data.attribute_changes as AttributeChange;
+        }
+
+        console.warn('⚠️ JSON数据中未找到attribute_changes字段');
+        console.log('📋 可用字段:', Object.keys(data));
+      } catch (jsonError) {
+        console.warn(`⚠️ 使用${parseMethod}解析JSON失败:`, jsonError);
+      }
+    }
+
+    // ========== 方法4: 单独寻找 loyalty 和 stamina 字段 ==========
+    console.log('🔍 尝试单独寻找属性变化字段...');
+    const result: AttributeChange = {};
+    let foundAny = false;
+
+    // 尝试寻找 "loyalty": 数字 格式
+    const loyaltyPattern = /["']?loyalty["']?\s*:\s*(-?\d+\.?\d*)/i;
+    const loyaltyMatch = processedResponse.match(loyaltyPattern);
+    if (loyaltyMatch) {
+      const loyaltyValue = parseFloat(loyaltyMatch[1]);
+      if (!isNaN(loyaltyValue)) {
+        result.loyalty = loyaltyValue;
+        foundAny = true;
+        console.log(`✅ 找到独立的loyalty值: ${loyaltyValue}`);
+      }
+    }
+
+    // 尝试寻找 "stamina": 数字 格式
+    const staminaPattern = /["']?stamina["']?\s*:\s*(-?\d+\.?\d*)/i;
+    const staminaMatch = processedResponse.match(staminaPattern);
+    if (staminaMatch) {
+      const staminaValue = parseFloat(staminaMatch[1]);
+      if (!isNaN(staminaValue)) {
+        result.stamina = staminaValue;
+        foundAny = true;
+        console.log(`✅ 找到独立的stamina值: ${staminaValue}`);
+      }
+    }
+
+    if (foundAny) {
+      console.log('✅ 通过单独字段提取找到属性变化数据:', result);
+      return result;
+    }
+
+    // ========== 所有方法都失败，使用保底机制 ==========
+    console.warn('❌ 所有解析方法都失败，启用保底机制');
+    console.log('📄 完整处理后的回复:', processedResponse);
+
+    // 保底机制：给予小幅度的正面属性变化（忠诚度+1，体力-2）
+    const fallbackChanges: AttributeChange = {
+      loyalty: 2, // 默认增加1点忠诚度
+      stamina: -2, // 默认消耗2点体力
+    };
+    console.log('🛡️ 保底机制生效：默认属性变化', fallbackChanges);
+    return fallbackChanges;
   }
 
   /**

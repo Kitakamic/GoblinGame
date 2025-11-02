@@ -4,7 +4,7 @@
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h2 class="modal-title">📚 剧情总结</h2>
-          <button class="close-btn" @click="$emit('close')">✕</button>
+          <button class="close-btn" @click="handleCancel">✕</button>
         </div>
 
         <div class="modal-body">
@@ -89,9 +89,28 @@
                 <select v-model="selectedCharacterId" class="character-select" :disabled="loadingCharacters">
                   <option value="" disabled>请选择人物</option>
                   <option v-for="character in filteredCharacters" :key="character.id" :value="character.id">
-                    {{ character.name }}
+                    {{ character.title ? `${character.title}-${character.name}` : character.name }}
                   </option>
                 </select>
+              </div>
+
+              <!-- 保留对话轮数设置 -->
+              <div v-if="selectedEntryType === 'character_story_history'" class="retained-dialogues-setting">
+                <div class="setting-label">
+                  <span>保留对话轮数:</span>
+                  <span class="setting-hint">（总结时将保留最近N轮对话，不发送给AI）</span>
+                </div>
+                <div class="setting-input-group">
+                  <input
+                    v-model.number="retainedDialogueRounds"
+                    type="number"
+                    min="0"
+                    max="20"
+                    class="setting-input"
+                    @change="saveRetainedDialogueRounds"
+                  />
+                  <span class="setting-unit">轮</span>
+                </div>
               </div>
             </div>
 
@@ -103,7 +122,7 @@
             <button class="btn-primary btn-large" :disabled="!canSummarize || processing" @click="handleSummarize">
               {{ processing ? '处理中...' : '开始总结' }}
             </button>
-            <button class="btn-secondary btn-large" @click="$emit('close')">取消</button>
+            <button class="btn-secondary btn-large" @click="handleCancel">取消</button>
           </div>
         </div>
       </div>
@@ -149,10 +168,11 @@ const WORLDBOOK_NAME = '哥布林巢穴-人物档案';
 // 状态
 const availableEntries = ref({ conquest: 0, characters: 0, events: 0 });
 const selectedEntryType = ref<string>(''); // 改为单选
-const characters = ref<Array<{ id: string; name: string }>>([]);
+const characters = ref<Array<{ id: string; name: string; title?: string }>>([]);
 const selectedCharacterId = ref('');
 const loadingCharacters = ref(false);
 const processing = ref(false);
+const retainedDialogueRounds = ref(5); // 保留的对话轮数（默认5轮）
 
 // 弹窗提示引用
 const toastRef = ref<InstanceType<typeof ToastContainer>>();
@@ -163,7 +183,10 @@ const confirmModalTitle = ref('');
 const confirmModalInfo = ref('');
 const confirmModalContent = ref('');
 const pendingSummaries = ref<
-  Map<number, { summary: string; incremental: boolean; entryName: string; entryType: string }>
+  Map<
+    number,
+    { summary: string; incremental: boolean; entryName: string; entryType: string; retainedDialogues?: string }
+  >
 >(new Map());
 // 存储被禁用的条目UID，用于取消时恢复
 const disabledEntryUids = ref<number[]>([]);
@@ -180,11 +203,12 @@ const filteredCharacters = computed(() => {
   return characters.value;
 });
 
-// 选中的角色名称
+// 选中的角色名称（包含title）
 const selectedCharacter = computed(() => {
   if (!selectedCharacterId.value) return '';
   const character = characters.value.find(c => c.id === selectedCharacterId.value);
-  return character ? character.name : '';
+  if (!character) return '';
+  return character.title ? `${character.title}-${character.name}` : character.name;
 });
 
 // 监听人物选择，重新计算tokens
@@ -333,6 +357,32 @@ async function loadCharacters() {
   }
 }
 
+// 加载保留对话轮数设置
+function loadRetainedDialogueRounds() {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const rounds = globalVars['summary_retained_dialogue_rounds'];
+    if (typeof rounds === 'number' && rounds >= 0) {
+      retainedDialogueRounds.value = rounds;
+    }
+  } catch (error) {
+    console.warn('读取保留对话轮数设置失败:', error);
+  }
+}
+
+// 保存保留对话轮数设置
+function saveRetainedDialogueRounds() {
+  try {
+    const rounds = Math.max(0, Math.min(20, Math.floor(retainedDialogueRounds.value || 0)));
+    retainedDialogueRounds.value = rounds;
+    replaceVariables({ summary_retained_dialogue_rounds: rounds }, { type: 'global' });
+    console.log(`✅ 已保存保留对话轮数设置: ${rounds} 轮`);
+  } catch (error) {
+    console.error('保存保留对话轮数设置失败:', error);
+    toastRef.value?.error('保存设置失败');
+  }
+}
+
 // 处理总结
 async function handleSummarize() {
   if (!canSummarize.value || processing.value) return;
@@ -343,7 +393,52 @@ async function handleSummarize() {
     return;
   }
 
+  // 如果是人物剧情记录，检查实际对话轮数是否足够（设置为0轮时跳过检查，表示不保留任何对话）
+  if (
+    selectedEntryType.value === 'character_story_history' &&
+    selectedCharacterId.value &&
+    retainedDialogueRounds.value > 0
+  ) {
+    try {
+      // 获取该人物的世界书条目
+      const entries = await StorySummaryManager.getWorldbookEntries(WORLDBOOK_NAME);
+      const characterEntry = entries.find(
+        e => e.extra?.entry_type === 'character_story_history' && e.extra?.character_id === selectedCharacterId.value,
+      );
+
+      if (characterEntry) {
+        // 解析对话记录
+        const { TrainingRecordManager } = await import('./调教记录管理器');
+        const records = TrainingRecordManager.parseTrainingHistory(characterEntry.content || '');
+
+        // 计算实际对话轮数（每轮 = 用户输入 + AI回复 = 2条）
+        const actualRounds = Math.floor(records.length / 2);
+        const settingRounds = retainedDialogueRounds.value;
+
+        // 如果实际轮数小于设置的保留轮数，禁止总结
+        if (actualRounds < settingRounds) {
+          toastRef.value?.warning(
+            `⚠️ 当前人物只有 ${actualRounds} 轮对话记录，无法保留 ${settingRounds} 轮。请将"保留对话轮数"调整为 ${actualRounds} 轮或更少后再进行总结。`,
+            { duration: 6000 },
+          );
+          return;
+        }
+
+        console.log(`✅ 对话轮数检查通过: 实际 ${actualRounds} 轮，设置保留 ${settingRounds} 轮`);
+      } else {
+        console.warn('⚠️ 未找到该人物的世界书条目');
+      }
+    } catch (error) {
+      console.error('检查人物对话记录失败:', error);
+      toastRef.value?.error('检查对话记录失败，请重试');
+      return;
+    }
+  } else if (selectedEntryType.value === 'character_story_history' && retainedDialogueRounds.value === 0) {
+    console.log('ℹ️ 保留对话轮数设置为0，跳过对话轮数检查（将不保留任何对话，所有对话用于总结）');
+  }
+
   processing.value = true;
+  let tempDisabledUids: number[] = [];
   try {
     // 准备角色ID列表
     let characterIds: string[] | undefined;
@@ -351,33 +446,47 @@ async function handleSummarize() {
       characterIds = [selectedCharacterId.value];
     }
 
-    // 只传一个条目类型
-    const entryTypes = [selectedEntryType.value];
-
+    // 只传单个条目类型（单选，不支持多选）
     // 生成总结（不直接更新世界书，但会禁用相关条目）
     const summaries = await StorySummaryManager.generateSummaries(
       WORLDBOOK_NAME,
-      entryTypes,
+      selectedEntryType.value,
       characterIds,
       toastRef.value,
     );
 
-    if (summaries.size === 0) {
-      toastRef.value?.warning('没有可总结的内容');
-      // 如果没有生成总结，可能需要恢复被禁用的条目
-      if (disabledEntryUids.value.length > 0) {
-        try {
-          await StorySummaryManager.restoreDisabledEntries(WORLDBOOK_NAME, disabledEntryUids.value);
+    // 获取被禁用的条目UID（generateSummaries 会禁用条目，即使总结失败）
+    if (summaries.size > 0) {
+      tempDisabledUids = Array.from(summaries.keys());
+      disabledEntryUids.value = tempDisabledUids;
+    } else {
+      // 如果没有生成总结，尝试恢复可能被禁用的条目
+      // 需要获取实际被禁用的条目
+      try {
+        const entries = await StorySummaryManager.getWorldbookEntries(WORLDBOOK_NAME);
+        const disabledEntries = entries.filter(
+          e =>
+            e.extra?.entry_type === selectedEntryType.value &&
+            (!characterIds || characterIds.includes(e.extra?.character_id || '')) &&
+            e.enabled === false &&
+            e.extra?._original_enabled !== undefined,
+        );
+        if (disabledEntries.length > 0) {
+          tempDisabledUids = disabledEntries.map(e => e.uid);
+          disabledEntryUids.value = tempDisabledUids;
+          await StorySummaryManager.restoreDisabledEntries(WORLDBOOK_NAME, tempDisabledUids);
           disabledEntryUids.value = [];
-        } catch (error) {
-          console.error('恢复禁用条目失败:', error);
+          console.log(`✅ 已恢复 ${tempDisabledUids.length} 个被禁用的条目`);
         }
+      } catch (error) {
+        console.error('恢复禁用条目失败:', error);
       }
+      toastRef.value?.warning('没有可总结的内容');
       return;
     }
 
     // 保存被禁用的条目UID（用于取消时恢复）
-    disabledEntryUids.value = Array.from(summaries.keys());
+    disabledEntryUids.value = tempDisabledUids;
 
     // 只有一个条目，简化显示
     const firstSummary = summaries.values().next().value;
@@ -405,6 +514,29 @@ async function handleSummarize() {
     console.error('总结失败:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
     toastRef.value?.error(`总结失败：${errorMessage}`);
+
+    // 总结失败时，恢复所有可能被禁用的条目
+    try {
+      const entries = await StorySummaryManager.getWorldbookEntries(WORLDBOOK_NAME);
+      const disabledEntries = entries.filter(
+        e =>
+          e.extra?.entry_type === selectedEntryType.value &&
+          (!selectedCharacterId.value ||
+            !selectedEntryType.value ||
+            selectedEntryType.value !== 'character_story_history' ||
+            e.extra?.character_id === selectedCharacterId.value) &&
+          e.enabled === false &&
+          e.extra?._original_enabled !== undefined,
+      );
+      if (disabledEntries.length > 0) {
+        const uidsToRestore = disabledEntries.map(e => e.uid);
+        await StorySummaryManager.restoreDisabledEntries(WORLDBOOK_NAME, uidsToRestore);
+        disabledEntryUids.value = [];
+        console.log(`✅ 总结失败，已恢复 ${uidsToRestore.length} 个被禁用的条目`);
+      }
+    } catch (restoreError) {
+      console.error('恢复禁用条目失败:', restoreError);
+    }
   } finally {
     processing.value = false;
   }
@@ -416,7 +548,7 @@ async function handleConfirmSummary(content: string) {
     // 只有一个条目，直接使用编辑后的内容
     const finalSummaries = new Map<
       number,
-      { summary: string; incremental: boolean; entryName?: string; entryType?: string }
+      { summary: string; incremental: boolean; entryName?: string; entryType?: string; retainedDialogues?: string }
     >();
 
     // 获取唯一的一个条目的UID
@@ -427,10 +559,11 @@ async function handleConfirmSummary(content: string) {
     }
     const [uid, originalData] = firstEntry;
 
-    // 使用用户编辑后的内容
+    // 使用用户编辑后的内容，保留 retainedDialogues
     finalSummaries.set(uid, {
       summary: content.trim(),
       incremental: originalData.incremental,
+      retainedDialogues: originalData.retainedDialogues,
     });
 
     // 应用总结到世界书（应用总结时会自动启用条目）
@@ -456,7 +589,7 @@ async function handleConfirmSummary(content: string) {
   }
 }
 
-// 取消总结
+// 取消总结（确认弹窗的取消）
 async function handleCancelSummary() {
   try {
     // 恢复被禁用的条目
@@ -475,16 +608,87 @@ async function handleCancelSummary() {
   toastRef.value?.info('已取消总结，相关条目已恢复启用状态');
 }
 
-// 监听show变化，当对话框打开时重新加载条目统计
+// 取消操作（主界面的取消按钮）
+async function handleCancel() {
+  try {
+    // 如果有记录的禁用条目UID，优先使用
+    let uidsToRestore = disabledEntryUids.value.length > 0 ? [...disabledEntryUids.value] : [];
+
+    // 如果没有记录的UID，尝试从世界书中查找被禁用的条目（带有 _original_enabled 标记的）
+    if (uidsToRestore.length === 0) {
+      try {
+        const entries = await StorySummaryManager.getWorldbookEntries(WORLDBOOK_NAME);
+        const disabledEntries = entries.filter(e => e.enabled === false && e.extra?._original_enabled !== undefined);
+        if (disabledEntries.length > 0) {
+          uidsToRestore = disabledEntries.map(e => e.uid);
+          console.log(`🔍 发现 ${uidsToRestore.length} 个被禁用的条目，准备恢复`);
+        }
+      } catch (error) {
+        console.error('查找禁用条目失败:', error);
+      }
+    }
+
+    // 如果有需要恢复的条目，恢复它们
+    if (uidsToRestore.length > 0) {
+      await StorySummaryManager.restoreDisabledEntries(WORLDBOOK_NAME, uidsToRestore);
+      console.log(`✅ 已恢复 ${uidsToRestore.length} 个条目的启用状态`);
+      disabledEntryUids.value = [];
+      toastRef.value?.info(`已恢复 ${uidsToRestore.length} 个条目状态`);
+    }
+
+    // 清除待确认的总结
+    pendingSummaries.value = new Map();
+  } catch (error) {
+    console.error('恢复禁用条目失败:', error);
+    toastRef.value?.error('恢复条目状态失败，请手动检查世界书');
+  }
+
+  // 关闭确认弹窗（如果打开）
+  showConfirmModal.value = false;
+
+  // 关闭界面
+  emit('close');
+}
+
+// 监听show变化，当对话框打开/关闭时处理
 watch(
   () => show,
-  async isVisible => {
+  async (isVisible, wasVisible) => {
     if (isVisible) {
+      // 界面打开时：加载条目统计和设置
       await loadEntriesStats();
+      loadRetainedDialogueRounds();
       // 重置选择状态
       selectedEntryType.value = '';
       selectedCharacterId.value = '';
       characters.value = [];
+    } else if (wasVisible) {
+      // 界面关闭时：如果有未完成的总结，恢复条目状态
+      try {
+        // 优先使用记录的UID
+        let uidsToRestore = disabledEntryUids.value.length > 0 ? [...disabledEntryUids.value] : [];
+
+        // 如果没有记录的UID，尝试从世界书中查找被禁用的条目
+        if (uidsToRestore.length === 0) {
+          const entries = await StorySummaryManager.getWorldbookEntries(WORLDBOOK_NAME);
+          const disabledEntries = entries.filter(e => e.enabled === false && e.extra?._original_enabled !== undefined);
+          if (disabledEntries.length > 0) {
+            uidsToRestore = disabledEntries.map(e => e.uid);
+            console.log(`🔍 界面关闭时发现 ${uidsToRestore.length} 个被禁用的条目，准备恢复`);
+          }
+        }
+
+        // 如果有需要恢复的条目，恢复它们
+        if (uidsToRestore.length > 0) {
+          await StorySummaryManager.restoreDisabledEntries(WORLDBOOK_NAME, uidsToRestore);
+          console.log(`✅ 界面关闭时已恢复 ${uidsToRestore.length} 个条目的启用状态`);
+          disabledEntryUids.value = [];
+          pendingSummaries.value = new Map();
+        }
+      } catch (error) {
+        console.error('恢复禁用条目失败:', error);
+        // 界面已关闭，无法显示 toast，只能记录错误
+      }
     }
   },
 );
@@ -493,8 +697,19 @@ watch(
 onMounted(async () => {
   if (show) {
     await loadEntriesStats();
+    loadRetainedDialogueRounds();
   }
 });
+
+// 监听 show prop，当界面显示时加载设置
+watch(
+  () => show,
+  isShow => {
+    if (isShow) {
+      loadRetainedDialogueRounds();
+    }
+  },
+);
 </script>
 
 <style scoped lang="scss">
@@ -771,6 +986,67 @@ onMounted(async () => {
     opacity: 0.5;
     cursor: not-allowed;
   }
+}
+
+.retained-dialogues-setting {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(205, 133, 63, 0.2);
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #ffe9d2;
+  font-weight: 600;
+}
+
+.setting-hint {
+  font-size: 12px;
+  color: rgba(255, 233, 210, 0.6);
+  font-weight: normal;
+}
+
+.setting-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-input {
+  width: 80px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, rgba(40, 26, 20, 0.8), rgba(25, 17, 14, 0.9));
+  border: 1px solid rgba(205, 133, 63, 0.25);
+  border-radius: 6px;
+  color: #ffe9d2;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 200, 150, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+
+  &:focus {
+    outline: none;
+    border-color: rgba(255, 180, 120, 0.6);
+    background: linear-gradient(180deg, rgba(40, 26, 20, 0.9), rgba(25, 17, 14, 1));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 200, 150, 0.12),
+      0 4px 12px rgba(255, 180, 120, 0.2);
+  }
+
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+}
+
+.setting-unit {
+  font-size: 14px;
+  color: rgba(255, 233, 210, 0.8);
 }
 
 .btn-primary {

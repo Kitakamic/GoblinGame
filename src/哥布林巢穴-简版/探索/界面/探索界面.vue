@@ -326,6 +326,7 @@
         <template v-if="scoutingModalState === 'loading'">
           <div class="modal-header">
             <h3>🔍 侦察中</h3>
+            <button class="modal-close-button" title="关闭" @click="handleScoutingModalClose">✕</button>
           </div>
           <div class="modal-content">
             <div class="loading-icon">
@@ -402,6 +403,8 @@ const showScoutingModal = ref(false);
 const scoutingModalState = ref<'loading' | 'failure'>('loading');
 const scoutingLoadingMessage = ref('正在侦察中...');
 const scoutingFailureData = ref<{ location: Location; originalCost: { gold: number; food: number } } | null>(null);
+const currentScoutingLocation = ref<Location | null>(null); // 当前正在侦察的据点
+const scoutLocationAbortController = ref<AbortController | null>(null); // 用于取消侦察的控制器
 
 // 据点状态筛选
 const selectedStatusFilter = ref('all');
@@ -691,6 +694,8 @@ const scoutLocation = async (location: Location) => {
       scoutingLoadingMessage.value = `发现英雄！正在生成 "${location.name}" 的英雄信息...`;
       scoutingModalState.value = 'loading';
       showScoutingModal.value = true;
+      currentScoutingLocation.value = location; // 记录当前正在侦察的据点
+      scoutLocationAbortController.value = new AbortController(); // 创建取消控制器
     }
 
     const result = await exploreService.scoutLocation(location.id);
@@ -715,12 +720,16 @@ const scoutLocation = async (location: Location) => {
         location: result.aiFailureData.location,
         originalCost: result.aiFailureData.originalCost,
       };
+      currentScoutingLocation.value = null; // 清除当前侦察据点（因为已经失败）
+      scoutLocationAbortController.value = null; // 清除取消控制器
       // 弹窗继续显示，不关闭
       return;
     }
 
     // 隐藏加载弹窗
     showScoutingModal.value = false;
+    currentScoutingLocation.value = null; // 清除当前侦察据点
+    scoutLocationAbortController.value = null; // 清除取消控制器
 
     // 等待一小段时间确保UI更新，然后移除侦察状态
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -745,6 +754,8 @@ const scoutLocation = async (location: Location) => {
   } catch (error) {
     // 隐藏加载弹窗
     showScoutingModal.value = false;
+    currentScoutingLocation.value = null; // 清除当前侦察据点
+    scoutLocationAbortController.value = null; // 清除取消控制器
 
     // 侦察失败，移除侦察状态并显示错误信息
     scoutingLocations.value.delete(location.id);
@@ -768,6 +779,7 @@ const handleScoutingModalAbandon = async () => {
     if (success) {
       showScoutingModal.value = false;
       scoutingFailureData.value = null;
+      currentScoutingLocation.value = null;
 
       await ConfirmService.showSuccess(
         `据点 "${location.name}" 已设置为可直接进攻状态`,
@@ -794,6 +806,7 @@ const handleScoutingModalRetry = async () => {
     if (success) {
       showScoutingModal.value = false;
       scoutingFailureData.value = null;
+      currentScoutingLocation.value = null;
 
       await ConfirmService.showInfo(
         `已退还侦察成本：${originalCost.gold} 金币和 ${originalCost.food} 食物`,
@@ -805,6 +818,86 @@ const handleScoutingModalRetry = async () => {
     }
   } catch (error) {
     console.error('处理重新侦察失败:', error);
+    await ConfirmService.showDanger(`错误信息: ${error}`, '操作失败');
+  }
+};
+
+// 处理侦察弹窗 - 关闭（仅在加载状态时可用）
+const handleScoutingModalClose = async () => {
+  // 只在加载状态时允许关闭
+  if (scoutingModalState.value !== 'loading') {
+    return;
+  }
+
+  // 弹出确认框
+  const confirmed = await ConfirmService.showWarning(
+    '是否放弃此次生成？',
+    '确认关闭',
+    '如果放弃，侦察将取消，并尝试停止AI生成和返还资源。',
+  );
+
+  if (!confirmed) {
+    return; // 用户取消，不关闭弹窗
+  }
+
+  // 用户确认放弃，执行取消操作
+  try {
+    // 尝试停止所有正在进行的AI生成
+    try {
+      await stopAllGeneration();
+      console.log('已尝试停止正在进行的AI生成操作');
+    } catch (error) {
+      console.error('停止AI生成失败:', error);
+      // 即使停止失败，也继续执行其他取消操作
+    }
+
+    // 取消侦察并清理状态
+    if (currentScoutingLocation.value) {
+      const location = currentScoutingLocation.value;
+
+      // 计算侦察成本（用于返还资源）
+      const cost = exploreService.calculateScoutCost(location.difficulty, location.distance);
+
+      // 移除侦察状态
+      scoutingLocations.value.delete(location.id);
+      scoutingAnimation.value.delete(location.id);
+
+      // 关闭弹窗
+      showScoutingModal.value = false;
+      currentScoutingLocation.value = null;
+      scoutLocationAbortController.value = null;
+
+      // 返还行动力
+      actionPointsService.refundActionPoints('scoutLocation');
+
+      // 尝试返还资源（金币和食物）
+      try {
+        modularSaveManager.addResource('gold', cost.gold, `侦察取消退还金币`);
+        modularSaveManager.addResource('food', cost.food, `侦察取消退还食物`);
+        console.log(`已退还侦察成本: ${cost.gold} 金币, ${cost.food} 食物`);
+
+        await ConfirmService.showInfo(
+          `侦察已取消`,
+          '操作完成',
+          `据点 "${location.name}" 的侦察已取消。\n已返还行动力、金币和食物。`,
+        );
+      } catch (resourceError) {
+        console.error('返还资源失败:', resourceError);
+        // 如果返还资源失败，至少返还行动力成功
+        await ConfirmService.showWarning(
+          `侦察已取消`,
+          '操作完成',
+          `据点 "${location.name}" 的侦察已取消，行动力已返还。\n但资源返还可能失败，请检查资源状态。`,
+        );
+      }
+    } else {
+      // 如果没有当前侦察据点，直接关闭弹窗
+      showScoutingModal.value = false;
+      currentScoutingLocation.value = null;
+      scoutLocationAbortController.value = null;
+    }
+  } catch (error) {
+    console.error('取消侦察失败:', error);
     await ConfirmService.showDanger(`错误信息: ${error}`, '操作失败');
   }
 };
@@ -2854,19 +2947,26 @@ const restoreSelectionState = () => {
         font-weight: 700;
       }
 
-      .close-button {
+      .close-button,
+      .modal-close-button {
         background: none;
         border: none;
         color: #9ca3af;
         font-size: 24px;
         cursor: pointer;
-        padding: 4px;
+        padding: 4px 8px;
         border-radius: 4px;
         transition: all 0.2s ease;
+        line-height: 1;
+        flex-shrink: 0;
 
         &:hover {
           background: rgba(239, 68, 68, 0.1);
           color: #ef4444;
+        }
+
+        &:active {
+          transform: scale(0.95);
         }
       }
     }

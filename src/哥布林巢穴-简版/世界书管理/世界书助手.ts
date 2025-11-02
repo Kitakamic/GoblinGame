@@ -112,4 +112,72 @@ export class WorldbookHelper {
     // 确保返回正数，并且在合理范围内
     return Math.abs(hash) % 2147483647;
   }
+
+  /**
+   * 从内容中提取并去重summary标签（仅支持新格式<summary_N>）
+   * @param content 要处理的内容
+   * @returns 去重后的summary数组，按序号排序，每个序号只保留第一个出现的
+   */
+  static extractAndDeduplicateSummaries(
+    content: string,
+  ): Array<{ index: number; content: string; innerContent: string }> {
+    const summaryIndexMap = new Map<number, { content: string; innerContent: string }>();
+    const summaryMatches = content.matchAll(/<summary_(\d+)>([\s\S]*?)<\/summary_\1>/g);
+
+    for (const match of summaryMatches) {
+      const index = parseInt(match[1]);
+      const innerContent = match[2].trim(); // 标签内的实际内容
+
+      // 只保留非空的summary标签
+      if (innerContent.length > 0) {
+        // 如果该序号已存在，只保留第一次出现的（避免重复）
+        if (!summaryIndexMap.has(index)) {
+          summaryIndexMap.set(index, {
+            content: match[0], // 完整的标签对
+            innerContent,
+          });
+        } else {
+          console.warn(`⚠️ 发现重复的summary_${index}标签，已去重（只保留第一个）`);
+        }
+      } else {
+        console.warn(`⚠️ 发现空的summary_${index}标签，已过滤`);
+      }
+    }
+
+    // 将去重后的summary按序号排序
+    const result: Array<{ index: number; content: string; innerContent: string }> = [];
+    for (const [index, summary] of summaryIndexMap.entries()) {
+      result.push({
+        index,
+        content: summary.content,
+        innerContent: summary.innerContent,
+      });
+    }
+    // 按序号排序
+    result.sort((a, b) => a.index - b.index);
+
+    return result;
+  }
+
+  /**
+   * 从内容中移除所有summary标签，保留其他内容
+   * @param content 要处理的内容
+   * @returns 移除summary标签后的内容
+   */
+  static removeAllSummaries(content: string): string {
+    return content.replace(/<summary_\d+>[\s\S]*?<\/summary_\d+>\n*/g, '').trim();
+  }
+
+  /**
+   * 组合summary标签数组为完整内容
+   * @param summaries summary数组
+   * @param separator 分隔符，默认为'\n\n'
+   * @returns 组合后的字符串
+   */
+  static combineSummaries(
+    summaries: Array<{ index: number; content: string; innerContent: string }>,
+    separator: string = '\n\n',
+  ): string {
+    return summaries.map(s => s.content).join(separator);
+  }
 }

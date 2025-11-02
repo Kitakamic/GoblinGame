@@ -1,4 +1,6 @@
+import type { Character } from '../人物管理/类型/人物类型';
 import { databaseService } from '../存档管理/数据库服务';
+import { modularSaveManager } from '../存档管理/模块化存档服务';
 import { WorldbookHelper } from './世界书助手';
 import type { HistoryRecord, WorldbookEntry } from './世界书类型定义';
 import { ChainOfThoughtManager, ChainOfThoughtMode } from './思维链管理器';
@@ -15,6 +17,192 @@ function estimateTokens(text: string): number {
   const rawEstimate = chineseChars * 2 + nonChineseChars * 0.5;
   // 除以2.1调整，更接近实际token消耗
   return Math.ceil(rawEstimate / 2.1);
+}
+
+/**
+ * 获取保留的对话轮数（默认5轮，允许设置为0）
+ */
+function getRetainedDialogueRounds(): number {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const rounds = globalVars['summary_retained_dialogue_rounds'];
+    // 允许设置为0（表示不保留任何对话）
+    if (typeof rounds === 'number' && rounds >= 0) {
+      return rounds;
+    }
+  } catch (error) {
+    console.warn('读取保留对话轮数设置失败:', error);
+  }
+  return 5; // 默认5轮
+}
+
+/**
+ * 从人物剧情记录中提取最近N轮对话（作为保留对话）
+ * @param content 人物剧情记录内容
+ * @param rounds 保留的对话轮数（每轮 = 用户输入 + AI回复 = 2条）
+ * @returns 保留的对话内容（带training_history标签），如果没有对话则返回空字符串
+ */
+function extractRecentDialogues(content: string, rounds: number): string {
+  // 如果保留轮数为0，直接返回空
+  if (rounds === 0) {
+    return '';
+  }
+
+  // 先移除所有summary标签，只解析原始数据
+  const contentWithoutSummaries = WorldbookHelper.removeAllSummaries(content);
+
+  // 从剩余内容中提取training_history标签（只从summary标签外的内容中提取）
+  const trainingMatch = contentWithoutSummaries.match(/<training_history>([\s\S]*?)<\/training_history>/);
+  if (!trainingMatch) {
+    return '';
+  }
+
+  const trainingContent = trainingMatch[1];
+  const lines = trainingContent.split('\n');
+
+  // 解析所有对话记录（完整保留多行内容）
+  const dialogueRecords: Array<{ fullContent: string; sender: string; index: number }> = [];
+  let currentRecord: { fullContent: string; sender: string; index: number } | null = null;
+  let recordIndex = 0;
+
+  lines.forEach(line => {
+    // 匹配格式：[任意时间格式] 发送者: 内容
+    const recordMatch = line.match(/^\[(.+?)\] (.+?): (.*)$/);
+    if (recordMatch) {
+      // 如果有当前记录，先保存它
+      if (currentRecord) {
+        dialogueRecords.push(currentRecord);
+      }
+
+      // 创建新记录
+      const [, , sender] = recordMatch;
+      recordIndex++;
+      currentRecord = {
+        fullContent: line.trim(),
+        sender: sender === '{{user}}' ? 'user' : sender,
+        index: recordIndex,
+      };
+    } else if (currentRecord && line.trim()) {
+      // 追加内容到当前记录（AI回复的多行内容）
+      currentRecord.fullContent += '\n' + line.trim();
+    }
+  });
+
+  // 保存最后一条记录
+  if (currentRecord) {
+    dialogueRecords.push(currentRecord);
+  }
+
+  if (dialogueRecords.length === 0) {
+    return '';
+  }
+
+  // 计算需要保留的对话数量（每轮 = 用户输入 + AI回复 = 2条）
+  const retainedCount = Math.min(rounds * 2, dialogueRecords.length);
+
+  // 如果保留轮数为0，不保留任何对话
+  if (retainedCount === 0 || rounds === 0) {
+    return '';
+  }
+
+  // 保留最近N轮对话（从后往前取）
+  const retainedRecords = dialogueRecords.slice(-retainedCount);
+
+  // 构建保留的对话内容
+  if (retainedRecords.length > 0) {
+    return `<training_history>\n${retainedRecords.map(r => r.fullContent).join('\n')}\n</training_history>`;
+  }
+
+  return '';
+}
+
+/**
+ * 从人物剧情记录中移除最近N轮对话（总结时使用）
+ * @param content 人物剧情记录内容
+ * @param rounds 要移除的对话轮数
+ * @returns 移除保留对话后的内容
+ */
+function removeRecentDialogues(content: string, rounds: number): string {
+  // 先移除所有summary标签，只处理原始数据
+  const existingSummaries = WorldbookHelper.extractAndDeduplicateSummaries(content);
+  const summaryContent = WorldbookHelper.combineSummaries(existingSummaries);
+  const contentWithoutSummaries = WorldbookHelper.removeAllSummaries(content);
+
+  // 从剩余内容中提取training_history标签
+  const trainingMatch = contentWithoutSummaries.match(/<training_history>([\s\S]*?)<\/training_history>/);
+  if (!trainingMatch) {
+    // 如果没有training_history标签，直接返回原内容（包含summary）
+    return summaryContent ? `${summaryContent}\n\n${contentWithoutSummaries}`.trim() : contentWithoutSummaries;
+  }
+
+  const trainingContent = trainingMatch[1];
+  const lines = trainingContent.split('\n');
+
+  // 解析所有对话记录（完整保留多行内容，类似 parseTrainingHistory 的逻辑）
+  const dialogueRecords: Array<{ fullContent: string; sender: string; index: number }> = [];
+  let currentRecord: { fullContent: string; sender: string; index: number } | null = null;
+  let recordIndex = 0;
+
+  lines.forEach(line => {
+    // 匹配格式：[任意时间格式] 发送者: 内容
+    const recordMatch = line.match(/^\[(.+?)\] (.+?): (.*)$/);
+    if (recordMatch) {
+      // 如果有当前记录，先保存它
+      if (currentRecord) {
+        dialogueRecords.push(currentRecord);
+      }
+
+      // 创建新记录
+      const [, , sender] = recordMatch;
+      recordIndex++;
+      currentRecord = {
+        fullContent: line.trim(),
+        sender: sender === '{{user}}' ? 'user' : sender,
+        index: recordIndex,
+      };
+    } else if (currentRecord && line.trim()) {
+      // 追加内容到当前记录（AI回复的多行内容）
+      currentRecord.fullContent += '\n' + line.trim();
+    }
+  });
+
+  // 保存最后一条记录
+  if (currentRecord) {
+    dialogueRecords.push(currentRecord);
+  }
+
+  if (dialogueRecords.length === 0) {
+    // 没有对话记录，返回原内容（包含summary）
+    return summaryContent ? `${summaryContent}\n\n${contentWithoutSummaries}`.trim() : contentWithoutSummaries;
+  }
+
+  // 计算需要移除的对话数量（每轮 = 用户输入 + AI回复 = 2条）
+  const retainedCount = Math.min(rounds * 2, dialogueRecords.length);
+  // 如果 retainedCount = 0，则保留所有对话用于总结；否则排除最后 retainedCount 条
+  const recordsToSummarize = retainedCount === 0 ? dialogueRecords : dialogueRecords.slice(0, -retainedCount);
+
+  // 构建需要总结的内容（移除保留的对话）
+  let contentToSummarize = contentWithoutSummaries;
+  // 无论 retainedCount 是多少，都需要替换 training_history 标签
+  // 如果 retainedCount = 0，说明不保留任何对话，所有对话都要用来总结
+  // 如果 retainedCount > 0，则保留最近N轮对话，其余用来总结
+  const originalTrainingSection = `<training_history>${trainingMatch[1]}</training_history>`;
+  const trainingToSummarize =
+    recordsToSummarize.length > 0
+      ? `<training_history>\n${recordsToSummarize.map(r => r.fullContent).join('\n')}\n</training_history>`
+      : '';
+  contentToSummarize = contentWithoutSummaries.replace(originalTrainingSection, trainingToSummarize);
+
+  // 如果有summary标签，重新添加到内容前面
+  if (summaryContent) {
+    contentToSummarize = `${summaryContent}\n\n${contentToSummarize}`.trim();
+  }
+
+  console.log(
+    `💬 对话分离: 总对话 ${dialogueRecords.length} 条，保留最近 ${retainedCount} 条（${rounds}轮），总结 ${recordsToSummarize.length} 条${existingSummaries.length > 0 ? `，保留${existingSummaries.length}个已有summary` : ''}`,
+  );
+
+  return contentToSummarize.trim();
 }
 
 /**
@@ -69,28 +257,63 @@ export class StorySummaryManager {
    * 使用AI总结世界书条目内容
    * @param entry 要总结的条目
    * @param incremental 是否为增量总结（已有summary）
+   * @returns 总结内容和保留的对话（仅人物剧情记录）
    */
-  static async summarizeEntry(entry: WorldbookEntry, incremental: boolean = false): Promise<string> {
+  static async summarizeEntry(
+    entry: WorldbookEntry,
+    incremental: boolean = false,
+  ): Promise<{ summary: string; retainedDialogues?: string }> {
     try {
       let content = entry.content || '';
       const entryType = entry.extra?.entry_type || '未知类型';
       const entryName = entry.name || '未知条目';
+      let retainedDialogues = ''; // 保留的最近N轮对话
+
+      // 如果是人物剧情记录，提取最近N轮对话作为保留
+      if (entryType === 'character_story_history') {
+        const rounds = getRetainedDialogueRounds();
+        console.log(`🔍 获取保留对话轮数: ${rounds} 轮`);
+
+        // 如果保留轮数为0，不提取也不移除
+        if (rounds === 0) {
+          console.log(`ℹ️ 保留轮数设置为0，不保留任何对话，所有对话用于总结`);
+          retainedDialogues = ''; // 明确设置为空
+        } else {
+          retainedDialogues = extractRecentDialogues(content, rounds);
+          if (retainedDialogues) {
+            // 从发送给AI的内容中移除保留的对话
+            content = removeRecentDialogues(content, rounds);
+            console.log(
+              `💬 保留最近 ${rounds} 轮对话，共 ${retainedDialogues.split('\n').filter(l => l.trim()).length - 2} 条记录`,
+            );
+            console.log(`📄 移除保留对话后的内容长度: ${content.length}, 预览: ${content.substring(0, 200)}...`);
+          } else {
+            // 即使没有提取到保留对话，也需要移除（可能所有对话都被总结了）
+            console.log(`ℹ️ 未提取到保留对话，但保留轮数设置为 ${rounds}，尝试移除对话`);
+            content = removeRecentDialogues(content, rounds);
+          }
+        }
+      }
 
       // 如果是增量总结，提取旧summary作为上下文，但标注只总结新数据
       let contextualSummary = '';
       if (incremental && /<summary_\d+>/.test(content)) {
-        // 提取所有旧的summary作为上下文，用空行分隔（只支持新格式<summary_N>）
-        const summaryMatches = content.matchAll(/<summary_(\d+)>([\s\S]*?)<\/summary_\1>/g);
-        for (const match of summaryMatches) {
-          contextualSummary += match[2].trim() + '\n\n';
+        // 提取所有旧的summary作为上下文，用空行分隔（仅支持新格式<summary_N>，自动去重）
+        const existingSummaries = WorldbookHelper.extractAndDeduplicateSummaries(content);
+        for (const summary of existingSummaries) {
+          contextualSummary += summary.innerContent + '\n\n';
         }
 
         // 提取新数据部分（移除所有summary_N标签）
-        content = content.replace(/<summary_\d+>[\s\S]*?<\/summary_\d+>\n*/g, '').trim();
-        console.log(`📝 增量总结: ${entryName} (提取新数据部分，已保留旧总结作为上下文)`);
+        content = WorldbookHelper.removeAllSummaries(content);
+        console.log(`📝 增量总结: ${entryName} (提取新数据部分，已保留${existingSummaries.length}个旧总结作为上下文)`);
+        console.log(`📄 移除summary后的内容长度: ${content.length}, 内容预览: ${content.substring(0, 300)}...`);
 
-        if (!content) {
-          throw new Error('没有可总结的新数据');
+        // 检查内容是否为空或只包含空白字符
+        const trimmedContent = content.trim();
+        if (!trimmedContent || trimmedContent.length === 0) {
+          console.error(`❌ 提取新数据后内容为空，原始内容长度: ${entry.content?.length || 0}`);
+          throw new Error('没有可总结的新数据（移除summary和保留对话后内容为空）');
         }
       }
 
@@ -139,12 +362,46 @@ ${basePrompt}`;
       }
 
       // 应用酒馆正则处理
-      const formattedResponse = formatAsTavernRegexedString(aiResponse, 'ai_output', 'display');
+      let formattedResponse = formatAsTavernRegexedString(aiResponse, 'ai_output', 'display');
+
+      // 提取 <summaryhistory> 标签内的内容（如果存在），移除标签本身和标签前的所有内容
+      // 先尝试匹配完整的标签（带结束标签）
+      const summaryHistoryMatch = formattedResponse.match(/<summaryhistory>([\s\S]*?)<\/summaryhistory>/i);
+
+      // 如果没有匹配到结束标签，尝试匹配开始标签并提取之后的所有内容
+      if (!summaryHistoryMatch) {
+        const startMatch = formattedResponse.match(/<summaryhistory>/i);
+        if (startMatch) {
+          // 找到开始标签位置，提取之后的所有内容（移除标签前的所有思维链内容）
+          const startIndex = startMatch.index! + startMatch[0].length;
+          formattedResponse = formattedResponse.substring(startIndex).trim();
+          console.log('📦 检测到 <summaryhistory> 标签（无结束标签），已提取标签后的内容，已移除标签前的所有内容');
+        }
+      } else {
+        // 匹配到完整标签，只提取标签内的内容（自动移除了标签前的所有内容）
+        formattedResponse = summaryHistoryMatch[1].trim();
+
+        // 递归移除可能存在的嵌套或多余的 <summaryhistory> 标签
+        while (/<summaryhistory>([\s\S]*?)<\/summaryhistory>/i.test(formattedResponse)) {
+          formattedResponse = formattedResponse.replace(/<summaryhistory>([\s\S]*?)<\/summaryhistory>/gi, '$1').trim();
+        }
+
+        console.log('📦 检测到 <summaryhistory> 标签，已提取并清理标签内内容，已移除标签前的所有内容');
+      }
+
+      // 清理标签内可能残留的开始标签（如果有嵌套或未匹配的情况）
+      formattedResponse = formattedResponse.replace(/<summaryhistory>/gi, '').trim();
+
+      // 清理可能的结尾标签残留
+      formattedResponse = formattedResponse.replace(/<\/summaryhistory>/gi, '').trim();
 
       console.log(`✅ AI总结完成: ${formattedResponse.substring(0, 100)}...`);
 
-      // 直接返回AI生成的总结内容，保持原有格式
-      return formattedResponse;
+      // 返回总结内容和保留的对话
+      return {
+        summary: formattedResponse,
+        retainedDialogues: retainedDialogues || undefined,
+      };
     } catch (error) {
       console.error('AI总结失败:', error);
       // 总结失败时抛出错误，让上层处理
@@ -177,7 +434,7 @@ ${content}
 - 简洁但要包含核心信息
 
 ### 3. **输出格式**
-以时间为主干的编年体，直接输出总结性的段落描述
+使用<summaryhistory>标签包裹总结内容，以时间为主干的编年体，直接输出总结性的段落描述
 
 ### 4. **关键要求**
 - **用连贯的段落形式**描述征服历史
@@ -186,7 +443,7 @@ ${content}
 - **体现地理分布和征服规模**
 - **仅输出总结内容，禁止输出任何分析过程或额外评论**
 
-现在开始处理，直接输出总结性描述：`;
+现在开始处理，直接输出总结：`;
   }
 
   /**
@@ -218,7 +475,7 @@ ${content}
 - 语言要**庄重史诗**，符合重要历史事件的感觉
 
 ### 4. **输出格式**
-章节体，直接输出叙事性的段落描述
+使用<summaryhistory>标签包裹总结内容，章节体，直接输出叙事性的段落描述
 
 ### 5. **关键要求**
 - 风格类似编年史
@@ -229,7 +486,7 @@ ${content}
 - **仅输出叙事性描述，禁止输出任何分析过程或额外评论**
 - 每次总结只总结为一章最新章节，不加入序号，只列标题
 
-现在开始处理，直接输出叙事性描述：`;
+现在开始处理，直接输出总结：`;
   }
 
   /**
@@ -263,7 +520,7 @@ ${content}
 - 必须体现**剧情细节和互动过程**
 
 ### 4. **输出格式**
-每行格式：序号: [上下文标签] 事件详尽描述
+使用<summaryhistory>标签包裹总结所有总结内容，每行格式：序号: [上下文标签] 事件详尽描述
 
 **上下文标签格式：**
 - 完整版：\`(时间: X | 地点: Y | 人物: A,B | 关系: C(D))\`
@@ -294,66 +551,34 @@ ${content}
 
 ${content}
 
-请用中文回复，保留重要的关键信息。`;
-  }
-
-  /**
-   * 批量总结条目（使用AI）
-   */
-  static async batchSummarizeEntries(
-    entries: WorldbookEntry[],
-  ): Promise<Record<number, { summary: string; incremental: boolean }>> {
-    const summaries: Record<number, { summary: string; incremental: boolean }> = {};
-
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
-      const entryType = entry.extra?.entry_type || 'unknown';
-      const entryName = entry.name || 'unnamed';
-
-      // 判断是否为增量总结（检查是否有新格式的summary_N）
-      const hasSummary = !!entry.content && /<summary_\d+>/.test(entry.content);
-
-      console.log(
-        `📄 [${i + 1}/${entries.length}] 处理条目: ${entryName}, 类型: ${entryType}, UID: ${entry.uid}, 增量: ${hasSummary}`,
-      );
-
-      try {
-        const summary = await this.summarizeEntry(entry, hasSummary);
-        summaries[entry.uid] = { summary, incremental: hasSummary };
-
-        console.log(`✅ 生成摘要: ${summary.substring(0, 100)}...`);
-
-        // 防止请求过快
-        if (i < entries.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      } catch (error) {
-        console.error(`❌ 总结失败: ${entryName}`, error);
-        // 总结失败时不添加到summaries，这样就不会覆盖原内容
-        console.warn(`⚠️ ${entryName} 总结失败，保持原内容不变`);
-      }
-    }
-
-    return summaries;
+请用中文回复，保留重要的关键信息。使用<summaryhistory>标签包裹总结内容，直接输出总结`;
   }
 
   /**
    * 生成总结内容（不更新世界书）
    * @param worldbookName 世界书名称
-   * @param entryTypes 要总结的条目类型
-   * @param characterIds 人物ID列表（仅对character_story_history生效）
+   * @param entryType 要总结的条目类型（单选，不支持多选）
+   * @param characterIds 人物ID列表（仅对character_story_history生效，单选）
    * @param toastRef 弹窗引用
-   * @returns 总结结果：每个条目的总结内容和元数据
+   * @returns 总结结果：单个条目的总结内容和元数据
    */
   static async generateSummaries(
     worldbookName: string,
-    entryTypes: string[],
+    entryType: string,
     characterIds?: string[],
     toastRef?: any,
-  ): Promise<Map<number, { summary: string; incremental: boolean; entryName: string; entryType: string }>> {
-    const result = new Map<number, { summary: string; incremental: boolean; entryName: string; entryType: string }>();
+  ): Promise<
+    Map<
+      number,
+      { summary: string; incremental: boolean; entryName: string; entryType: string; retainedDialogues?: string }
+    >
+  > {
+    const result = new Map<
+      number,
+      { summary: string; incremental: boolean; entryName: string; entryType: string; retainedDialogues?: string }
+    >();
     try {
-      console.log('📚 开始压缩世界书:', { worldbookName, entryTypes, characterIds });
+      console.log('📚 开始压缩世界书:', { worldbookName, entryType, characterIds });
 
       const entries = await this.getWorldbookEntries(worldbookName);
       console.log(`📊 世界书包含 ${entries.length} 个条目`);
@@ -366,8 +591,8 @@ ${content}
       });
       console.log('📋 条目类型统计:', entryTypeStats);
 
-      // 过滤条目
-      let filteredEntries = entryTypes.length > 0 ? this.filterEntriesByType(entries, entryTypes) : entries;
+      // 过滤条目（只过滤单个类型）
+      let filteredEntries: WorldbookEntry[] = entryType ? this.filterEntriesByType(entries, [entryType]) : entries;
 
       // 分析哪些条目需要总结
       const beforeSummaryFilter = filteredEntries.length;
@@ -375,12 +600,13 @@ ${content}
       const entriesNeedingSummary: WorldbookEntry[] = []; // 完全没有summary的条目
 
       filteredEntries.forEach(entry => {
-        // 检查是否有summary（只支持新格式<summary_N>）
-        const hasSummary = entry.content && /<summary_\d+>/.test(entry.content);
+        // 检查是否有summary（仅支持新格式<summary_N>）
+        const summaries = WorldbookHelper.extractAndDeduplicateSummaries(entry.content || '');
+        const hasSummary = summaries.length > 0;
 
         if (hasSummary) {
           // 检查是否有原始数据（所有summary之外的内容）
-          const contentAfterSummaries = entry.content.replace(/<summary_\d+>[\s\S]*?<\/summary_\d+>\n*/g, '').trim();
+          const contentAfterSummaries = WorldbookHelper.removeAllSummaries(entry.content || '');
 
           if (contentAfterSummaries.length > 0) {
             // 已有summary但有新数据，需要增量总结
@@ -426,8 +652,10 @@ ${content}
         console.warn('⚠️ 没有找到符合条件的条目');
         if (toastRef) {
           // 检查是否有已总结的条目被跳过
-          const totalEntries = entryTypes.length > 0 ? this.filterEntriesByType(entries, entryTypes) : entries;
-          const summarizedCount = totalEntries.filter(e => e.content && /<summary_\d+>/.test(e.content)).length;
+          const totalEntries = entryType ? this.filterEntriesByType(entries, [entryType]) : entries;
+          const summarizedCount = totalEntries.filter(
+            e => WorldbookHelper.extractAndDeduplicateSummaries(e.content || '').length > 0,
+          ).length;
 
           if (summarizedCount > 0) {
             toastRef.warning(`所有符合条件的条目都已被总结过了（共${summarizedCount}个）`);
@@ -445,15 +673,6 @@ ${content}
       const worldbook = await this.getWorldbookEntries(worldbookName);
       const entryUidsToDisable = new Set(filteredEntries.map(e => e.uid));
       let disabledCount = 0;
-
-      // 保存思维链的原始模式，以便后续恢复
-      let originalChainMode: ChainOfThoughtMode | null = null;
-      const chainEntry = worldbook.find(
-        entry => entry.extra?.entry_type === 'chain_of_thought' || entry.uid === 999999999,
-      );
-      if (chainEntry?.extra?.mode) {
-        originalChainMode = chainEntry.extra.mode as ChainOfThoughtMode;
-      }
 
       for (let i = 0; i < worldbook.length; i++) {
         const entry = worldbook[i];
@@ -474,35 +693,94 @@ ${content}
         console.log(`✅ 已禁用 ${disabledCount} 个条目`);
       }
 
+      // 只处理第一个符合条件的条目（放弃批量总结方式）
+      if (filteredEntries.length > 1) {
+        console.warn(`⚠️ 发现 ${filteredEntries.length} 个符合条件的条目，但只处理第一个`);
+        if (toastRef) {
+          toastRef.warning(`发现 ${filteredEntries.length} 个符合条件的条目，但只处理第一个`);
+        }
+      }
+
+      const entry = filteredEntries[0];
+      const currentEntryType = entry.extra?.entry_type || '未知类型';
+      const entryName = entry.name || '未知条目';
+
+      // 判断是否为增量总结（检查是否有新格式的summary_N，自动去重）
+      const existingSummaries = WorldbookHelper.extractAndDeduplicateSummaries(entry.content || '');
+      const hasSummary = existingSummaries.length > 0;
+
+      console.log(`📄 处理条目: ${entryName}, 类型: ${currentEntryType}, UID: ${entry.uid}, 增量: ${hasSummary}`);
+
       // 切换到总结模式的思维链
       await ChainOfThoughtManager.addChainToWorldbook(worldbookName, ChainOfThoughtMode.STORY_SUMMARY);
       console.log('🔄 已切换到剧情总结思维链模式');
 
-      // 为每个条目生成总结（使用AI）
+      // 为单个条目生成总结（使用AI）
       // 注意：不在这里保存调教记录，而是在确认总结时再保存（确保使用正确的存档ID）
-      console.log(`🤖 开始使用AI总结 ${filteredEntries.length} 个条目...`);
-      const summaries = await this.batchSummarizeEntries(filteredEntries);
+      try {
+        const { summary, retainedDialogues } = await this.summarizeEntry(entry, hasSummary);
+        console.log(`✅ 生成摘要: ${summary.substring(0, 100)}...`);
 
-      // 将结果添加到返回的Map中
-      for (const entry of filteredEntries) {
-        if (summaries[entry.uid]) {
-          const { summary, incremental } = summaries[entry.uid];
-          result.set(entry.uid, {
-            summary,
-            incremental,
-            entryName: entry.name || '未知条目',
-            entryType: entry.extra?.entry_type || '未知类型',
-          });
+        result.set(entry.uid, {
+          summary,
+          incremental: hasSummary,
+          entryName,
+          entryType: currentEntryType,
+          retainedDialogues,
+        });
+
+        console.log(`总结生成完成，共生成 ${result.size} 个条目的总结`);
+      } catch (error) {
+        console.error(`❌ 总结失败: ${entryName}`, error);
+        // 总结失败时不添加到result，这样就不会覆盖原内容
+        console.warn(`⚠️ ${entryName} 总结失败，保持原内容不变`);
+        if (toastRef) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          toastRef.error(`总结失败：${errorMessage}`);
         }
       }
 
-      console.log(`总结生成完成，共生成 ${result.size} 个条目的总结`);
       return result;
     } catch (error) {
       console.error('总结生成失败:', error);
       // 不在这里显示 toast，让调用方处理用户提示
       throw error;
     }
+  }
+
+  /**
+   * 合并调教记录并去重
+   * @param existingRecords 数据库中已有的记录
+   * @param newRecords 世界书中解析的新记录
+   * @returns 合并去重后的记录数组，按时间戳排序
+   */
+  private static mergeTrainingRecords(existingRecords: HistoryRecord[], newRecords: HistoryRecord[]): HistoryRecord[] {
+    // 使用Map去重，key为：gameTime + sender + content的前100个字符（避免完全重复）
+    const recordMap = new Map<string, HistoryRecord>();
+
+    // 先添加已有记录
+    existingRecords.forEach(record => {
+      const key = `${record.gameTime}|${record.sender || ''}|${record.content.substring(0, 100)}`;
+      if (!recordMap.has(key)) {
+        recordMap.set(key, record);
+      }
+    });
+
+    // 再添加新记录（如果不存在）
+    let addedCount = 0;
+    newRecords.forEach(record => {
+      const key = `${record.gameTime}|${record.sender || ''}|${record.content.substring(0, 100)}`;
+      if (!recordMap.has(key)) {
+        recordMap.set(key, record);
+        addedCount++;
+      }
+    });
+
+    // 转换为数组并按时间戳排序
+    const merged = Array.from(recordMap.values());
+    merged.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    return merged;
   }
 
   /**
@@ -545,7 +823,7 @@ ${content}
         Object.assign(existingOriginalChars, existingDbData.originalCharacters);
       }
 
-      // 为每个角色保存调教记录
+      // 为每个角色保存调教记录（合并去重，避免重复保存）
       for (const entry of characterHistoryEntries) {
         const characterId = entry.extra?.character_id || '';
         const characterName = entry.extra?.character_name || entry.name || '未知人物';
@@ -555,11 +833,22 @@ ${content}
           continue;
         }
 
-        // 从世界书中解析调教记录
-        const records = TrainingRecordManager.parseTrainingHistory(entry.content || '');
-        if (records.length > 0) {
-          allTrainingHistory[characterName] = records;
-          console.log(`✅ 已保存 ${characterName} 的 ${records.length} 条调教记录到数据库`);
+        // 从世界书中解析调教记录（包括保留的对话）
+        const worldbookRecords = TrainingRecordManager.parseTrainingHistory(entry.content || '');
+
+        // 获取数据库中已有的记录
+        const existingRecords = allTrainingHistory[characterName] || [];
+
+        if (worldbookRecords.length > 0 || existingRecords.length > 0) {
+          // 合并去重：数据库已有记录 + 世界书记录
+          const mergedRecords = this.mergeTrainingRecords(existingRecords, worldbookRecords);
+          allTrainingHistory[characterName] = mergedRecords;
+
+          const addedCount = mergedRecords.length - existingRecords.length;
+          const duplicatedCount = worldbookRecords.length - addedCount;
+          console.log(
+            `✅ 已合并保存 ${characterName} 的调教记录：数据库原有 ${existingRecords.length} 条，世界书新增 ${worldbookRecords.length} 条，去重后新增 ${addedCount} 条，重复 ${duplicatedCount} 条，总计 ${mergedRecords.length} 条`,
+          );
 
           // 如果有暂存的对话对，也包含在内（但不清除，保持暂存状态）
           if (existingPendingPairs[characterName]) {
@@ -608,11 +897,14 @@ ${content}
   /**
    * 应用总结到世界书
    * @param worldbookName 世界书名称
-   * @param summaries 总结内容Map，key为entry UID，value为总结内容
+   * @param summaries 总结内容Map，key为entry UID，value为总结内容和保留的对话
    */
   static async applySummaries(
     worldbookName: string,
-    summaries: Map<number, { summary: string; incremental: boolean; entryName?: string; entryType?: string }>,
+    summaries: Map<
+      number,
+      { summary: string; incremental: boolean; entryName?: string; entryType?: string; retainedDialogues?: string }
+    >,
   ): Promise<void> {
     try {
       // 确认总结时，先保存所有需要总结的调教记录到数据库（此时存档ID是正确的）
@@ -625,7 +917,7 @@ ${content}
       for (let i = 0; i < worldbook.length; i++) {
         const entry = worldbook[i];
         if (summaries.has(entry.uid)) {
-          const { summary: summaryContentRaw, incremental } = summaries.get(entry.uid)!;
+          const { summary: summaryContentRaw, incremental, retainedDialogues } = summaries.get(entry.uid)!;
 
           // 清理AI返回内容中可能包含的summary标签，避免嵌套或连续的summary
           let summaryContent = summaryContentRaw;
@@ -650,45 +942,46 @@ ${content}
 
           let newContent = '';
 
-          if (incremental) {
-            // 增量总结：寻找已有的summary序号，新增下一个序号（只支持新格式<summary_N>）
-            const existingSummaries: Array<{ index: number; content: string; innerContent: string }> = [];
+          // 检查条目中是否已经存在summary（无论incremental参数如何，都要检查实际情况）
+          // 使用通用函数提取并去重summary（仅支持新格式<summary_N>）
+          const existingSummaries = WorldbookHelper.extractAndDeduplicateSummaries(entry.content || '');
 
-            // 查找新格式的 summary_N
-            const summaryMatches = entry.content.matchAll(/<summary_(\d+)>([\s\S]*?)<\/summary_\1>/g);
-            for (const match of summaryMatches) {
-              const innerContent = match[2].trim(); // 标签内的实际内容
-              // 只保留非空的summary标签，过滤掉空内容的summary
-              if (innerContent.length > 0) {
-                existingSummaries.push({
-                  index: parseInt(match[1]),
-                  content: match[0],
-                  innerContent,
-                });
-              } else {
-                console.warn(`⚠️ 发现空的summary_${match[1]}标签，已过滤`);
-              }
-            }
-
+          if (existingSummaries.length > 0) {
+            // 如果条目中已有summary，总是进行增量总结（无论incremental参数如何）
             // 找到最大的序号
-            const maxIndex = existingSummaries.length > 0 ? Math.max(...existingSummaries.map(s => s.index)) : 0;
+            const maxIndex = Math.max(...existingSummaries.map(s => s.index));
             const nextIndex = maxIndex + 1;
 
             // 组合所有非空的summary
-            const allSummaries = existingSummaries.map(s => s.content).join('\n\n');
+            const allSummaries = WorldbookHelper.combineSummaries(existingSummaries);
             const newSummary = `<summary_${nextIndex}>\n${summaryContent}\n</summary_${nextIndex}>`;
 
-            if (allSummaries) {
+            // 如果有保留的对话，追加到summary后面
+            if (retainedDialogues && retainedDialogues.trim()) {
+              newContent = `${allSummaries}\n\n${newSummary}\n${retainedDialogues}`;
+              console.log(
+                `📝 增量总结: 添加到summary_${nextIndex}（保留${existingSummaries.length}个已有summary，检测到条目中已存在summary，参数incremental=${incremental}），并追加保留的对话`,
+              );
+            } else {
               newContent = `${allSummaries}\n\n${newSummary}`;
+              console.log(
+                `📝 增量总结: 添加到summary_${nextIndex}（保留${existingSummaries.length}个已有summary，检测到条目中已存在summary，参数incremental=${incremental}）`,
+              );
+            }
+          } else {
+            // 首次总结：使用summary_1（确认条目中没有任何summary）
+            const newSummary = `<summary_1>\n${summaryContent}\n</summary_1>`;
+
+            // 如果有保留的对话，追加到summary后面
+            if (retainedDialogues && retainedDialogues.trim()) {
+              newContent = `${newSummary}\n${retainedDialogues}`;
+              console.log(
+                `📝 首次总结: 创建summary_1（确认条目中没有已有summary，参数incremental=${incremental}），并追加保留的对话`,
+              );
             } else {
               newContent = newSummary;
+              console.log(`📝 首次总结: 创建summary_1（确认条目中没有已有summary，参数incremental=${incremental}）`);
             }
-
-            console.log(`📝 增量总结: 添加到summary_${nextIndex}（保留${existingSummaries.length}个已有summary）`);
-          } else {
-            // 首次总结：使用summary_1
-            newContent = `<summary_1>\n${summaryContent}\n</summary_1>`;
-            console.log('📝 首次总结: 创建summary_1');
           }
 
           // 更新条目内容
@@ -784,24 +1077,92 @@ ${content}
 
   /**
    * 获取世界书中的人物列表（用于剧情总结）
-   * 返回所有有剧情记录的角色的ID和名称
+   * 返回所有有剧情记录的角色的ID、名称和title
+   * 通过剧情条目的人物名称，从数据库中查找人物的title
    */
-  static async getCharactersInWorldbook(worldbookName: string): Promise<Array<{ id: string; name: string }>> {
+  static async getCharactersInWorldbook(
+    worldbookName: string,
+  ): Promise<Array<{ id: string; name: string; title?: string }>> {
     try {
       const entries = await this.getWorldbookEntries(worldbookName);
 
       // 从character_story_history类型的条目中提取人物信息
       const characterStoryEntries = entries.filter(entry => entry.extra?.entry_type === 'character_story_history');
 
+      // 从数据库获取所有人物数据，用于通过名称查找title
+      let databaseCharacters: Character[] = [];
+      try {
+        const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
+        if (trainingData && trainingData.characters && Array.isArray(trainingData.characters)) {
+          databaseCharacters = trainingData.characters as Character[];
+        }
+      } catch (e) {
+        console.warn('从数据库获取人物数据失败:', e);
+      }
+
       // 使用Map去重，因为同一人物可能有多条剧情记录
-      const characterMap = new Map<string, { id: string; name: string }>();
+      const characterMap = new Map<string, { id: string; name: string; title?: string }>();
 
       characterStoryEntries.forEach(entry => {
         const characterId = entry.extra?.character_id || '';
         const characterName = entry.extra?.character_name || entry.name || '未知人物';
 
         if (characterId && !characterMap.has(characterId)) {
-          characterMap.set(characterId, { id: characterId, name: characterName });
+          // 尝试从数据库中通过人物名称查找title
+          let title: string | undefined;
+          if (characterName && databaseCharacters.length > 0) {
+            // 方法1：先通过ID查找
+            const characterById = databaseCharacters.find(c => c.id === characterId);
+            if (characterById && characterById.title) {
+              title = characterById.title;
+            } else {
+              // 方法2：通过名称查找（精确匹配）
+              const characterByName = databaseCharacters.find(c => c.name === characterName);
+              if (characterByName && characterByName.title) {
+                title = characterByName.title;
+              } else {
+                // 方法3：通过名称模糊匹配（处理可能的格式差异）
+                const characterByNameFuzzy = databaseCharacters.find(
+                  c => c.name.includes(characterName) || characterName.includes(c.name),
+                );
+                if (characterByNameFuzzy && characterByNameFuzzy.title) {
+                  title = characterByNameFuzzy.title;
+                }
+              }
+            }
+          }
+
+          // 如果数据库中没有找到，尝试从世界书条目中获取title
+          if (!title) {
+            // 获取所有人物条目（entry_type为character_entry或没有entry_type但extra.character_id存在的条目）
+            const characterEntries = entries.filter(
+              entry =>
+                (entry.extra?.character_type === 'manual_training' || entry.extra?.character_id) &&
+                entry.extra?.entry_type !== 'character_story_history',
+            );
+
+            const characterEntry = characterEntries.find(e => e.extra?.character_id === characterId);
+            if (characterEntry) {
+              // 方法1：从条目名称解析 "title-name" 格式
+              const nameMatch = characterEntry.name.match(/^(.+?)-(.+)$/);
+              if (nameMatch) {
+                title = nameMatch[1];
+              } else {
+                // 方法2：尝试从content中解析JSON获取title
+                try {
+                  const contentMatch = characterEntry.content.match(/```json\s*([\s\S]*?)\s*```/);
+                  if (contentMatch) {
+                    const parsed = JSON.parse(contentMatch[1]);
+                    title = parsed.basicInfo?.title;
+                  }
+                } catch (e) {
+                  // 解析失败，忽略
+                }
+              }
+            }
+          }
+
+          characterMap.set(characterId, { id: characterId, name: characterName, title });
         }
       });
 

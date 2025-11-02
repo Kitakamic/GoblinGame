@@ -540,21 +540,15 @@ export class TrainingRecordManager {
       entry => entry.extra?.entry_type === 'character_story_history' && entry.extra?.character_id === characterId,
     );
 
-    // 如果现有条目有summary（支持多种格式），保留它
+    // 如果现有条目有summary（仅支持新格式<summary_N>），保留它
     let finalContent = content;
     if (historyEntryIndex !== -1) {
       const existingEntry = worldbook[historyEntryIndex];
-      // 提取所有summary标签（支持<summary>和<summary_N>格式）
-      const allSummaries: string[] = [];
-      const summaryMatches = existingEntry.content?.matchAll(/<summary(?:_\d+)?>([\s\S]*?)<\/summary(?:_\d+)?>/g);
-      if (summaryMatches) {
-        for (const match of summaryMatches) {
-          allSummaries.push(match[0]);
-        }
-      }
+      // 提取所有summary标签并去重（仅支持新格式<summary_N>）
+      const summaries = WorldbookHelper.extractAndDeduplicateSummaries(existingEntry.content || '');
 
-      if (allSummaries.length > 0) {
-        const summariesContent = allSummaries.join('\n\n');
+      if (summaries.length > 0) {
+        const summariesContent = WorldbookHelper.combineSummaries(summaries);
         finalContent = summariesContent + '\n\n' + content;
       }
     }
