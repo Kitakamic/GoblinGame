@@ -1024,10 +1024,15 @@ const processCharacterTurn = () => {
         // 更新角色信息
         character.offspring += breedingResult.totalOffspring;
 
-        // 更新角色等级（基于后代数量）
-        // 如果人物通过献祭升级到了更高等级，则保持献祭等级，否则使用后代数量计算
-        const calculatedLevel = Math.floor(character.offspring / 10);
-        character.level = Math.max(character.level ?? 0, calculatedLevel);
+        // 更新角色等级（基于此次生育数量）
+        // 生育和献祭可以叠加：当前等级 + 此次生育数量/10
+        // 获取当前等级（如果为空则使用基于总后代的等级作为默认值）
+        const baseLevelFromOffspring = Math.floor((character.offspring - breedingResult.totalOffspring) / 10);
+        const currentLevel = character.level ?? baseLevelFromOffspring ?? 1;
+        // 计算此次生育获得的等级（基于此次生育的后代数量）
+        const levelGainFromBreeding = Math.floor(breedingResult.totalOffspring / 10);
+        // 新等级 = 当前等级 + 此次生育获得的等级
+        character.level = currentLevel + levelGainFromBreeding;
 
         // 生育消耗生育值（完全基于生育数量和评级）
         const getRatingFertilityMultiplier = (rating: string) => {
@@ -1080,6 +1085,9 @@ const processCharacterTurn = () => {
 
         // 更新玩家角色等级（基于我方最高等级人物）
         PlayerLevelService.checkAndUpdatePlayerLevel();
+
+        // 触发事件通知调教界面刷新人物数据（因为等级可能更新了）
+        eventEmit('人物等级更新');
 
         // 将生育的哥布林添加到资源中
         breedingResult.records.forEach(record => {
