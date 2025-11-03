@@ -304,7 +304,6 @@ import DebugPanel from './共享资源层/组件/调试界面.vue';
 import { continentExploreService } from './功能模块层/探索/服务/大陆探索服务';
 import RandomEventManager from './功能模块层/随机事件/视图/随机事件管理器.vue';
 import { WorldbookService } from './核心层/服务/世界书管理/服务/世界书服务';
-import SaveLoadModal from './核心层/服务/存档系统/存档界面.vue';
 import { modularSaveManager } from './核心层/服务/存档系统/模块化存档服务';
 import { SummaryCheckService } from './核心层/服务/通用服务/总结检查服务';
 import { TimeParseService } from './核心层/服务/通用服务/时间解析服务';
@@ -312,8 +311,11 @@ import { checkAndShowWelcome, markWelcomeAsShown } from './核心层/服务/通�
 import { PlayerLevelService } from './核心层/服务/通用服务/玩家等级服务';
 import { BreedingService } from './核心层/服务/通用服务/生育服务';
 import { ConfirmService, confirmState } from './核心层/服务/通用服务/确认框服务';
+
+// 主界面独立弹窗界面
 import StorySummaryModal from './界面显示层/主界面子页面/剧情总结界面.vue';
 import HistoryModal from './界面显示层/主界面子页面/历史记录界面.vue';
+import SaveLoadModal from './界面显示层/主界面子页面/存档界面.vue';
 
 const route = useRoute();
 
