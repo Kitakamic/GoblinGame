@@ -174,7 +174,7 @@
         <span class="icon">🗺️</span>
         <span class="label">探索</span>
       </router-link>
-      <router-link to="/部队编制" class="nav-item" active-class="active">
+      <router-link to="/编制" class="nav-item" active-class="active">
         <span class="icon">⚔️</span>
         <span class="label">编制</span>
       </router-link>
@@ -294,26 +294,26 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
-import RandomEventManager from '../随机事件/界面/随机事件管理器.vue';
-import { WorldbookService } from './世界书管理/世界书服务';
-import StorySummaryModal from './世界书管理/剧情总结界面.vue';
-import HistoryModal from './历史记录/历史记录界面.vue';
-import SaveLoadModal from './存档管理/存档界面.vue';
-import { modularSaveManager } from './存档管理/模块化存档服务';
-import { continentExploreService } from './探索/服务/大陆探索服务';
-import { SummaryCheckService } from './服务/总结检查服务';
-import { TimeParseService } from './服务/时间解析服务';
-import { checkAndShowWelcome, markWelcomeAsShown } from './服务/欢迎提示服务';
-import { PlayerLevelService } from './服务/玩家等级服务';
-import { BreedingService } from './服务/生育服务';
-import { ConfirmService, confirmState } from './服务/确认框服务';
-import GlobalFAB from './组件/全局悬浮球.vue';
-import TextStyleSettings from './组件/文字样式设置.vue';
-import WelcomeModal from './组件/欢迎提示弹窗.vue';
-import GameSettingsPanel from './组件/游戏设置面板.vue';
-import GenerationErrorPanel from './组件/生成错误提示.vue';
-import CustomConfirm from './组件/自定义确认框.vue';
-import DebugPanel from './组件/调试界面.vue';
+import GlobalFAB from './共享资源层/组件/全局悬浮球.vue';
+import TextStyleSettings from './共享资源层/组件/文字样式设置.vue';
+import WelcomeModal from './共享资源层/组件/欢迎提示弹窗.vue';
+import GameSettingsPanel from './共享资源层/组件/游戏设置面板.vue';
+import GenerationErrorPanel from './共享资源层/组件/生成错误提示.vue';
+import CustomConfirm from './共享资源层/组件/自定义确认框.vue';
+import DebugPanel from './共享资源层/组件/调试界面.vue';
+import { continentExploreService } from './功能模块层/探索/服务/大陆探索服务';
+import RandomEventManager from './功能模块层/随机事件/视图/随机事件管理器.vue';
+import { WorldbookService } from './核心层/服务/世界书管理/服务/世界书服务';
+import SaveLoadModal from './核心层/服务/存档系统/存档界面.vue';
+import { modularSaveManager } from './核心层/服务/存档系统/模块化存档服务';
+import { SummaryCheckService } from './核心层/服务/通用服务/总结检查服务';
+import { TimeParseService } from './核心层/服务/通用服务/时间解析服务';
+import { checkAndShowWelcome, markWelcomeAsShown } from './核心层/服务/通用服务/欢迎提示服务';
+import { PlayerLevelService } from './核心层/服务/通用服务/玩家等级服务';
+import { BreedingService } from './核心层/服务/通用服务/生育服务';
+import { ConfirmService, confirmState } from './核心层/服务/通用服务/确认框服务';
+import StorySummaryModal from './界面显示层/主界面子页面/剧情总结界面.vue';
+import HistoryModal from './界面显示层/主界面子页面/历史记录界面.vue';
 
 const route = useRoute();
 
@@ -782,7 +782,7 @@ const handleLoad = async (slot: number, data: any) => {
       const explorationData = gameData.exploration;
       if (explorationData) {
         // 导入探索服务
-        const { exploreService } = await import('./探索/服务/探索服务');
+        const { exploreService } = await import('./功能模块层/探索/服务/探索服务');
         await exploreService.restoreFromSaveData(explorationData);
         console.log('探索数据已恢复');
       }
@@ -802,7 +802,7 @@ const handleLoad = async (slot: number, data: any) => {
       }
 
       // 确保大陆探索服务已经初始化（通过 initializeFromSave）
-      const { continentExploreService } = await import('./探索/服务/大陆探索服务');
+      const { continentExploreService } = await import('./功能模块层/探索/服务/大陆探索服务');
       await continentExploreService.initializeFromSave();
 
       // 在所有数据加载完成后，重新计算征服进度
@@ -857,7 +857,7 @@ const handleInitGame = async () => {
     // 建筑数据现在由数据库系统处理
 
     // 初始化探索数据
-    const { exploreService } = await import('./探索/服务/探索服务');
+    const { exploreService } = await import('./功能模块层/探索/服务/探索服务');
     exploreService.resetExploreData();
     console.log('探索数据已初始化');
 

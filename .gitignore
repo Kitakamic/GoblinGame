@@ -1,4 +1,7 @@
 node_modules
+imageGenerate
+scripts
+
 
 .DS_Store
 Thumbs.db
@@ -15,4 +18,8 @@ src/哥布林巢穴-简版/人物管理/类型/传奇人物图片Tags.md
 STRUCTURE_OPTIMIZATION.md
 GIT_MIGRATION_STRATEGY.md
 GIT_QUICK_REFERENCE.md
-scripts/restructure-phase1-chinese.js
+
+# imageGenerate目录
+
+
+# scripts目录

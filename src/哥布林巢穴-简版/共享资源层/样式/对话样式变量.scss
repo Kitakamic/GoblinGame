@@ -1,0 +1,226 @@
+/**
+ * 对话界面字体样式变量
+ * 
+ * 统一管理所有对话界面的字体设定
+ * 使用方式：在组件的 <style> 中 @import 此文件
+ * 
+ * 颜色通过CSS变量支持用户自定义
+ */
+
+// ========== CSS变量（可在运行时修改）==========
+:root {
+  // 正文样式
+  --dialogue-text-color: #f7efd9;
+  --dialogue-text-font: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+
+  // 斜体样式
+  --dialogue-italic-color: #ff69b4;
+
+  // 粗体样式
+  --dialogue-strong-color: #f7efd9;
+
+  // 单引号样式
+  --dialogue-single-quote-color: #ffbd7a;
+
+  // 双引号样式
+  --dialogue-double-quote-color: #ffd7a1;
+
+  // 引用块样式（blockquote，保持默认，不可自定义）
+  --dialogue-quote-border-color: rgba(212, 184, 150, 0.6);
+  --dialogue-quote-bg: rgba(212, 184, 150, 0.05);
+}
+
+// ========== 字体变量 ==========
+
+$font-serif: 'Microsoft YaHei', '微软雅黑', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+$primary-text-color: #f7efd9; // 正文默认颜色
+
+$font-size-base: 18px;
+$font-size-large: 22px;
+$font-size-small: 14px;
+$font-size-option: 17px;
+
+$line-height-base: 1.85;
+$line-height-mobile: 1.75;
+$letter-spacing-base: 0.3px;
+$letter-spacing-mobile: 0.2px;
+
+// 宽屏字体优化变量
+$font-size-1400: 19px;
+$line-height-1400: 1.9;
+$letter-spacing-1400: 0.35px;
+
+$font-size-1600: 20px;
+$line-height-1600: 1.95;
+$letter-spacing-1600: 0.4px;
+
+$font-size-1920: 21px;
+$line-height-1920: 2;
+$letter-spacing-1920: 0.45px;
+
+$font-size-2560: 22px;
+$line-height-2560: 2.05;
+$letter-spacing-2560: 0.5px;
+
+// ========== 文字格式样式变量 ==========
+
+// 粗体样式
+$strong-font-weight: bold;
+
+// 斜体样式
+$italic-font-style: italic;
+$italic-color: #ff69b4; // 紫粉色
+
+// 引用样式
+$quote-font-family: 'Arial', 'Helvetica', sans-serif; // 引号字体（使用无衬线字体）
+$quote-color: #d4b896; // 引号文字颜色（偏暖的米色）
+$quote-border-color: rgba(212, 184, 150, 0.6); // 引用边框颜色
+$quote-border-width: 4px;
+$quote-border-style: solid;
+$quote-padding: 12px 16px;
+$quote-margin: 16px 0;
+
+// 代码块样式
+$code-block-padding: 12px;
+$code-block-margin: 16px 0;
+
+// 行内代码样式
+$inline-code-padding: 3px 6px;
+$inline-code-border-radius: 4px;
+
+// 段落样式
+$paragraph-text-indent: 2em;
+$paragraph-margin: 0 0 12px 0;
+$paragraph-padding-bottom: 8px;
+
+// ========== 混合样式（Mixin）==========
+
+// 书籍样式文本
+@mixin typo-book {
+  font-family: var(--dialogue-text-font, $font-serif);
+  color: var(--dialogue-text-color, $primary-text-color);
+  font-size: $font-size-base;
+  line-height: $line-height-base;
+  letter-spacing: $letter-spacing-base;
+  text-rendering: optimizeLegibility;
+
+  /* 宽屏优化 */
+  @media (min-width: 1400px) {
+    font-size: $font-size-1400;
+    line-height: $line-height-1400;
+    letter-spacing: $letter-spacing-1400;
+  }
+
+  @media (min-width: 1600px) {
+    font-size: $font-size-1600;
+    line-height: $line-height-1600;
+    letter-spacing: $letter-spacing-1600;
+  }
+
+  @media (min-width: 1920px) {
+    font-size: $font-size-1920;
+    line-height: $line-height-1920;
+    letter-spacing: $letter-spacing-1920;
+  }
+
+  @media (min-width: 2560px) {
+    font-size: $font-size-2560;
+    line-height: $line-height-2560;
+    letter-spacing: $letter-spacing-2560;
+  }
+
+  @media (max-width: 768px) {
+    font-size: 16px;
+    line-height: $line-height-mobile;
+    letter-spacing: $letter-spacing-mobile;
+  }
+
+  // 段落样式
+  p {
+    text-indent: $paragraph-text-indent;
+    margin: $paragraph-margin;
+    position: relative;
+    padding-bottom: $paragraph-padding-bottom;
+  }
+
+  // 斜体
+  em,
+  .italic-text {
+    font-style: $italic-font-style;
+    color: var(--dialogue-italic-color, #ff69b4);
+    text-underline-offset: 2px;
+  }
+
+  // 粗体
+  .strong-text,
+  strong {
+    font-weight: $strong-font-weight;
+    color: var(--dialogue-strong-color, inherit);
+    text-underline-offset: 3px;
+  }
+
+  // 引用块（blockquote - 保持默认样式，不可自定义）
+  .quote,
+  blockquote {
+    font-family: 'Arial', 'Helvetica', sans-serif;
+    color: #d4b896;
+    border-left: $quote-border-width $quote-border-style rgba(212, 184, 150, 0.6);
+    padding: $quote-padding;
+    margin: $quote-margin;
+    border-radius: 4px;
+    font-style: italic;
+    background: rgba(212, 184, 150, 0.05);
+
+    // 引用内的粗体和斜体
+    .strong-text,
+    strong {
+      font-weight: bold;
+      color: #d4b896;
+    }
+
+    em,
+    .italic-text {
+      font-style: italic;
+      color: #d4b896;
+    }
+  }
+
+  // 代码块
+  .code-block,
+  pre {
+    border-radius: 6px;
+    padding: $code-block-padding;
+    margin: $code-block-margin;
+    overflow-x: auto;
+
+    code {
+      background: transparent;
+      border: none;
+      padding: 0;
+      font-family: 'Courier New', 'Consolas', monospace;
+    }
+  }
+
+  // 行内代码
+  .inline-code,
+  code {
+    padding: $inline-code-padding;
+    border-radius: $inline-code-border-radius;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 0.9em;
+  }
+
+  // 双引号样式（"文字"、"文字"、「文字」、『文字』）
+  .double-quote {
+    color: var(--dialogue-double-quote-color, #ffd7a1);
+    font-weight: 500;
+    font-style: italic;
+  }
+
+  // 单引号样式（'文字'、'文字'）
+  .single-quote {
+    color: var(--dialogue-single-quote-color, #ffbd7a);
+    font-weight: 500;
+    font-style: italic;
+  }
+}
