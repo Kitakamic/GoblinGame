@@ -243,7 +243,7 @@ export class ModularSaveManager {
       console.error('初始化默认slot失败:', error);
       // 如果失败，只有在没有 currentGameData 时才创建新游戏数据
       if (!this.currentGameData) {
-        this.currentGameData = createFullGameData();
+        this.createNewGame();
         this.syncResourcesToReactive();
       }
     }

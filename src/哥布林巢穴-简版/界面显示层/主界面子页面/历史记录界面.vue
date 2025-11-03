@@ -153,7 +153,7 @@ const getResourceName = (type: string): string => {
   const names: Record<string, string> = {
     gold: '金钱',
     food: '食物',
-    threat: '威胁',
+    threat: '威胁度',
     slaves: '俘虏',
     time: '时间',
     rounds: '回合',
