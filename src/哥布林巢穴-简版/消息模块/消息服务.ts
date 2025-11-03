@@ -242,14 +242,77 @@ export class MessageService {
   }
 
   /**
-   * 滚动到容器底部
+   * 滚动到容器底部（智能滚动）
    * @param container 容器元素
+   * @param options 滚动选项
    */
-  static scrollToBottom(container: HTMLElement | null): void {
-    if (container) {
+  static scrollToBottom(
+    container: HTMLElement | null,
+    options: { force?: boolean; enableStreamFollow?: boolean } = {},
+  ): void {
+    if (!container) return;
+
+    const { force = false, enableStreamFollow = false } = options;
+
+    // 获取容器的滚动状态对象（存储在元素上）
+    let scrollState = (container as any).__scrollState;
+    if (!scrollState) {
+      const scrollHeight = container.scrollHeight;
+      const clientHeight = container.clientHeight;
+      const currentScrollTop = container.scrollTop;
+      const isNearBottom = scrollHeight - currentScrollTop - clientHeight < 50;
+
+      scrollState = {
+        userScrolled: false,
+        lastScrollTop: currentScrollTop,
+        isNearBottom: isNearBottom,
+      };
+      (container as any).__scrollState = scrollState;
+
+      // 监听滚动事件，检测用户是否手动滚动
+      container.addEventListener('scroll', () => {
+        const currentScrollTop = container.scrollTop;
+        const scrollHeight = container.scrollHeight;
+        const clientHeight = container.clientHeight;
+
+        // 判断是否接近底部（距离底部 50px 内认为是接近底部）
+        const isNearBottom = scrollHeight - currentScrollTop - clientHeight < 50;
+
+        // 如果用户向上滚动，标记为用户手动滚动
+        if (currentScrollTop < scrollState.lastScrollTop && !isNearBottom) {
+          scrollState.userScrolled = true;
+        }
+
+        // 如果用户滚动到底部，重置用户滚动标记
+        if (isNearBottom) {
+          scrollState.userScrolled = false;
+        }
+
+        scrollState.lastScrollTop = currentScrollTop;
+        scrollState.isNearBottom = isNearBottom;
+      });
+    }
+
+    // 如果是强制滚动，直接滚动
+    if (force) {
       setTimeout(() => {
         container.scrollTop = container.scrollHeight;
+        scrollState.userScrolled = false; // 重置用户滚动标记
       }, 100);
+      return;
     }
+
+    // 如果是流式输出且开启了跟随，且用户未手动滚动，则自动滚动
+    if (enableStreamFollow && !scrollState.userScrolled) {
+      setTimeout(() => {
+        // 再次检查用户是否在滚动过程中手动滚动了
+        if (!scrollState.userScrolled) {
+          container.scrollTop = container.scrollHeight;
+        }
+      }, 100);
+      return;
+    }
+
+    // 其他情况（非流式或用户已手动滚动），不自动滚动
   }
 }

@@ -307,7 +307,7 @@ const createGameTimeMessage = (role: 'system' | 'assistant' | 'user', content: s
 const addUserMessageWithGameTime = (content: string) => {
   const userMessage = createGameTimeMessage('user', content, '{{user}}');
   messages.value = [...messages.value, userMessage];
-  MessageService.scrollToBottom(dialogueContent.value);
+  // 不自动滚动，让玩家自己控制
 };
 
 // 清理AI回复内容，删除多余空行并整理格式
@@ -325,7 +325,7 @@ const addAIMessageWithGameTime = (content: string, sender: string = '系统') =>
   const cleanedContent = cleanAIContent(content);
   const aiMessage = createGameTimeMessage('assistant', cleanedContent, sender);
   messages.value = [...messages.value, aiMessage];
-  MessageService.scrollToBottom(dialogueContent.value);
+  // 不自动滚动，让玩家自己控制
 };
 
 const isSending = ref(false);
@@ -862,8 +862,13 @@ const generateAndHandleAIReply = async () => {
         currentPageIndex.value = currentStreamingPageIndex.value;
       }
 
-      // 滚动到底部
-      MessageService.scrollToBottom(dialogueContent.value);
+      // 流式传输时智能滚动（只在用户未手动滚动时跟随）
+      const globalVars = getVariables({ type: 'global' });
+      const enableStreamOutput =
+        typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : true;
+      MessageService.scrollToBottom(dialogueContent.value, {
+        enableStreamFollow: enableStreamOutput,
+      });
 
       // console.log('📝 流式传输更新:', formatted.substring(0, 50) + '...');
     };

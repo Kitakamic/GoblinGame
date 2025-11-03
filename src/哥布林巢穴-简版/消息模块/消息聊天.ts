@@ -39,8 +39,7 @@ export function useMessageChat(options: { autoLoadHistory?: boolean } = {}) {
     const playerMessage = MessageService.createMessage('user', messageContent, '玩家');
     messages.value = [...messages.value, playerMessage];
 
-    // 滚动到底部
-    MessageService.scrollToBottom(containerRef.value);
+    // 不自动滚动，让玩家自己控制
 
     isLoading.value = true;
 
@@ -54,8 +53,7 @@ export function useMessageChat(options: { autoLoadHistory?: boolean } = {}) {
       // 添加AI回复到本地
       messages.value = [...messages.value, aiMessage];
 
-      // 再次滚动到底部
-      MessageService.scrollToBottom(containerRef.value);
+      // 不自动滚动，让玩家自己控制
     } catch (error) {
       console.error('发送消息失败:', error);
     } finally {
@@ -90,7 +88,7 @@ export function useMessageChat(options: { autoLoadHistory?: boolean } = {}) {
   const addSystemMessage = (content: string) => {
     const systemMessage = MessageService.createMessage('system', content, '系统');
     messages.value = [...messages.value, systemMessage];
-    MessageService.scrollToBottom(containerRef.value);
+    // 不自动滚动，让玩家自己控制
   };
 
   /**
@@ -99,7 +97,7 @@ export function useMessageChat(options: { autoLoadHistory?: boolean } = {}) {
   const addUserMessage = (content: string) => {
     const userMessage = MessageService.createMessage('user', content, '{{user}}');
     messages.value = [...messages.value, userMessage];
-    MessageService.scrollToBottom(containerRef.value);
+    // 不自动滚动，让玩家自己控制
   };
 
   /**
@@ -108,7 +106,7 @@ export function useMessageChat(options: { autoLoadHistory?: boolean } = {}) {
   const addAIMessage = (content: string, sender: string = '系统') => {
     const aiMessage = MessageService.createMessage('assistant', content, sender);
     messages.value = [...messages.value, aiMessage];
-    MessageService.scrollToBottom(containerRef.value);
+    // 不自动滚动，让玩家自己控制
   };
 
   // 组件挂载时根据选项决定是否加载历史消息

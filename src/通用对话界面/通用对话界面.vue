@@ -477,8 +477,13 @@ const generateAndHandleAIReply = async () => {
         currentPageIndex.value = currentStreamingPageIndex.value;
       }
 
-      // 滚动到底部
-      MessageService.scrollToBottom(dialogueContent.value);
+      // 流式传输时智能滚动（只在用户未手动滚动时跟随）
+      const globalVars = getVariables({ type: 'global' });
+      const enableStreamOutput =
+        typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : true;
+      MessageService.scrollToBottom(dialogueContent.value, {
+        enableStreamFollow: enableStreamOutput,
+      });
 
       // console.log('📝 流式传输更新:', formatted.substring(0, 50) + '...');
     };
