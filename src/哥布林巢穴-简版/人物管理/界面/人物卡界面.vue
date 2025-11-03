@@ -3,9 +3,13 @@
     <div class="modal-content character-detail-modal" @click.stop>
       <div class="modal-header">
         <div class="header-left"></div>
-        <h4 class="character-title">{{ character?.name }}</h4>
+        <h4 class="character-title">{{ internalCharacter?.name }}</h4>
         <div class="header-right">
-          <button class="edit-avatar-btn" title="编辑头像" @click="character && $emit('edit-avatar', character)">
+          <button
+            class="edit-avatar-btn"
+            title="编辑头像"
+            @click="internalCharacter && $emit('edit-avatar', internalCharacter)"
+          >
             <span class="btn-icon">🖼️</span>
           </button>
           <button class="edit-json-btn" title="编辑JSON" @click="openJsonEditor">
@@ -14,30 +18,34 @@
           <button class="close-btn" @click="close">×</button>
         </div>
       </div>
-      <div v-if="character" class="modal-body">
+      <div v-if="internalCharacter" class="modal-body">
         <div class="character-detail-content">
           <!-- 人物基础信息展示 -->
           <div class="character-basic-info">
             <!-- 左侧头像 -->
-            <div class="character-avatar" :class="`rating-${(character.rating || 'D').toLowerCase()}`">
+            <div class="character-avatar" :class="`rating-${(internalCharacter.rating || 'D').toLowerCase()}`">
               <div class="avatar-container">
-                <img v-if="getCurrentAvatar(character)" :src="getCurrentAvatar(character)" :alt="character.name" />
+                <img
+                  v-if="getCurrentAvatar(internalCharacter)"
+                  :src="getCurrentAvatar(internalCharacter)"
+                  :alt="internalCharacter.name"
+                />
                 <div v-else class="default-avatar">
                   <span class="avatar-icon">👤</span>
                 </div>
-                <div class="avatar-status" :class="character.status">
-                  {{ getStatusText(character.status) }}
+                <div class="avatar-status" :class="internalCharacter.status">
+                  {{ getStatusText(internalCharacter.status) }}
                 </div>
                 <!-- 评级徽章 -->
-                <div class="rating-badge-overlay" :class="character.rating.toLowerCase()">
-                  {{ character.rating }}
+                <div class="rating-badge-overlay" :class="internalCharacter.rating.toLowerCase()">
+                  {{ internalCharacter.rating }}
                 </div>
 
                 <!-- 等级标签 -->
                 <div class="character-level-badge">
                   <span class="level-icon">LV.</span>
                   <span class="level-value">{{
-                    character.level ?? Math.floor((character.offspring ?? 0) / 10) ?? 1
+                    internalCharacter.level ?? Math.floor((internalCharacter.offspring ?? 0) / 10) ?? 1
                   }}</span>
                 </div>
               </div>
@@ -50,48 +58,56 @@
                 <div class="info-grid">
                   <div class="info-item">
                     <span class="info-label">身份：</span>
-                    <span class="info-value">{{ character.title }}</span>
+                    <span class="info-value">{{ internalCharacter.title }}</span>
                   </div>
                   <div class="info-item">
                     <span class="info-label">种族：</span>
-                    <span class="info-value">{{ character.race }}</span>
+                    <span class="info-value">{{ internalCharacter.race }}</span>
                   </div>
                   <div class="info-item">
                     <span class="info-label">年龄：</span>
-                    <span class="info-value">{{ character.age }}岁</span>
+                    <span class="info-value">{{ internalCharacter.age }}岁</span>
                   </div>
                   <div class="info-item">
                     <span class="info-label">国家：</span>
-                    <span class="info-value">{{ character.country }}</span>
+                    <span class="info-value">{{ internalCharacter.country }}</span>
                   </div>
                 </div>
               </div>
 
-              <div v-if="character.appearance" class="appearance-info-section">
+              <div v-if="internalCharacter.appearance" class="appearance-info-section">
                 <div class="appearance-grid">
                   <div class="appearance-item">
                     <span class="appearance-label">身高：</span>
-                    <span class="appearance-value">{{ character.appearance.height }}cm</span>
+                    <span class="appearance-value">{{ internalCharacter.appearance.height }}cm</span>
                   </div>
                   <div class="appearance-item">
                     <span class="appearance-label">体重：</span>
-                    <span class="appearance-value">{{ character.appearance.weight }}kg</span>
+                    <span class="appearance-value">{{ internalCharacter.appearance.weight }}kg</span>
                   </div>
                   <div class="appearance-item">
                     <span class="appearance-label">三围：</span>
-                    <span class="appearance-value">{{ character.appearance.measurements }}</span>
+                    <span class="appearance-value">{{ internalCharacter.appearance.measurements }}</span>
                   </div>
-                  <div v-if="character.appearance.cupSize" class="appearance-item">
+                  <div v-if="internalCharacter.appearance.cupSize" class="appearance-item">
                     <span class="appearance-label">罩杯：</span>
-                    <span class="appearance-value">{{ character.appearance.cupSize }}</span>
+                    <span class="appearance-value">{{ internalCharacter.appearance.cupSize }}</span>
                   </div>
                 </div>
               </div>
 
               <!-- 性格特征 -->
-              <div v-if="character.personality && character.personality.length > 0" class="personality-section">
-                <div class="personality-traits" :class="{ locked: !getUnlockStatus(character.loyalty).personality }">
-                  <span v-for="trait in character.personality" :key="trait" class="personality-trait">{{ trait }}</span>
+              <div
+                v-if="internalCharacter.personality && internalCharacter.personality.length > 0"
+                class="personality-section"
+              >
+                <div
+                  class="personality-traits"
+                  :class="{ locked: !getUnlockStatus(internalCharacter.loyalty).personality }"
+                >
+                  <span v-for="trait in internalCharacter.personality" :key="trait" class="personality-trait">{{
+                    trait
+                  }}</span>
                 </div>
               </div>
             </div>
@@ -100,7 +116,7 @@
           <!-- 详细属性 -->
           <div class="detail-right">
             <!-- 外貌描述 -->
-            <div v-if="character.appearance && character.appearance.description" class="detail-section">
+            <div v-if="internalCharacter.appearance && internalCharacter.appearance.description" class="detail-section">
               <div class="appearance-description">
                 <div class="appearance-text-container" style="position: relative; overflow: visible">
                   <p
@@ -122,7 +138,7 @@
                       z-index: 1;
                     "
                   >
-                    {{ character.appearance.description }}
+                    {{ internalCharacter.appearance.description }}
                   </p>
                   <div class="appearance-shimmer"></div>
                 </div>
@@ -134,21 +150,24 @@
                 <div class="stat-label">
                   <span class="stat-icon">💖</span>
                   堕落值
-                  <span v-if="character.loyalty >= 100" class="max-corruption-badge">已堕落</span>
+                  <span v-if="internalCharacter.loyalty >= 100" class="max-corruption-badge">已堕落</span>
                 </div>
-                <div class="stat-bar-detail corruption-bar" :class="{ 'max-corruption': character.loyalty >= 100 }">
+                <div
+                  class="stat-bar-detail corruption-bar"
+                  :class="{ 'max-corruption': internalCharacter.loyalty >= 100 }"
+                >
                   <div
                     class="stat-fill-detail corruption-fill"
-                    :style="{ width: character.loyalty + '%' }"
-                    :class="getLoyaltyClass(character.loyalty)"
+                    :style="{ width: internalCharacter.loyalty + '%' }"
+                    :class="getLoyaltyClass(internalCharacter.loyalty)"
                   ></div>
                 </div>
                 <div
                   class="stat-value-detail corruption-value"
-                  :class="{ 'max-corruption-text': character.loyalty >= 100 }"
+                  :class="{ 'max-corruption-text': internalCharacter.loyalty >= 100 }"
                 >
-                  {{ character.loyalty }}%
-                  <span v-if="character.loyalty >= 100" class="max-corruption-icon">🔥</span>
+                  {{ internalCharacter.loyalty }}%
+                  <span v-if="internalCharacter.loyalty >= 100" class="max-corruption-icon">🔥</span>
                 </div>
               </div>
               <div class="stat-detail">
@@ -159,11 +178,13 @@
                 <div class="stat-bar-detail">
                   <div
                     class="stat-fill-detail"
-                    :style="{ width: (character.stamina / (character.maxStamina || 200)) * 100 + '%' }"
-                    :class="getStaminaClass(character.stamina, character.maxStamina || 200)"
+                    :style="{ width: (internalCharacter.stamina / (internalCharacter.maxStamina || 200)) * 100 + '%' }"
+                    :class="getStaminaClass(internalCharacter.stamina, internalCharacter.maxStamina || 200)"
                   ></div>
                 </div>
-                <div class="stat-value-detail">{{ character.stamina }}/{{ character.maxStamina || 200 }}</div>
+                <div class="stat-value-detail">
+                  {{ internalCharacter.stamina }}/{{ internalCharacter.maxStamina || 200 }}
+                </div>
               </div>
               <div class="stat-detail">
                 <div class="stat-label">
@@ -173,29 +194,36 @@
                 <div class="stat-bar-detail">
                   <div
                     class="stat-fill-detail"
-                    :style="{ width: (character.fertility / (character.maxFertility || 200)) * 100 + '%' }"
-                    :class="getFertilityClass(character.fertility, character.maxFertility || 200)"
+                    :style="{
+                      width: (internalCharacter.fertility / (internalCharacter.maxFertility || 200)) * 100 + '%',
+                    }"
+                    :class="getFertilityClass(internalCharacter.fertility, internalCharacter.maxFertility || 200)"
                   ></div>
                 </div>
-                <div class="stat-value-detail">{{ character.fertility }}/{{ character.maxFertility || 200 }}</div>
+                <div class="stat-value-detail">
+                  {{ internalCharacter.fertility }}/{{ internalCharacter.maxFertility || 200 }}
+                </div>
               </div>
               <div class="stat-detail">
                 <div class="stat-label">
                   <span class="stat-icon">👶</span>
                   后代数量
                 </div>
-                <div class="stat-value-detail">{{ character.offspring }}</div>
+                <div class="stat-value-detail">{{ internalCharacter.offspring }}</div>
               </div>
 
               <!-- 生育记录显示 -->
-              <div v-if="character.breedingRecords && character.breedingRecords.length > 0" class="breeding-records">
+              <div
+                v-if="internalCharacter.breedingRecords && internalCharacter.breedingRecords.length > 0"
+                class="breeding-records"
+              >
                 <h4>
                   <span class="section-icon">👶</span>
                   生育记录
                 </h4>
                 <div class="breeding-stats">
                   <div
-                    v-for="(count, type) in getBreedingStats(character.breedingRecords)"
+                    v-for="(count, type) in getBreedingStats(internalCharacter.breedingRecords)"
                     :key="type"
                     class="breeding-stat"
                   >
@@ -207,7 +235,7 @@
             </div>
 
             <!-- 衣着信息 -->
-            <div v-if="character.appearance?.clothing" class="detail-section clothing-section">
+            <div v-if="internalCharacter.appearance?.clothing" class="detail-section clothing-section">
               <h4 class="expandable-header" @click="isClothingExpanded = !isClothingExpanded">
                 <span class="section-icon">👗</span>
                 衣着装扮
@@ -218,56 +246,56 @@
                   <div class="clothing-icon">👑</div>
                   <div class="clothing-content">
                     <div class="clothing-label">头部</div>
-                    <div class="clothing-text">{{ character.appearance.clothing.head || '无' }}</div>
+                    <div class="clothing-text">{{ internalCharacter.appearance.clothing.head || '无' }}</div>
                   </div>
                 </div>
                 <div class="clothing-item">
                   <div class="clothing-icon">👕</div>
                   <div class="clothing-content">
                     <div class="clothing-label">上装</div>
-                    <div class="clothing-text">{{ character.appearance.clothing.top || '无' }}</div>
+                    <div class="clothing-text">{{ internalCharacter.appearance.clothing.top || '无' }}</div>
                   </div>
                 </div>
                 <div class="clothing-item">
                   <div class="clothing-icon">👖</div>
                   <div class="clothing-content">
                     <div class="clothing-label">下装</div>
-                    <div class="clothing-text">{{ character.appearance.clothing.bottom || '无' }}</div>
+                    <div class="clothing-text">{{ internalCharacter.appearance.clothing.bottom || '无' }}</div>
                   </div>
                 </div>
                 <div class="clothing-item">
                   <div class="clothing-icon">🧦</div>
                   <div class="clothing-content">
                     <div class="clothing-label">袜子</div>
-                    <div class="clothing-text">{{ character.appearance.clothing.socks || '无' }}</div>
+                    <div class="clothing-text">{{ internalCharacter.appearance.clothing.socks || '无' }}</div>
                   </div>
                 </div>
                 <div class="clothing-item">
                   <div class="clothing-icon">👠</div>
                   <div class="clothing-content">
                     <div class="clothing-label">鞋子</div>
-                    <div class="clothing-text">{{ character.appearance.clothing.shoes || '无' }}</div>
+                    <div class="clothing-text">{{ internalCharacter.appearance.clothing.shoes || '无' }}</div>
                   </div>
                 </div>
                 <div class="clothing-item">
                   <div class="clothing-icon">🩱</div>
                   <div class="clothing-content">
                     <div class="clothing-label">内衣</div>
-                    <div class="clothing-text">{{ character.appearance.clothing.underwear || '无' }}</div>
+                    <div class="clothing-text">{{ internalCharacter.appearance.clothing.underwear || '无' }}</div>
                   </div>
                 </div>
                 <div class="clothing-item">
                   <div class="clothing-icon">💎</div>
                   <div class="clothing-content">
                     <div class="clothing-label">装饰</div>
-                    <div class="clothing-text">{{ character.appearance.clothing.accessories || '无' }}</div>
+                    <div class="clothing-text">{{ internalCharacter.appearance.clothing.accessories || '无' }}</div>
                   </div>
                 </div>
                 <div class="clothing-item">
                   <div class="clothing-icon">🎀</div>
                   <div class="clothing-content">
                     <div class="clothing-label">玩具</div>
-                    <div class="clothing-text">{{ character.appearance.clothing.toys || '无' }}</div>
+                    <div class="clothing-text">{{ internalCharacter.appearance.clothing.toys || '无' }}</div>
                   </div>
                 </div>
               </div>
@@ -275,43 +303,43 @@
 
             <!-- 人生经历（10%） -->
             <div
-              v-if="character.lifeStory"
+              v-if="internalCharacter.lifeStory"
               class="detail-section"
-              :class="{ locked: !getUnlockStatus(character.loyalty).lifeStory }"
+              :class="{ locked: !getUnlockStatus(internalCharacter.loyalty).lifeStory }"
             >
               <h4>
                 <span class="section-icon">📖</span>
                 人生经历
-                <span v-if="!getUnlockStatus(character.loyalty).lifeStory" class="lock-icon">🔒</span>
+                <span v-if="!getUnlockStatus(internalCharacter.loyalty).lifeStory" class="lock-icon">🔒</span>
               </h4>
-              <div v-if="getUnlockStatus(character.loyalty).lifeStory">
+              <div v-if="getUnlockStatus(internalCharacter.loyalty).lifeStory">
                 <div
-                  v-if="character.lifeStory.childhood && character.lifeStory.childhood.length > 0"
+                  v-if="internalCharacter.lifeStory.childhood && internalCharacter.lifeStory.childhood.length > 0"
                   class="life-story-item"
                 >
                   <strong>童年：</strong>
-                  <p class="detail-text">{{ character.lifeStory.childhood.join(' ') }}</p>
+                  <p class="detail-text">{{ internalCharacter.lifeStory.childhood.join(' ') }}</p>
                 </div>
                 <div
-                  v-if="character.lifeStory.adolescence && character.lifeStory.adolescence.length > 0"
+                  v-if="internalCharacter.lifeStory.adolescence && internalCharacter.lifeStory.adolescence.length > 0"
                   class="life-story-item"
                 >
                   <strong>青年：</strong>
-                  <p class="detail-text">{{ character.lifeStory.adolescence.join(' ') }}</p>
+                  <p class="detail-text">{{ internalCharacter.lifeStory.adolescence.join(' ') }}</p>
                 </div>
                 <div
-                  v-if="character.lifeStory.adulthood && character.lifeStory.adulthood.length > 0"
+                  v-if="internalCharacter.lifeStory.adulthood && internalCharacter.lifeStory.adulthood.length > 0"
                   class="life-story-item"
                 >
                   <strong>成年：</strong>
-                  <p class="detail-text">{{ character.lifeStory.adulthood.join(' ') }}</p>
+                  <p class="detail-text">{{ internalCharacter.lifeStory.adulthood.join(' ') }}</p>
                 </div>
                 <div
-                  v-if="character.lifeStory.currentState && character.lifeStory.currentState.length > 0"
+                  v-if="internalCharacter.lifeStory.currentState && internalCharacter.lifeStory.currentState.length > 0"
                   class="life-story-item"
                 >
                   <strong>当前：</strong>
-                  <p class="detail-text">{{ character.lifeStory.currentState.join(' ') }}</p>
+                  <p class="detail-text">{{ internalCharacter.lifeStory.currentState.join(' ') }}</p>
                 </div>
               </div>
               <div v-else class="locked-content">
@@ -324,17 +352,17 @@
 
             <!-- 性经验（30%） -->
             <div
-              v-if="character.sexExperience"
+              v-if="internalCharacter.sexExperience"
               class="detail-section"
-              :class="{ locked: !getUnlockStatus(character.loyalty).sensitivePoints }"
+              :class="{ locked: !getUnlockStatus(internalCharacter.loyalty).sensitivePoints }"
             >
               <h4>
                 <span class="section-icon">💕</span>
                 性经验
-                <span v-if="!getUnlockStatus(character.loyalty).sensitivePoints" class="lock-icon">🔒</span>
+                <span v-if="!getUnlockStatus(internalCharacter.loyalty).sensitivePoints" class="lock-icon">🔒</span>
               </h4>
-              <div v-if="getUnlockStatus(character.loyalty).sensitivePoints">
-                <p class="detail-text">{{ character.sexExperience }}</p>
+              <div v-if="getUnlockStatus(internalCharacter.loyalty).sensitivePoints">
+                <p class="detail-text">{{ internalCharacter.sexExperience }}</p>
               </div>
               <div v-else class="locked-content">
                 <div class="lock-message">
@@ -348,14 +376,14 @@
             <div
               v-if="getSensitivePoint(character)"
               class="detail-section"
-              :class="{ locked: !getUnlockStatus(character.loyalty).sensitivePoints }"
+              :class="{ locked: !getUnlockStatus(internalCharacter.loyalty).sensitivePoints }"
             >
               <h4>
                 <span class="section-icon">🔍</span>
                 敏感点详情
-                <span v-if="!getUnlockStatus(character.loyalty).sensitivePoints" class="lock-icon">🔒</span>
+                <span v-if="!getUnlockStatus(internalCharacter.loyalty).sensitivePoints" class="lock-icon">🔒</span>
               </h4>
-              <div v-if="getUnlockStatus(character.loyalty).sensitivePoints" class="sensitive-details">
+              <div v-if="getUnlockStatus(internalCharacter.loyalty).sensitivePoints" class="sensitive-details">
                 <div class="sensitive-detail-item">
                   <div class="sensitive-detail-header">
                     <span class="sensitive-part">{{ getSensitivePoint(character)?.part }}</span>
@@ -375,17 +403,17 @@
             </div>
 
             <div
-              v-if="character.fears"
+              v-if="internalCharacter.fears"
               class="detail-section"
-              :class="{ locked: !getUnlockStatus(character.loyalty).fearsAndSecrets }"
+              :class="{ locked: !getUnlockStatus(internalCharacter.loyalty).fearsAndSecrets }"
             >
               <h4>
                 <span class="section-icon">😨</span>
                 恐惧
-                <span v-if="!getUnlockStatus(character.loyalty).fearsAndSecrets" class="lock-icon">🔒</span>
+                <span v-if="!getUnlockStatus(internalCharacter.loyalty).fearsAndSecrets" class="lock-icon">🔒</span>
               </h4>
-              <div v-if="getUnlockStatus(character.loyalty).fearsAndSecrets">
-                <p class="detail-text">{{ character.fears }}</p>
+              <div v-if="getUnlockStatus(internalCharacter.loyalty).fearsAndSecrets">
+                <p class="detail-text">{{ internalCharacter.fears }}</p>
               </div>
               <div v-else class="locked-content">
                 <div class="lock-message">
@@ -396,17 +424,17 @@
             </div>
 
             <div
-              v-if="character.secrets"
+              v-if="internalCharacter.secrets"
               class="detail-section"
-              :class="{ locked: !getUnlockStatus(character.loyalty).fearsAndSecrets }"
+              :class="{ locked: !getUnlockStatus(internalCharacter.loyalty).fearsAndSecrets }"
             >
               <h4>
                 <span class="section-icon">🤫</span>
                 秘密
-                <span v-if="!getUnlockStatus(character.loyalty).fearsAndSecrets" class="lock-icon">🔒</span>
+                <span v-if="!getUnlockStatus(internalCharacter.loyalty).fearsAndSecrets" class="lock-icon">🔒</span>
               </h4>
-              <div v-if="getUnlockStatus(character.loyalty).fearsAndSecrets">
-                <p class="detail-text">{{ character.secrets }}</p>
+              <div v-if="getUnlockStatus(internalCharacter.loyalty).fearsAndSecrets">
+                <p class="detail-text">{{ internalCharacter.secrets }}</p>
               </div>
               <div v-else class="locked-content">
                 <div class="lock-message">
@@ -416,18 +444,18 @@
               </div>
             </div>
 
-            <div v-if="character.locationId || character.capturedAt" class="detail-section">
+            <div v-if="internalCharacter.locationId || internalCharacter.capturedAt" class="detail-section">
               <h4>
                 <span class="section-icon">ℹ️</span>
                 其他信息
               </h4>
-              <div v-if="character.locationId" class="other-info-item">
+              <div v-if="internalCharacter.locationId" class="other-info-item">
                 <strong>来源据点：</strong>
-                <span class="detail-text">{{ getLocationName(character.locationId) }}</span>
+                <span class="detail-text">{{ getLocationName(internalCharacter.locationId) }}</span>
               </div>
-              <div v-if="character.capturedAt" class="other-info-item">
+              <div v-if="internalCharacter.capturedAt" class="other-info-item">
                 <strong>被俘获时间：</strong>
-                <span class="detail-text">{{ formatCapturedTime(character.capturedAt) }}</span>
+                <span class="detail-text">{{ formatCapturedTime(internalCharacter.capturedAt) }}</span>
               </div>
             </div>
           </div>
@@ -484,6 +512,23 @@ interface Emits {
 
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
+
+// 内部人物数据，用于响应式更新
+const internalCharacter = ref<Character | null>(null);
+
+// 监听 props.character 变化，同步到内部数据
+watch(
+  () => props.character,
+  newCharacter => {
+    if (newCharacter) {
+      // 使用深拷贝确保响应式更新
+      internalCharacter.value = JSON.parse(JSON.stringify(newCharacter));
+    } else {
+      internalCharacter.value = null;
+    }
+  },
+  { immediate: true, deep: false },
+);
 
 // 衣着栏展开状态
 const isClothingExpanded = ref(false);
@@ -666,10 +711,10 @@ const isSaving = ref(false);
 
 // 打开JSON编辑器
 const openJsonEditor = () => {
-  if (!props.character) return;
+  if (!internalCharacter.value) return;
 
   // 将字段名转换为中文后显示
-  const chineseJson = translateKeysToChinese(props.character);
+  const chineseJson = translateKeysToChinese(internalCharacter.value);
   jsonText.value = JSON.stringify(chineseJson, null, 2);
   jsonError.value = '';
   showJsonEditor.value = true;
@@ -712,7 +757,7 @@ watch(jsonText, () => {
 
 // 保存JSON
 const saveJson = async () => {
-  if (!props.character || jsonError.value || isSaving.value) return;
+  if (!internalCharacter.value || jsonError.value || isSaving.value) return;
 
   try {
     isSaving.value = true;
@@ -721,8 +766,8 @@ const saveJson = async () => {
     const chineseJson = JSON.parse(jsonText.value);
 
     // 在转换之前，先保存原始appearance的深拷贝（用于后续恢复服装信息）
-    const originalAppearance = props.character.appearance
-      ? JSON.parse(JSON.stringify(props.character.appearance))
+    const originalAppearance = internalCharacter.value.appearance
+      ? JSON.parse(JSON.stringify(internalCharacter.value.appearance))
       : null;
 
     // 将字段名转换回英文
@@ -738,7 +783,7 @@ const saveJson = async () => {
 
     // 确保unitType字段存在（如果缺失则从原始数据恢复或使用默认值）
     if (!updatedCharacter.unitType) {
-      updatedCharacter.unitType = props.character.unitType || 'physical';
+      updatedCharacter.unitType = internalCharacter.value.unitType || 'physical';
     }
 
     // 特殊处理appearance中的服装信息（必须在其他隐藏字段恢复之前处理）
@@ -795,20 +840,20 @@ const saveJson = async () => {
     }
 
     // 特殊处理attributes对象（战斗属性是计算出来的，必须完整保留）
-    if (props.character.attributes) {
+    if (internalCharacter.value.attributes) {
       console.log('🔍 [人物编辑] 恢复attributes战斗属性...');
-      updatedCharacter.attributes = JSON.parse(JSON.stringify(props.character.attributes));
+      updatedCharacter.attributes = JSON.parse(JSON.stringify(internalCharacter.value.attributes));
       console.log('✅ [人物编辑] attributes已恢复:', updatedCharacter.attributes);
     }
 
     // 特殊处理sensitivePointsDetail数组中的isSensitive字段
-    if (props.character.sensitivePointsDetail && props.character.sensitivePointsDetail.length > 0) {
+    if (internalCharacter.value.sensitivePointsDetail && internalCharacter.value.sensitivePointsDetail.length > 0) {
       console.log('🔍 [人物编辑] 检查sensitivePointsDetail数组...');
 
       // 如果用户修改了sensitivePointsDetail，需要恢复每个元素中的isSensitive字段
       if (updatedCharacter.sensitivePointsDetail) {
         const originalDetailMap = new Map(
-          props.character.sensitivePointsDetail.map(item => [item.part, item.isSensitive]),
+          internalCharacter.value.sensitivePointsDetail.map(item => [item.part, item.isSensitive]),
         );
 
         // 恢复每个敏感点的isSensitive状态
@@ -826,7 +871,9 @@ const saveJson = async () => {
         console.log('✅ [人物编辑] sensitivePointsDetail中的isSensitive已恢复');
       } else {
         // 如果用户删除了sensitivePointsDetail，完全恢复原始数据
-        updatedCharacter.sensitivePointsDetail = JSON.parse(JSON.stringify(props.character.sensitivePointsDetail));
+        updatedCharacter.sensitivePointsDetail = JSON.parse(
+          JSON.stringify(internalCharacter.value.sensitivePointsDetail),
+        );
         console.log('✅ [人物编辑] sensitivePointsDetail已完全恢复');
       }
     }
@@ -844,7 +891,7 @@ const saveJson = async () => {
         continue;
       }
 
-      const originalValue = (props.character as any)[hiddenField];
+      const originalValue = (internalCharacter.value as any)[hiddenField];
       if (originalValue !== undefined) {
         console.log(`🔍 [人物编辑] 恢复隐藏字段: ${hiddenField}`);
         // 直接设置隐藏字段的原始值（使用深拷贝）
@@ -879,6 +926,9 @@ const saveJson = async () => {
 
     // 更新世界书
     await WorldbookService.updateCharacterEntry(updatedCharacter);
+
+    // 更新内部人物数据，确保界面立即刷新
+    internalCharacter.value = JSON.parse(JSON.stringify(updatedCharacter));
 
     // 通知父组件更新人物数据
     emit('character-updated', updatedCharacter);
