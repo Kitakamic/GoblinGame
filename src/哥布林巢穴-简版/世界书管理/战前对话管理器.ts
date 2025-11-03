@@ -128,7 +128,7 @@ export class PreBattleDialogueManager {
       entry => entry.extra?.entry_type === 'character_story_history' && entry.extra?.character_id === characterId,
     );
 
-    const historyEntry = this.createCharacterStoryHistoryEntry(characterId, characterName, content);
+    const historyEntry = WorldbookHelper.createCharacterStoryHistoryEntry(characterId, characterName, content);
 
     if (historyEntryIndex !== -1) {
       // 更新现有条目（UID 已经是固定的，直接替换）
@@ -139,51 +139,6 @@ export class PreBattleDialogueManager {
     }
 
     await WorldbookHelper.replace(worldbookName, worldbook);
-  }
-
-  /**
-   * 创建人物剧情记录世界书条目
-   */
-  private static createCharacterStoryHistoryEntry(characterId: string, characterName: string, content: string): any {
-    return {
-      uid: WorldbookHelper.generateStoryHistoryUID(characterId),
-      name: `${characterName}-剧情记录`,
-      enabled: true,
-      strategy: {
-        type: 'selective',
-        keys: [characterName, '战斗总结', '调教记录', '战前对话', '剧情记录'],
-        keys_secondary: {
-          logic: 'and_any',
-          keys: [],
-        },
-        scan_depth: 'same_as_global',
-      },
-      position: {
-        type: 'at_depth',
-        role: 'system',
-        depth: 4,
-        order: 160,
-      },
-      content: content,
-      probability: 100,
-      recursion: {
-        prevent_incoming: true,
-        prevent_outgoing: true,
-        delay_until: null,
-      },
-      effect: {
-        sticky: null,
-        cooldown: null,
-        delay: null,
-      },
-      extra: {
-        entry_type: 'character_story_history',
-        character_id: characterId,
-        character_name: characterName,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    };
   }
 
   /**
