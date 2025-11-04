@@ -9,6 +9,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+<<<<<<< HEAD
 # 传奇人物图片Tags文档
 src/哥布林巢穴-简版/人物管理/类型/传奇人物图片Tags.md
 种族职业和据点职业对应表.yaml
@@ -16,3 +17,7 @@ STRUCTURE_OPTIMIZATION.md
 GIT_MIGRATION_STRATEGY.md
 GIT_QUICK_REFERENCE.md
 scripts/restructure-phase1-chinese.js
+=======
+auto-imports.d.ts
+components.d.ts
+>>>>>>> 8d88568a324a98f36d542d253ca61d6f5e5ee4a3
