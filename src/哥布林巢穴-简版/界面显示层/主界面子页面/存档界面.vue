@@ -96,11 +96,11 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
-import { toast } from '../../核心层/服务/通用服务/弹窗提示服务';
-import { FRONTEND_UPDATE_DATE, FRONTEND_VERSION } from '../../核心层/服务/通用服务/版本信息';
-import { ConfirmService } from '../../核心层/服务/通用服务/确认框服务';
+import { FRONTEND_UPDATE_DATE, FRONTEND_VERSION } from '../../version';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
 import type { BaseResources, ModularSaveSlot } from '../../核心层/服务/存档系统/模块化存档类型';
+import { toast } from '../../核心层/服务/通用服务/弹窗提示服务';
+import { ConfirmService } from '../../核心层/服务/通用服务/确认框服务';
 
 // Props
 interface Props {

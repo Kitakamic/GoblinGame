@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { FRONTEND_UPDATE_DATE, FRONTEND_VERSION } from '../../核心层/服务/通用服务/版本信息';
+import { FRONTEND_UPDATE_DATE, FRONTEND_VERSION } from '../../version';
 
 interface Props {
   show: boolean;

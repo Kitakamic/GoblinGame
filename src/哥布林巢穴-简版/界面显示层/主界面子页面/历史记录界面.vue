@@ -27,10 +27,11 @@
                 class="history-change"
                 :class="change.amount > 0 ? 'positive' : 'negative'"
               >
-                <span class="resource-icon">{{ getResourceIcon(change.type) }}</span>
-                <span class="resource-name">{{ getResourceName(change.type) }}</span>
+                <span class="resource-icon">{{ ResourceFormatService.getResourceIcon(change.type) }}</span>
+                <span class="resource-name">{{ ResourceFormatService.getResourceName(change.type) }}</span>
                 <span class="change-amount" :class="change.amount > 0 ? 'positive' : 'negative'"
-                  >{{ change.amount > 0 ? '+' : '' }}{{ change.amount }}</span
+                  >{{ change.amount > 0 ? '+' : change.amount < 0 ? '-' : ''
+                  }}{{ ResourceFormatService.formatNumber(Math.abs(change.amount)) }}</span
                 >
               </div>
             </div>
@@ -45,6 +46,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
 import type { HistoryModuleData } from '../../核心层/服务/存档系统/模块化存档类型';
+import { ResourceFormatService } from '../../核心层/服务/通用服务/资源格式化服务';
 
 // Props
 interface Props {
@@ -129,42 +131,6 @@ watch(
 onMounted(() => {
   loadHistoryFromSave();
 });
-
-// 获取资源图标
-const getResourceIcon = (type: string): string => {
-  const icons: Record<string, string> = {
-    gold: '💰',
-    food: '🍖',
-    threat: '⚠️',
-    slaves: '🔒',
-    time: '⏰',
-    rounds: '🔄',
-    normalGoblins: '👹',
-    warriorGoblins: '⚔️',
-    shamanGoblins: '🔮',
-    paladinGoblins: '🛡️',
-    trainingSlaves: '🔒',
-  };
-  return icons[type] || '❓';
-};
-
-// 获取资源名称
-const getResourceName = (type: string): string => {
-  const names: Record<string, string> = {
-    gold: '金钱',
-    food: '食物',
-    threat: '威胁度',
-    slaves: '俘虏',
-    time: '时间',
-    rounds: '回合',
-    normalGoblins: '普通哥布林',
-    warriorGoblins: '哥布林战士',
-    shamanGoblins: '哥布林萨满',
-    paladinGoblins: '哥布林圣骑士',
-    trainingSlaves: '调教俘虏',
-  };
-  return names[type] || type;
-};
 
 // 格式化时间
 const formatTime = (timestamp: number): string => {

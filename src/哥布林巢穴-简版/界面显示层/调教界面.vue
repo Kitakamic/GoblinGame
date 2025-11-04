@@ -305,14 +305,14 @@ import { AvatarSwitchService } from '../功能模块层/人物管理/服务/头�
 import { generateImage } from '../功能模块层/人物管理/服务/文生图服务';
 import { ClothingSwitchService } from '../功能模块层/人物管理/服务/衣着切换服务';
 import type { Character } from '../功能模块层/人物管理/类型/人物类型';
-import CharacterCardInterface from '../功能模块层/人物管理/视图/人物卡界面.vue';
-import OutfitInterface from '../功能模块层/人物管理/视图/换装界面.vue';
 import { pictureResourceMappingService } from '../功能模块层/探索/服务/图片资源映射服务';
-import OptionTrainingInterface from '../功能模块层/调教/视图/选项式调教界面.vue';
 import { WorldbookService } from '../核心层/服务/世界书管理/服务/世界书服务';
 import { modularSaveManager } from '../核心层/服务/存档系统/模块化存档服务';
 import { ConfirmService } from '../核心层/服务/通用服务/确认框服务';
 import { actionPointsService } from '../核心层/服务/通用服务/行动力服务';
+import CharacterCardInterface from '../界面显示层/调教界面子页面/人物卡界面.vue';
+import OutfitInterface from '../界面显示层/调教界面子页面/换装界面.vue';
+import OptionTrainingInterface from '../界面显示层/调教界面子页面/选项式调教界面.vue';
 
 // 资源管理 - 直接使用 modularSaveManager
 
