@@ -4,7 +4,7 @@
  */
 import type { Character } from '../../../功能模块层/人物管理/类型/人物类型';
 import { CUSTOM_CHARACTERS, CUSTOM_LOCATIONS } from '../../../功能模块层/人物管理/类型/传奇人物和据点';
-import type { Continent, ContinentExploreState } from '../../../功能模块层/探索/类型/大陆探索类型';
+import type { Continent, ContinentExploreState, Region } from '../../../功能模块层/探索/类型/大陆探索类型';
 import type { Location } from '../../../功能模块层/探索/类型/探索类型';
 
 // ==================== 游戏配置常量 ====================
@@ -419,8 +419,12 @@ export interface ExplorationModuleData {
   scoutingLocations: string[]; // 正在侦察的据点ID列表
   scoutingAnimation: string[]; // 正在播放侦察动画的据点ID列表
   // 大陆探索数据
-  continents: Continent[]; // 大陆数据
+  continents: Continent[]; // 大陆数据（包含默认和自定义）
   continentExploreState: ContinentExploreState; // 大陆探索状态
+  // 自定义大陆配置（可选，用于存储用户自定义的大陆和区域）
+  customContinents?: Continent[]; // 用户自定义的大陆数据
+  customRegions?: Region[]; // 用户自定义的区域数据
+  customConfigVersion?: string; // 自定义配置版本
 }
 
 // 调教消息记录

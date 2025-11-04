@@ -17,6 +17,10 @@
           <span class="icon">🔍</span>
           <span>{{ isGenerating ? '侦察中...' : '派出侦察队' }}</span>
         </button>
+        <button class="custom-continent-button" @click="showCustomContinentModal = true">
+          <span class="icon">🌍</span>
+          <span>自定义大陆</span>
+        </button>
       </div>
     </div>
 
@@ -85,6 +89,9 @@
       @retry="handleScoutingModalRetry"
       @abandon="handleScoutingModalAbandon"
     />
+
+    <!-- 自定义大陆管理弹窗 -->
+    <CustomContinentModal :show="showCustomContinentModal" @close="showCustomContinentModal = false" />
   </div>
 </template>
 
@@ -115,6 +122,7 @@ import ScoutingStatusModal from './探索界面子页面/侦察状态弹窗.vue'
 import LocationList from './探索界面子页面/据点列表组件.vue';
 import ExploreTabs from './探索界面子页面/探索选项卡组件.vue';
 import ScoutTeamModal from './探索界面子页面/派出侦察队弹窗.vue';
+import CustomContinentModal from './探索界面子页面/自定义大陆管理弹窗.vue';
 
 // ==================== 响应式数据 ====================
 
@@ -130,6 +138,9 @@ const selectedRegion = ref<string>('巢穴附近');
 // 侦察队弹窗
 const showScoutTeamModal = ref(false);
 const isGenerating = ref(false);
+
+// 自定义大陆管理弹窗
+const showCustomContinentModal = ref(false);
 
 // 侦察状态管理
 const scoutingLocations = ref<Set<string>>(new Set());
@@ -813,6 +824,41 @@ const restoreSelectionState = () => {
     &:disabled {
       opacity: 0.6;
       cursor: not-allowed;
+    }
+
+    .icon {
+      font-size: 14px;
+
+      @media (max-width: 768px) {
+        font-size: 12px;
+      }
+    }
+  }
+
+  .custom-continent-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: linear-gradient(180deg, #8b5cf6, #7c3aed);
+    border: 1px solid rgba(139, 92, 246, 0.6);
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 12px;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(139, 92, 246, 0.3);
+    transition: all 0.2s ease;
+    cursor: pointer;
+
+    @media (max-width: 768px) {
+      padding: 4px 8px;
+      font-size: 10px;
+    }
+
+    &:hover {
+      background: linear-gradient(180deg, #7c3aed, #6d28d9);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 8px rgba(139, 92, 246, 0.4);
     }
 
     .icon {

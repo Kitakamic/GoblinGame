@@ -154,7 +154,7 @@
     />
 
     <!-- 头像编辑弹窗 -->
-    <div v-if="showAvatarModal" class="modal-overlay" @click="closeAvatarModal">
+    <div v-if="showAvatarModal" class="modal-overlay">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h4>编辑头像 - {{ editingCharacter?.name }}</h4>
@@ -299,10 +299,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
+import { generateImage } from '../共享资源层/文生图/文生图服务';
 import ToastNotification from '../共享资源层/组件/弹窗提示.vue';
 import CustomConfirmDialog from '../共享资源层/组件/自定义确认框.vue';
 import { AvatarSwitchService } from '../功能模块层/人物管理/服务/头像切换服务';
-import { generateImage } from '../共享资源层/文生图/文生图服务';
 import { ClothingSwitchService } from '../功能模块层/人物管理/服务/衣着切换服务';
 import type { Character } from '../功能模块层/人物管理/类型/人物类型';
 import { pictureResourceMappingService } from '../功能模块层/探索/服务/图片资源映射服务';

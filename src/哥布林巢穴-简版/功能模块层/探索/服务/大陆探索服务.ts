@@ -4,6 +4,7 @@ import continentData from '../../../数据文件/探索数据/大陆信息表.cs
 import { modularSaveManager } from '../../../核心层/服务/存档系统/模块化存档服务';
 import type { Continent, ContinentExploreState, Region } from '../类型/大陆探索类型';
 import type { Location } from '../类型/探索类型';
+import { ContinentDataMerger } from './大陆数据合并服务';
 
 /**
  * 大陆探索服务类
@@ -927,19 +928,32 @@ export class ContinentExploreService {
         // 数据迁移和兼容性处理
         this.migrateExploreData(data);
 
-        // 加载大陆数据 - 优先使用CSV数据，存档数据作为补充
-        if (data.continents && Array.isArray(data.continents) && data.continents.length > 0) {
-          this.continents.value = data.continents;
-          // 修复已加载数据的前置关系（兼容旧存档）
-          this.fixContinentUnlockConditions();
-          console.log('从数据库加载大陆数据成功，共', data.continents.length, '个大陆');
-        } else {
-          // 如果存档中没有大陆数据，强制从CSV加载
-          console.log('存档中无大陆数据，强制从CSV加载...');
-          const continents = this.loadContinentDataFromCSV();
-          this.continents.value = continents;
-          console.log('从CSV加载大陆数据成功，共', continents.length, '个大陆');
-        }
+        // 加载默认数据（从CSV）
+        const defaultData = this.loadContinentDataFromCSV();
+
+        // 加载自定义数据
+        const customData = this.loadCustomContinents();
+
+        // 加载存档数据（包含游戏进度）
+        const savedData =
+          data.continents && Array.isArray(data.continents) && data.continents.length > 0 ? data.continents : [];
+
+        // 合并数据
+        const mergedData = ContinentDataMerger.mergeContinents(defaultData, customData, savedData, {
+          strategy: 'merge',
+          allowOverride: true,
+          preserveDefault: true,
+        });
+
+        // 设置合并后的数据
+        this.continents.value = mergedData;
+
+        // 修复已加载数据的前置关系（兼容旧存档）
+        this.fixContinentUnlockConditions();
+
+        console.log(
+          `从数据库加载大陆数据成功，共 ${mergedData.length} 个大陆（默认: ${defaultData.length}, 自定义: ${customData.length}）`,
+        );
 
         // 加载大陆探索状态
         if (data.continentExploreState) {
@@ -960,13 +974,27 @@ export class ContinentExploreService {
         console.log('从数据库加载大陆探索数据成功');
       } else {
         console.log('未找到大陆探索数据，使用默认数据');
-        // 如果没有存档数据，从CSV加载
-        this.initializeContinents();
+        // 如果没有存档数据，从CSV加载并合并自定义数据
+        const defaultData = this.loadContinentDataFromCSV();
+        const customData = this.loadCustomContinents();
+        const mergedData = ContinentDataMerger.mergeContinents(defaultData, customData, [], {
+          strategy: 'merge',
+          allowOverride: true,
+          preserveDefault: true,
+        });
+        this.continents.value = mergedData;
       }
     } catch (error) {
       console.error('加载大陆探索数据失败:', error);
       // 出错时也从CSV加载
-      this.initializeContinents();
+      const defaultData = this.loadContinentDataFromCSV();
+      const customData = this.loadCustomContinents();
+      const mergedData = ContinentDataMerger.mergeContinents(defaultData, customData, [], {
+        strategy: 'merge',
+        allowOverride: true,
+        preserveDefault: true,
+      });
+      this.continents.value = mergedData;
     }
   }
 
@@ -1136,6 +1164,291 @@ export class ContinentExploreService {
       this.saveExploreData();
     } catch (error) {
       console.error('重置大陆探索数据失败:', error);
+    }
+  }
+
+  // ==================== 自定义数据管理 API ====================
+
+  /**
+   * 获取自定义大陆列表
+   * @returns 自定义大陆数组
+   */
+  public getCustomContinents(): Continent[] {
+    return this.continents.value.filter(c => c.source === 'custom');
+  }
+
+  /**
+   * 获取默认大陆列表
+   * @returns 默认大陆数组
+   */
+  public getDefaultContinents(): Continent[] {
+    return this.continents.value.filter(c => c.source === 'default' || !c.source);
+  }
+
+  /**
+   * 添加自定义大陆
+   * @param continent 要添加的大陆数据
+   * @returns 是否成功添加
+   */
+  public addCustomContinent(continent: Continent): boolean {
+    try {
+      // 验证并修复数据
+      const validatedContinent = ContinentDataMerger.validateAndFixContinent(continent);
+      if (!validatedContinent) {
+        console.error('添加自定义大陆失败：数据验证失败', continent);
+        return false;
+      }
+
+      // 检查是否已存在同名大陆
+      const existingIndex = this.continents.value.findIndex(c => c.name === validatedContinent.name);
+      if (existingIndex >= 0) {
+        const existing = this.continents.value[existingIndex];
+        // 如果已存在且是自定义数据，更新它
+        if (existing.source === 'custom') {
+          console.log(`更新已存在的自定义大陆: ${validatedContinent.name}`);
+          this.continents.value[existingIndex] = {
+            ...validatedContinent,
+            source: 'custom',
+            version: '1.0.0',
+            metadata: {
+              ...validatedContinent.metadata,
+              createdAt: existing.metadata?.createdAt || Date.now(),
+              modifiedAt: Date.now(),
+            },
+            regions: validatedContinent.regions.map(region => ({
+              ...region,
+              source: 'custom' as const,
+              continentName: validatedContinent.name,
+              metadata: {
+                ...region.metadata,
+                createdAt: region.metadata?.createdAt || Date.now(),
+                modifiedAt: Date.now(),
+              },
+            })),
+          };
+        } else {
+          console.warn(`无法添加自定义大陆 "${validatedContinent.name}"：已存在同名默认大陆`);
+          return false;
+        }
+      } else {
+        // 添加新的大陆
+        const customContinent: Continent = {
+          ...validatedContinent,
+          source: 'custom',
+          version: '1.0.0',
+          metadata: {
+            createdAt: Date.now(),
+            modifiedAt: Date.now(),
+            ...validatedContinent.metadata,
+          },
+          regions: validatedContinent.regions.map(region => ({
+            ...region,
+            source: 'custom' as const,
+            continentName: validatedContinent.name,
+            metadata: {
+              createdAt: Date.now(),
+              modifiedAt: Date.now(),
+              ...region.metadata,
+            },
+          })),
+        };
+
+        this.continents.value.push(customContinent);
+        console.log(`成功添加自定义大陆: ${validatedContinent.name}`);
+      }
+
+      // 保存数据
+      this.saveExploreData();
+      this.saveCustomContinents();
+
+      return true;
+    } catch (error) {
+      console.error('添加自定义大陆失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 移除自定义大陆
+   * @param continentName 要移除的大陆名称
+   * @returns 是否成功移除
+   */
+  public removeCustomContinent(continentName: string): boolean {
+    try {
+      const index = this.continents.value.findIndex(c => c.name === continentName && c.source === 'custom');
+
+      if (index < 0) {
+        console.warn(`未找到自定义大陆: ${continentName}`);
+        return false;
+      }
+
+      // 检查是否在使用中
+      const continent = this.continents.value[index];
+      if (continent.isConquered || continent.conquestProgress > 0) {
+        console.warn(`无法移除自定义大陆 "${continentName}"：该大陆已有游戏进度`);
+        return false;
+      }
+
+      // 从列表中移除
+      this.continents.value.splice(index, 1);
+
+      // 更新探索状态（如果该大陆在状态中）
+      if (this.exploreState.value.currentContinent === continentName) {
+        this.exploreState.value.currentContinent = '';
+      }
+      if (this.exploreState.value.unlockedContinents.includes(continentName)) {
+        this.exploreState.value.unlockedContinents = this.exploreState.value.unlockedContinents.filter(
+          c => c !== continentName,
+        );
+      }
+      if (this.exploreState.value.conqueredContinents.includes(continentName)) {
+        this.exploreState.value.conqueredContinents = this.exploreState.value.conqueredContinents.filter(
+          c => c !== continentName,
+        );
+      }
+      if (this.exploreState.value.continentProgress[continentName]) {
+        delete this.exploreState.value.continentProgress[continentName];
+      }
+
+      console.log(`成功移除自定义大陆: ${continentName}`);
+
+      // 保存数据
+      this.saveExploreData();
+      this.saveCustomContinents();
+
+      return true;
+    } catch (error) {
+      console.error('移除自定义大陆失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 更新自定义大陆
+   * @param continentName 要更新的大陆名称
+   * @param updates 要更新的字段
+   * @returns 是否成功更新
+   */
+  public updateCustomContinent(continentName: string, updates: Partial<Continent>): boolean {
+    try {
+      const index = this.continents.value.findIndex(c => c.name === continentName && c.source === 'custom');
+
+      if (index < 0) {
+        console.warn(`未找到自定义大陆: ${continentName}`);
+        return false;
+      }
+
+      // 更新大陆数据
+      const continent = this.continents.value[index];
+      const updatedContinent = {
+        ...continent,
+        ...updates,
+        metadata: {
+          ...continent.metadata,
+          modifiedAt: Date.now(),
+        },
+      };
+
+      // 验证并修复更新后的数据
+      const validatedContinent = ContinentDataMerger.validateAndFixContinent(updatedContinent);
+      if (!validatedContinent) {
+        console.error('更新自定义大陆失败：数据验证失败');
+        return false;
+      }
+
+      // 应用更新
+      this.continents.value[index] = {
+        ...validatedContinent,
+        source: 'custom',
+        version: continent.version || '1.0.0',
+        metadata: {
+          ...validatedContinent.metadata,
+          createdAt: continent.metadata?.createdAt || Date.now(),
+          modifiedAt: Date.now(),
+        },
+      };
+
+      console.log(`成功更新自定义大陆: ${continentName}`);
+
+      // 保存数据
+      this.saveExploreData();
+      this.saveCustomContinents();
+
+      return true;
+    } catch (error) {
+      console.error('更新自定义大陆失败:', error);
+      return false;
+    }
+  }
+
+  /**
+   * 加载自定义大陆数据
+   */
+  private loadCustomContinents(): Continent[] {
+    try {
+      const exploreData = modularSaveManager.getModuleData({ moduleName: 'exploration' });
+      if (exploreData && (exploreData as any).customContinents) {
+        const customContinents = (exploreData as any).customContinents as Continent[];
+        console.log(`加载了 ${customContinents.length} 个自定义大陆`);
+        return customContinents;
+      }
+      return [];
+    } catch (error) {
+      console.error('加载自定义大陆数据失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 保存自定义大陆数据
+   */
+  private saveCustomContinents(): void {
+    try {
+      const customContinents = this.getCustomContinents();
+      const currentData = modularSaveManager.getModuleData({ moduleName: 'exploration' }) || {};
+
+      modularSaveManager.updateModuleData({
+        moduleName: 'exploration',
+        data: {
+          ...currentData,
+          customContinents,
+          customConfigVersion: '1.0.0',
+        },
+      });
+
+      console.log(`保存了 ${customContinents.length} 个自定义大陆`);
+    } catch (error) {
+      console.error('保存自定义大陆数据失败:', error);
+    }
+  }
+
+  /**
+   * 重新合并数据（在添加/移除自定义数据后调用）
+   */
+  public remergeContinents(): void {
+    try {
+      // 加载默认数据
+      const defaultData = this.loadContinentDataFromCSV();
+
+      // 加载自定义数据
+      const customData = this.loadCustomContinents();
+
+      // 加载存档数据（包含游戏进度）
+      const savedData = this.continents.value;
+
+      // 合并数据
+      const mergedData = ContinentDataMerger.mergeContinents(defaultData, customData, savedData, {
+        strategy: 'merge',
+        allowOverride: true,
+        preserveDefault: true,
+      });
+
+      // 更新大陆数据
+      this.continents.value = mergedData;
+
+      console.log('数据重新合并完成');
+    } catch (error) {
+      console.error('重新合并数据失败:', error);
     }
   }
 }

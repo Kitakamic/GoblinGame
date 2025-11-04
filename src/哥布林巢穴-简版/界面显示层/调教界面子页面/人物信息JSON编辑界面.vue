@@ -1,5 +1,5 @@
 <template>
-  <div v-if="show" class="json-editor-overlay" @click="close">
+  <div v-if="show" class="json-editor-overlay">
     <div class="json-editor-modal" @click.stop>
       <div class="json-editor-header">
         <h4>编辑人物JSON（测试性功能，不确定项不要乱改！！）</h4>

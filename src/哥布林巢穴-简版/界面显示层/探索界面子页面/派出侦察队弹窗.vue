@@ -1,5 +1,5 @@
 <template>
-  <div v-if="show" class="scout-team-modal-overlay" @click="handleClose">
+  <div v-if="show" class="scout-team-modal-overlay">
     <div class="scout-team-modal" @click.stop>
       <div class="modal-header">
         <h3>🔍 派出侦察队</h3>
