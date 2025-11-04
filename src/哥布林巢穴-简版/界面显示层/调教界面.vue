@@ -302,7 +302,7 @@ import { useRoute } from 'vue-router';
 import ToastNotification from '../共享资源层/组件/弹窗提示.vue';
 import CustomConfirmDialog from '../共享资源层/组件/自定义确认框.vue';
 import { AvatarSwitchService } from '../功能模块层/人物管理/服务/头像切换服务';
-import { generateImage } from '../功能模块层/人物管理/服务/文生图服务';
+import { generateImage } from '../共享资源层/文生图/文生图服务';
 import { ClothingSwitchService } from '../功能模块层/人物管理/服务/衣着切换服务';
 import type { Character } from '../功能模块层/人物管理/类型/人物类型';
 import { pictureResourceMappingService } from '../功能模块层/探索/服务/图片资源映射服务';

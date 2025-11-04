@@ -60,8 +60,6 @@ export interface CharacterAttributes {
   speed: number;
   /** 血量 */
   health: number;
-  /** 职业分类 */
-  Unittype?: string;
 }
 
 /** 部队编制信息 */
@@ -147,7 +145,7 @@ export interface BreedingRecord {
   type: GoblinType; // 哥布林类型
   count: number; // 数量
   date: Date; // 日期
-  round: number; // 轮次
+  round: number; // 回合
 }
 
 /** 生育结果 */
@@ -156,6 +154,13 @@ export interface BreedingResult {
   characterName: string;
   totalOffspring: number;
   records: BreedingRecord[];
+}
+
+// ==================== 额外附加信息 ====================
+
+/** 额外附加信息（允许玩家自定义） */
+export interface AdditionalInformation {
+  Notes: string;
 }
 
 // ==================== 主要人物类型 ====================
@@ -185,7 +190,7 @@ export interface Character {
   // ========== 状态信息 ==========
   /** 当前状态 */
   status: CharacterStatus;
-  /** 原始状态（用于生育完成后恢复） */
+  /** 原始状态（用于回合结束事件完毕后恢复） */
   originalStatus?: CharacterStatus;
   /** 位置信息（据点名称或交配间ID） */
   locationId?: string;
@@ -213,7 +218,7 @@ export interface Character {
   favorite?: boolean;
 
   // ========== 战斗属性 ==========
-  /** 等级（基于后代数量计算：后代数量/10，决定可下辖哥布林数量） */
+  /** 等级（决定可下辖哥布林数量） */
   level: number;
   /** 人物基础五维属性 */
   attributes: CharacterAttributes;
@@ -224,8 +229,8 @@ export interface Character {
   /** 部队编制位置（1-6） */
   formationPosition?: number;
 
-  // ========== 训练信息 ==========
-  /** 最后训练时间 */
+  // ========== 调教信息 ==========
+  /** 最后调教时间 */
   lastTraining?: Date;
 
   // ========== 生育记录 ==========
@@ -261,4 +266,6 @@ export interface Character {
   secrets?: string;
   /** 外观信息 */
   appearance?: CharacterAppearance;
+  /** 额外附加信息 */
+  additionalInformation?: AdditionalInformation;
 }

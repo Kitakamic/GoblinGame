@@ -228,6 +228,9 @@ export class ModularSaveManager {
       // 加载初始化数据到当前游戏数据（仅加载到内存，不保存到slot_0）
       // slot_0 会在自动存档时自动覆盖，自动保存时会自动设置currentSaveId为slot_0
       if (initGameData) {
+        // 【旧存档兼容性处理】迁移 attributes.Unittype 到 unitType
+        this.migrateUnitTypeFromAttributes(initGameData);
+
         // 清除currentSaveId，确保在自动保存之前不会从旧存档读取调教记录
         databaseService.clearCurrentSaveId();
 
@@ -266,6 +269,10 @@ export class ModularSaveManager {
 
         const slotIdx = this.deriveSlotFromId(save.id);
         const gameData = await databaseService.loadSave(save.id);
+        // 【旧存档兼容性处理】迁移 attributes.Unittype 到 unitType
+        if (gameData) {
+          this.migrateUnitTypeFromAttributes(gameData as ModularGameData);
+        }
         slots.push({
           slot: slotIdx,
           data: gameData as ModularGameData | null,
@@ -329,6 +336,10 @@ export class ModularSaveManager {
 
       if (save) {
         const gameData = await databaseService.loadSave(save.id);
+        // 【旧存档兼容性处理】迁移 attributes.Unittype 到 unitType
+        if (gameData) {
+          this.migrateUnitTypeFromAttributes(gameData as ModularGameData);
+        }
         return {
           slot: slotNumber,
           data: gameData as ModularGameData | null,
@@ -438,6 +449,9 @@ export class ModularSaveManager {
       if (!slotData.data) {
         throw new Error(`槽位 ${slot} 没有存档`);
       }
+
+      // 【旧存档兼容性处理】迁移 attributes.Unittype 到 unitType
+      this.migrateUnitTypeFromAttributes(slotData.data);
 
       // 更新当前游戏数据
       this.currentGameData = slotData.data;
@@ -752,6 +766,9 @@ export class ModularSaveManager {
 
       // 设置当前存档ID
       databaseService.setCurrentSaveId(saveId);
+
+      // 【旧存档兼容性处理】迁移 attributes.Unittype 到 unitType
+      this.migrateUnitTypeFromAttributes(gameData);
 
       // 更新当前游戏数据
       this.currentGameData = gameData;
@@ -1311,6 +1328,42 @@ export class ModularSaveManager {
       console.log(`已删除存档 ${saveId} 的世界书数据`);
     } catch (error) {
       console.error('删除存档世界书数据失败:', error);
+    }
+  }
+
+  /**
+   * 【旧存档兼容性处理】迁移 attributes.Unittype 到 unitType
+   * 将旧存档中人物 attributes.Unittype 字段迁移到新的 unitType 字段
+   */
+  private migrateUnitTypeFromAttributes(gameData: ModularGameData): void {
+    try {
+      if (!gameData.training || !gameData.training.characters) {
+        return;
+      }
+
+      let migratedCount = 0;
+      const characters = gameData.training.characters;
+
+      for (const character of characters) {
+        // 如果存在旧的 attributes.Unittype 且没有 unitType，进行迁移
+        const attributes = character.attributes as any;
+        if (
+          attributes?.Unittype &&
+          !character.unitType &&
+          (attributes.Unittype === 'physical' || attributes.Unittype === 'magical')
+        ) {
+          character.unitType = attributes.Unittype as 'physical' | 'magical';
+          // 删除旧的 Unittype 字段
+          delete attributes.Unittype;
+          migratedCount++;
+        }
+      }
+
+      if (migratedCount > 0) {
+        console.log(`✅ [旧存档兼容] 已迁移 ${migratedCount} 个人物的 Unittype 字段到 unitType`);
+      }
+    } catch (error) {
+      console.warn('⚠️ [旧存档兼容] 迁移 Unittype 字段时出错（不影响存档加载）:', error);
     }
   }
 

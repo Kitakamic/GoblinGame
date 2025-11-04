@@ -9,26 +9,67 @@ import type { UnlockStatus, WorldbookEntry } from '../类型/世界书类型定�
  */
 export class CharacterWorldbookManager {
   /**
+   * 为人物创建或更新世界书条目（核心逻辑）
+   * @param character 人物对象
+   * @param worldbookName 世界书名称
+   * @param bindToChat 是否绑定到当前聊天
+   * @returns 世界书名称
+   */
+  private static async upsertCharacterEntry(
+    character: Character,
+    worldbookName: string,
+    bindToChat: boolean = false,
+  ): Promise<string> {
+    // 检查是否为player角色
+    if (WorldbookHelper.isPlayerCharacter(character.id, character.name, character.status)) {
+      console.log(`跳过player角色 ${character.name} 的世界书操作`);
+      return worldbookName;
+    }
+
+    await WorldbookHelper.ensureExists(worldbookName);
+    const worldbook = await WorldbookHelper.get(worldbookName);
+
+    // 检查条目是否已存在
+    const entryIndex = WorldbookHelper.findEntryIndex(worldbook, entry => entry.extra?.character_id === character.id);
+
+    if (entryIndex !== -1) {
+      // 条目已存在，更新
+      console.log(`人物 ${character.name} 的世界书条目已存在，执行更新`);
+      const updatedContent = this.buildCharacterContent(character);
+      worldbook[entryIndex] = {
+        ...worldbook[entryIndex],
+        content: updatedContent,
+        extra: {
+          ...worldbook[entryIndex].extra,
+          updated_at: new Date().toISOString(),
+        },
+      };
+      await WorldbookHelper.replace(worldbookName, worldbook);
+      if (bindToChat) {
+        await WorldbookHelper.bindToCurrent(worldbookName);
+      }
+      console.log(`已更新人物 ${character.name} 的世界书条目`);
+    } else {
+      // 条目不存在，创建新条目
+      const worldbookEntry = this.createCharacterEntry(character);
+      worldbook.push(worldbookEntry);
+      await WorldbookHelper.replace(worldbookName, worldbook);
+      if (bindToChat) {
+        await WorldbookHelper.bindToCurrent(worldbookName);
+      }
+      console.log(`已将人物 ${character.name} 添加到世界书: ${worldbookName}`);
+    }
+
+    return worldbookName;
+  }
+
+  /**
    * 为人物创建世界书并绑定到当前聊天
+   * 如果条目已存在，则更新而不是创建新条目
    */
   static async createCharacterWorldbook(character: Character, worldbookName: string): Promise<string> {
     try {
-      // 检查是否为player角色
-      if (WorldbookHelper.isPlayerCharacter(character.id, character.name, character.status)) {
-        console.log(`跳过player角色 ${character.name} 的世界书创建`);
-        return worldbookName;
-      }
-
-      await WorldbookHelper.ensureExists(worldbookName);
-      const worldbook = await WorldbookHelper.get(worldbookName);
-      const worldbookEntry = this.createCharacterEntry(character);
-
-      worldbook.push(worldbookEntry);
-      await WorldbookHelper.replace(worldbookName, worldbook);
-      await WorldbookHelper.bindToCurrent(worldbookName);
-
-      console.log(`已将人物 ${character.name} 添加到世界书: ${worldbookName}`);
-      return worldbookName;
+      return await this.upsertCharacterEntry(character, worldbookName, true);
     } catch (error) {
       toast.error(`创建人物世界书失败: ${error}`);
       throw error;
@@ -43,41 +84,19 @@ export class CharacterWorldbookManager {
       const worldbook = await WorldbookHelper.get(worldbookName);
       return WorldbookHelper.findEntry(worldbook, entry => entry.extra?.character_id === characterId) || null;
     } catch (error) {
-      console.error('获取人物世界书条目失败:', error);
-      return null;
+      toast.error(`获取人物世界书条目失败: ${error}`);
+      throw error;
     }
   }
 
   /**
    * 更新人物世界书条目
+   * 如果条目不存在，则创建新条目
+   * 不会绑定到当前聊天（用于静默更新）
    */
   static async updateCharacterEntry(worldbookName: string, character: Character): Promise<void> {
     try {
-      // 检查是否为player角色
-      if (WorldbookHelper.isPlayerCharacter(character.id, character.name, character.status)) {
-        console.log(`跳过player角色 ${character.name} 的世界书更新`);
-        return;
-      }
-
-      const worldbook = await WorldbookHelper.get(worldbookName);
-      const entryIndex = WorldbookHelper.findEntryIndex(worldbook, entry => entry.extra?.character_id === character.id);
-
-      if (entryIndex !== -1) {
-        const updatedContent = this.buildCharacterContent(character);
-        worldbook[entryIndex] = {
-          ...worldbook[entryIndex],
-          content: updatedContent,
-          extra: {
-            ...worldbook[entryIndex].extra,
-            updated_at: new Date().toISOString(),
-          },
-        };
-
-        await WorldbookHelper.replace(worldbookName, worldbook);
-        // toast.success(`已更新人物 ${character.name} 的世界书条目`);
-      } else {
-        console.log(`未找到人物 ${character.name} 的世界书条目，跳过更新`);
-      }
+      await this.upsertCharacterEntry(character, worldbookName, false);
     } catch (error) {
       toast.error(`更新人物世界书条目失败: ${error}`);
       throw error;
@@ -236,9 +255,12 @@ export class CharacterWorldbookManager {
         capturedAtRaw: character.capturedAt,
       },
       trainingSettings: this.buildTrainingSettings(character),
+      additionalInformation: {
+        Notes: character.additionalInformation?.Notes || '',
+      },
     };
 
-    return `## 基本信息
+    return `## ${character.name}
 
 \`\`\`json
 ${JSON.stringify(fixedInfo, null, 2)}

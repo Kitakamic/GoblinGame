@@ -252,18 +252,18 @@ import { useMessageChat } from '../../共享资源层/消息/消息聊天';
 import ToastContainer from '../../共享资源层/组件/弹窗提示.vue';
 import TextStyleSettings from '../../共享资源层/组件/文字样式设置.vue';
 import CustomConfirm from '../../共享资源层/组件/自定义确认框.vue';
+import { AvatarSwitchService } from '../../功能模块层/人物管理/服务/头像切换服务';
+import type { Character } from '../../功能模块层/人物管理/类型/人物类型';
+import { AttributeChangeParseService } from '../../功能模块层/调教/服务/属性变化解析服务';
+import { OptionParseService } from '../../功能模块层/调教/服务/选项解析服务';
+import type { TrainingOption } from '../../功能模块层/调教/类型/调教类型';
 import { generateWithChainOfThought } from '../../核心层/服务/世界书管理/工具/AI生成助手';
 import { ChainOfThoughtMode } from '../../核心层/服务/世界书管理/工具/思维链管理器';
 import { WorldbookService } from '../../核心层/服务/世界书管理/服务/世界书服务';
 import { TrainingRecordManager } from '../../核心层/服务/世界书管理/管理器/调教记录管理器';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
 import { TimeParseService } from '../../核心层/服务/通用服务/时间解析服务';
-import { AvatarSwitchService } from '../../功能模块层/人物管理/服务/头像切换服务';
-import type { Character } from '../../功能模块层/人物管理/类型/人物类型';
 import CharacterDetailModal from '../调教界面子页面/人物卡界面.vue';
-import { AttributeChangeParseService } from '../../功能模块层/调教/服务/属性变化解析服务';
-import { OptionParseService } from '../../功能模块层/调教/服务/选项解析服务';
-import type { TrainingOption } from '../../功能模块层/调教/类型/调教类型';
 
 interface Props {
   character: Character;
@@ -1727,7 +1727,7 @@ const handleImageError = (event: Event) => {
 </script>
 
 <style lang="scss">
-@use '../../../共享资源层/样式/对话样式变量.scss' as *;
+@use '../../共享资源层/样式/对话样式变量.scss' as *;
 
 /* 复用手动调教界面的整体样式，并补充选项样式 */
 .manual-training-container {
