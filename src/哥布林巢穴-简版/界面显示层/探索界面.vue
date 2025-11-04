@@ -6,11 +6,11 @@
         <div class="explore-stats">
           <div class="stat-item">
             <span class="icon">💰</span>
-            <span class="value">{{ formatNumber(modularSaveManager.resources.value.gold) }}</span>
+            <span class="value">{{ ResourceFormatService.formatNumber(modularSaveManager.resources.value.gold) }}</span>
           </div>
           <div class="stat-item">
             <span class="icon">🍖</span>
-            <span class="value">{{ formatNumber(modularSaveManager.resources.value.food) }}</span>
+            <span class="value">{{ ResourceFormatService.formatNumber(modularSaveManager.resources.value.food) }}</span>
           </div>
         </div>
         <button class="scout-team-button" :disabled="isGenerating" @click="showScoutTeamModal = true">
@@ -98,6 +98,7 @@ import AdvancedBattleInterface from '../功能模块层/战斗/视图/高级战�
 // 功能模块层服务
 import { continentExploreService } from '../功能模块层/探索/服务/大陆探索服务';
 import { exploreService } from '../功能模块层/探索/服务/探索服务';
+import { ExploreUIUtils } from '../功能模块层/探索/服务/探索界面工具服务';
 import type { Location } from '../功能模块层/探索/类型/探索类型';
 
 // 核心层服务
@@ -107,6 +108,7 @@ import { toastService } from '../核心层/服务/通用服务/弹窗提示服�
 import { TimeParseService } from '../核心层/服务/通用服务/时间解析服务';
 import { ConfirmService } from '../核心层/服务/通用服务/确认框服务';
 import { actionPointsService } from '../核心层/服务/通用服务/行动力服务';
+import { ResourceFormatService } from '../核心层/服务/通用服务/资源格式化服务';
 
 // 子组件
 import ScoutingStatusModal from './探索界面子页面/侦察状态弹窗.vue';
@@ -175,57 +177,7 @@ const currentContinentConqueredStars = computed(() => {
 });
 
 const availableLocationTypes = computed(() => {
-  // 通用据点类型（所有大陆都可使用）
-  const commonTypes = [
-    { value: '', label: '随机探索' },
-    { value: 'village', label: '村庄' },
-    { value: 'town', label: '城镇' },
-    { value: 'city', label: '城市' },
-    { value: 'ruins', label: '遗迹' },
-    { value: 'trade_caravan', label: '贸易商队' },
-    { value: 'adventurer_party', label: '冒险者小队' },
-  ];
-
-  // 根据当前大陆添加专属据点类型
-  const continentSpecificTypes: Record<string, { value: string; label: string }[]> = {
-    古拉尔大陆: [
-      { value: 'exile_outpost', label: '流放者据点' },
-      { value: 'bandit_camp', label: '盗匪营地' },
-      { value: 'elven_forest', label: '精灵森林' },
-      { value: 'fox_colony', label: '狐族殖民地' },
-    ],
-    瓦尔基里大陆: [
-      { value: 'dark_spire', label: '巢都尖塔' },
-      { value: 'slave_camp', label: '奴隶营地' },
-      { value: 'dark_fortress', label: '黑暗要塞' },
-      { value: 'obsidian_mine', label: '黑曜石矿场' },
-      { value: 'raid_dock', label: '劫掠舰码头' },
-    ],
-    香草群岛: [
-      { value: 'fox_water_town', label: '狐族水乡' },
-      { value: 'shrine', label: '神社' },
-      { value: 'trading_port', label: '贸易港口' },
-      { value: 'warship_dock', label: '军舰泊地' },
-      { value: 'spice_plantation', label: '香料种植园' },
-    ],
-    赛菲亚大陆: [
-      { value: 'imperial_city', label: '帝国城市' },
-      { value: 'noble_estate', label: '贵族庄园' },
-      { value: 'mining_district', label: '矿业区域' },
-      { value: 'border_fortress', label: '边境要塞' },
-      { value: 'cathedral', label: '教堂' },
-      { value: 'academy', label: '学院' },
-    ],
-    世界树圣域: [
-      { value: 'tree_city', label: '树城' },
-      { value: 'elven_temple', label: '精灵圣殿' },
-      { value: 'guardian_outpost', label: '守卫哨所' },
-      { value: 'canopy_palace', label: '树冠宫殿' },
-    ],
-  };
-
-  const specificTypes = continentSpecificTypes[selectedContinent.value] || [];
-  return [...commonTypes, ...specificTypes];
+  return ExploreUIUtils.getAvailableLocationTypes(selectedContinent.value);
 });
 
 const allTargetLocations = computed(() => exploreService.getAllLocations());
@@ -261,16 +213,6 @@ const filteredLocations = computed(() => {
 });
 
 // ==================== 方法 ====================
-
-// 工具方法
-const formatNumber = (num: number): string => {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-  }
-  return num.toString();
-};
 
 // 大陆和区域选择
 const selectContinent = (continentName: string) => {
@@ -547,18 +489,10 @@ const startBattle = async (location: Location) => {
   selectedBattleTarget.value = location;
   const enemyUnits = exploreService.getLocationEnemyUnits(location.id, 1);
 
-  // 计算敌方部队总数
-  const getTotalEnemyTroops = (location: Location): number => {
-    if (location.enemyUnits && location.enemyUnits.length > 0) {
-      return location.enemyUnits.reduce((total, unit) => total + unit.troopCount, 0);
-    }
-    return location.baseGuards || 0;
-  };
-
   battleData.value = {
     target: location,
     enemyForces: {
-      guards: getTotalEnemyTroops(location),
+      guards: ExploreUIUtils.getTotalEnemyTroops(location),
       name: location.name,
       type: location.type,
       difficulty: location.difficulty,

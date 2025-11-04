@@ -76,6 +76,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { AILocationGenerationService } from '../../功能模块层/探索/服务/AI据点生成服务';
+import { ExploreUIUtils } from '../../功能模块层/探索/服务/探索界面工具服务';
 import { ConfirmService } from '../../核心层/服务/通用服务/确认框服务';
 import { actionPointsService } from '../../核心层/服务/通用服务/行动力服务';
 
@@ -115,10 +116,8 @@ watch(
   },
 );
 
-// 难度文本
-const getDifficultyText = (difficulty: number) => {
-  return '★'.repeat(difficulty);
-};
+// 工具函数（使用 ExploreUIUtils 服务）
+const getDifficultyText = ExploreUIUtils.getDifficultyText;
 
 // 关闭弹窗
 const handleClose = async () => {

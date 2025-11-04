@@ -102,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { exploreService } from '../../功能模块层/探索/服务/探索服务';
+import { ExploreUIUtils } from '../../功能模块层/探索/服务/探索界面工具服务';
 import type { Location } from '../../功能模块层/探索/类型/探索类型';
 
 // Props
@@ -121,58 +121,16 @@ const emit = defineEmits<{
   attack: [location: Location];
 }>();
 
-// 难度文本
-const getDifficultyText = (difficulty: number) => {
-  return '★'.repeat(difficulty);
-};
-
-// 计算侦察成本显示
-const getScoutCost = (difficulty: number, distance?: number): string => {
-  const cost = exploreService.calculateScoutCost(difficulty, distance);
-  return `💰${cost.gold} 🍖${cost.food}`;
-};
-
-// 获取据点的实际敌方部队总数
-const getTotalEnemyTroops = (location: Location): number => {
-  // 如果据点已有敌方单位数据，计算实际总数
-  if (location.enemyUnits && location.enemyUnits.length > 0) {
-    return location.enemyUnits.reduce((total, unit) => total + unit.troopCount, 0);
-  }
-
-  // 如果没有敌方单位数据，返回基础守军数量
-  return location.baseGuards || 0;
-};
-
-// 检查据点是否为区域首都
-const isLocationCapital = (location: Location): boolean => {
-  return props.currentRegionCapital === location.name;
-};
-
-// 状态文本
-const getStatusText = (location: Location) => {
-  // 如果正在侦察中，显示侦察中状态
-  if (props.scoutingLocations.has(location.id)) {
-    return '侦察中';
-  }
-
-  const statusMap = {
-    unknown: '未知',
-    scouted: '已侦察',
-    attacked: '已攻击',
-    conquered: '已征服',
-  };
-  return statusMap[location.status as keyof typeof statusMap] || '未知';
-};
-
-// 状态类
-const getStatusClass = (location: Location) => {
-  // 如果正在侦察中，使用侦察中的样式
-  if (props.scoutingLocations.has(location.id)) {
-    return 'scouting';
-  }
-
-  return location.status;
-};
+// 工具函数（使用 ExploreUIUtils 服务）
+const getDifficultyText = ExploreUIUtils.getDifficultyText;
+const getScoutCost = ExploreUIUtils.formatScoutCost;
+const getTotalEnemyTroops = ExploreUIUtils.getTotalEnemyTroops;
+const isLocationCapital = (location: Location) =>
+  ExploreUIUtils.isLocationCapital(location, props.currentRegionCapital);
+const getStatusText = (location: Location) =>
+  ExploreUIUtils.getStatusText(location, props.scoutingLocations.has(location.id));
+const getStatusClass = (location: Location) =>
+  ExploreUIUtils.getStatusClass(location, props.scoutingLocations.has(location.id));
 
 // 处理筛选变化
 const handleFilterChange = (value: string) => {
