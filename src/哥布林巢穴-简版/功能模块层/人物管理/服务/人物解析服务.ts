@@ -856,7 +856,16 @@ export class CharacterParser {
    * @throws Error 如果字段缺失或无效
    */
   private static validateRequiredNumber(value: any, fieldName: string, category: string = '基础信息'): number {
-    if (value === undefined || value === null || typeof value !== 'number' || isNaN(value)) {
+    // 添加详细的调试信息
+    console.log(`🔍 [人物解析] 验证数字字段 "${fieldName}":`, {
+      值: value,
+      类型: typeof value,
+      是否为null: value === null,
+      是否为undefined: value === undefined,
+    });
+
+    // 检查是否为 null 或 undefined
+    if (value === undefined || value === null) {
       const error: ParseError = {
         field: fieldName,
         message: '字段缺失或无效，AI必须提供有效的数字',
@@ -867,7 +876,55 @@ export class CharacterParser {
       this.errorCollector.addError(error);
       throw new Error(`${fieldName}字段缺失或无效，AI必须提供有效的数字`);
     }
-    return value;
+
+    // 如果已经是数字类型，直接验证并返回
+    if (typeof value === 'number') {
+      if (isNaN(value)) {
+        const error: ParseError = {
+          field: fieldName,
+          message: '字段值为NaN，AI必须提供有效的数字',
+          category: category as any,
+          actualValue: value,
+          expectedType: 'number',
+        };
+        this.errorCollector.addError(error);
+        throw new Error(`${fieldName}字段值为NaN，AI必须提供有效的数字`);
+      }
+      console.log(`✅ [人物解析] 字段 "${fieldName}" 验证通过，值: ${value}`);
+      return value;
+    }
+
+    // 如果是字符串类型，尝试转换为数字（兼容YAML解析器可能将数字解析为字符串的情况）
+    if (typeof value === 'string') {
+      const trimmedValue = value.trim();
+      // 尝试转换为数字
+      const numValue = Number(trimmedValue);
+      if (!isNaN(numValue) && isFinite(numValue)) {
+        console.log(`✅ [人物解析] 字段 "${fieldName}" 从字符串 "${trimmedValue}" 转换为数字: ${numValue}`);
+        return numValue;
+      } else {
+        const error: ParseError = {
+          field: fieldName,
+          message: `字段类型错误（期望数字，实际为字符串 "${trimmedValue}"），无法转换为有效数字`,
+          category: category as any,
+          actualValue: value,
+          expectedType: 'number',
+        };
+        this.errorCollector.addError(error);
+        throw new Error(`${fieldName}字段类型错误（期望数字，实际为字符串 "${trimmedValue}"），无法转换为有效数字`);
+      }
+    }
+
+    // 其他类型都不接受
+    const error: ParseError = {
+      field: fieldName,
+      message: `字段类型错误（期望数字，实际为 ${typeof value}）`,
+      category: category as any,
+      actualValue: value,
+      expectedType: 'number',
+    };
+    this.errorCollector.addError(error);
+    throw new Error(`${fieldName}字段类型错误（期望数字，实际为 ${typeof value}），AI必须提供有效的数字`);
   }
 
   /**
