@@ -1714,7 +1714,7 @@ const executeCharacter = async (character: Character) => {
     // 从世界书中删除人物条目和剧情记录
     try {
       await WorldbookService.deleteCharacterEntry(character.id);
-      await WorldbookService.deleteCharacterStoryHistoryEntry(character.id);
+      await WorldbookService.deleteCharacterStoryHistoryEntry(character.name);
       console.log(`已从世界书中删除人物 ${character.name} 及其剧情记录`);
     } catch (error) {
       console.error('删除世界书条目失败:', error);
