@@ -17,7 +17,7 @@
           <span class="icon">🔍</span>
           <span>{{ isGenerating ? '侦察中...' : '派出侦察队' }}</span>
         </button>
-        <button class="custom-continent-button" @click="showCustomContinentModal = true">
+        <button class="custom-continent-button" @click="handleCustomContinentClick">
           <span class="icon">🌍</span>
           <span>自定义大陆</span>
         </button>
@@ -432,6 +432,13 @@ const handleScoutingModalRetry = async () => {
 
 const handleScoutingModalClose = async () => {
   showScoutingModal.value = false;
+};
+
+// 自定义大陆按钮点击处理（暂时显示开发中提示）
+const handleCustomContinentClick = () => {
+  toastService.info('自定义大陆功能开发中，敬请期待...', { title: '开发中', duration: 3000 });
+  // 暂时注释掉弹窗打开
+  // showCustomContinentModal.value = true;
 };
 
 const handleScoutingModalCancel = async (location: Location, cost: { gold: number; food: number }) => {

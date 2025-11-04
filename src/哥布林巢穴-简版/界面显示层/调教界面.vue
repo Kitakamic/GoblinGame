@@ -69,6 +69,30 @@
             </div>
           </div>
           <button class="close-wheel-btn" @click="closeCharacterMenu">×</button>
+          <!-- 调教开关按钮 - 位于关闭按钮下方 -->
+          <button
+            v-if="selectedCharacter"
+            class="auto-train-toggle-btn"
+            :class="{ enabled: selectedCharacter.autoTrainEnabled !== false }"
+            :title="
+              selectedCharacter.autoTrainEnabled !== false ? '已开启：支持一键调教' : '已关闭：跳过一键调教，需手动操作'
+            "
+            @click.stop="toggleAutoTrain(selectedCharacter)"
+          >
+            <span class="toggle-icon">⚡</span>
+          </button>
+          <!-- 生育开关按钮 - 位于调教开关下方 -->
+          <button
+            v-if="selectedCharacter"
+            class="auto-breed-toggle-btn"
+            :class="{ enabled: selectedCharacter.autoBreedEnabled !== false }"
+            :title="
+              selectedCharacter.autoBreedEnabled !== false ? '已开启：支持一键生育' : '已关闭：跳过一键生育，需手动操作'
+            "
+            @click.stop="toggleAutoBreed(selectedCharacter)"
+          >
+            <span class="toggle-icon">🤱</span>
+          </button>
         </div>
 
         <!-- 轮盘按钮 -->
@@ -2048,8 +2072,10 @@ const batchTraining = async () => {
     return;
   }
 
-  // 只对关押中且未堕落的人物进行批量调教
-  const imprisonedCharacters = characters.value.filter(c => c.status === 'imprisoned' && c.stamina >= 20);
+  // 只对关押中且未堕落的人物进行批量调教，且需要开启一键调教开关
+  const imprisonedCharacters = characters.value.filter(
+    c => c.status === 'imprisoned' && c.stamina >= 20 && c.autoTrainEnabled !== false,
+  );
 
   if (imprisonedCharacters.length === 0) {
     // 返还行动力（没有符合条件的人物）
@@ -2082,9 +2108,9 @@ const batchBreeding = async () => {
     return;
   }
 
-  // 筛选符合生育条件的人物
+  // 筛选符合生育条件的人物，且需要开启一键生育开关
   const eligibleCharacters = characters.value.filter(
-    c => (c.status === 'imprisoned' || c.status === 'surrendered') && c.stamina >= 20,
+    c => (c.status === 'imprisoned' || c.status === 'surrendered') && c.stamina >= 20 && c.autoBreedEnabled !== false,
   );
 
   if (eligibleCharacters.length === 0) {
@@ -2171,6 +2197,76 @@ const batchBreeding = async () => {
 const toggleFavorite = (character: Character) => {
   character.favorite = !character.favorite;
   applyFilters();
+
+  // 保存调教数据
+  saveTrainingData();
+};
+
+// 切换一键调教开关
+const toggleAutoTrain = (character: Character) => {
+  // 如果未定义或为 true，则设置为 false；否则设置为 true
+  character.autoTrainEnabled = character.autoTrainEnabled !== false ? false : true;
+
+  // 更新本地人物数据
+  const index = characters.value.findIndex(c => c.id === character.id);
+  if (index > -1) {
+    characters.value[index].autoTrainEnabled = character.autoTrainEnabled;
+  }
+
+  // 更新选中的字符
+  if (selectedCharacter.value?.id === character.id) {
+    selectedCharacter.value.autoTrainEnabled = character.autoTrainEnabled;
+  }
+
+  // 显示提示
+  const statusText = character.autoTrainEnabled ? '已开启' : '已关闭';
+  const actionText = character.autoTrainEnabled ? '支持一键调教' : '跳过一键调教，需手动操作';
+  if (character.autoTrainEnabled) {
+    toastRef.value?.success(`${character.name} 调教设置 ${statusText}：${actionText}`, {
+      title: '一键调教设置',
+      duration: 1000,
+    });
+  } else {
+    toastRef.value?.warning(`${character.name} 调教设置 ${statusText}：${actionText}`, {
+      title: '一键调教设置',
+      duration: 1000,
+    });
+  }
+
+  // 保存调教数据
+  saveTrainingData();
+};
+
+// 切换一键生育开关
+const toggleAutoBreed = (character: Character) => {
+  // 如果未定义或为 true，则设置为 false；否则设置为 true
+  character.autoBreedEnabled = character.autoBreedEnabled !== false ? false : true;
+
+  // 更新本地人物数据
+  const index = characters.value.findIndex(c => c.id === character.id);
+  if (index > -1) {
+    characters.value[index].autoBreedEnabled = character.autoBreedEnabled;
+  }
+
+  // 更新选中的字符
+  if (selectedCharacter.value?.id === character.id) {
+    selectedCharacter.value.autoBreedEnabled = character.autoBreedEnabled;
+  }
+
+  // 显示提示
+  const statusText = character.autoBreedEnabled ? '已开启' : '已关闭';
+  const actionText = character.autoBreedEnabled ? '支持一键生育' : '跳过一键生育，需手动操作';
+  if (character.autoBreedEnabled) {
+    toastRef.value?.success(`${character.name} 生育设置 ${statusText}：${actionText}`, {
+      title: '一键生育设置',
+      duration: 1000,
+    });
+  } else {
+    toastRef.value?.warning(`${character.name} 生育设置 ${statusText}：${actionText}`, {
+      title: '一键生育设置',
+      duration: 1000,
+    });
+  }
 
   // 保存调教数据
   saveTrainingData();
@@ -3198,7 +3294,7 @@ watch(
     .close-wheel-btn {
       position: absolute;
       bottom: 200px;
-      left: 115%;
+      left: 150%; // 水平位置：调整此值来改变三个按钮的水平位置（向右增大数值，向左减小数值）
       transform: translateX(-50%);
       width: 28px;
       height: 28px;
@@ -3217,6 +3313,367 @@ watch(
       &:hover {
         background: rgba(220, 38, 38, 1);
         transform: translateX(-50%) scale(1.1);
+      }
+    }
+
+    // 调教开关按钮 - 位于关闭按钮左侧（横向排列）
+    .auto-train-toggle-btn {
+      position: absolute;
+      bottom: 200px; // 与关闭按钮同一水平线
+      left: calc(150% - 36px); // 关闭按钮左侧，间距36px（按钮宽度28px + 间距8px）
+      transform: translateX(-50%);
+      width: 28px;
+      height: 28px;
+      border: 2px solid rgba(205, 133, 63, 0.6);
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));
+      color: #ffe9d2;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      z-index: 15;
+
+      &.enabled {
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(56, 142, 60, 0.95));
+        border-color: rgba(76, 175, 80, 0.8);
+
+        .toggle-icon {
+          color: #fff;
+        }
+      }
+
+      &:not(.enabled) {
+        background: linear-gradient(135deg, rgba(158, 158, 158, 0.7), rgba(97, 97, 97, 0.8));
+        border-color: rgba(158, 158, 158, 0.6);
+        opacity: 0.6;
+
+        .toggle-icon {
+          color: #fff;
+        }
+      }
+
+      &:hover {
+        transform: translateX(-50%) scale(1.15);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+
+      &:active {
+        transform: translateX(-50%) scale(1.05);
+      }
+
+      .toggle-icon {
+        font-size: 14px;
+        line-height: 1;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+      }
+    }
+
+    // 生育开关按钮 - 位于调教开关左侧（横向排列）
+    .auto-breed-toggle-btn {
+      position: absolute;
+      bottom: 200px; // 与关闭按钮同一水平线
+      left: calc(150% - 72px); // 调教开关左侧，间距36px（按钮宽度28px + 间距8px）
+      transform: translateX(-50%);
+      width: 28px;
+      height: 28px;
+      border: 2px solid rgba(205, 133, 63, 0.6);
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));
+      color: #ffe9d2;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      z-index: 15;
+
+      &.enabled {
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(56, 142, 60, 0.95));
+        border-color: rgba(76, 175, 80, 0.8);
+
+        .toggle-icon {
+          color: #fff;
+        }
+      }
+
+      &:not(.enabled) {
+        background: linear-gradient(135deg, rgba(158, 158, 158, 0.7), rgba(97, 97, 97, 0.8));
+        border-color: rgba(158, 158, 158, 0.6);
+        opacity: 0.6;
+
+        .toggle-icon {
+          color: #fff;
+        }
+      }
+
+      &:hover {
+        transform: translateX(-50%) scale(1.15);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+
+      &:active {
+        transform: translateX(-50%) scale(1.05);
+      }
+
+      .toggle-icon {
+        font-size: 14px;
+        line-height: 1;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+      }
+    }
+  }
+
+  .wheel-buttons {
+    position: relative;
+    width: 100%;
+    height: 100%;
+
+    .wheel-btn {
+      position: absolute;
+      width: 80px;
+      height: 80px;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      z-index: 5;
+
+      &:hover:not(:disabled) {
+        transform: scale(1.15);
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+      }
+
+      &:active:not(:disabled) {
+        transform: scale(1.05);
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn-icon {
+        font-size: 20px;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+      }
+
+      // 按钮位置 - 均匀圆形分布（5个按钮围绕中心，半径100px，避免被中心头像遮挡）
+      &.btn-0 {
+        // 0度 - 正上方
+        top: calc(50% - 155px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #4a90e2, #357abd);
+        border: 2px solid rgba(74, 144, 226, 0.6);
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(135deg, #5ba0f2, #4a90e2);
+          border-color: rgba(74, 144, 226, 0.8);
+          transform: translateX(-50%) scale(1.15);
+        }
+
+        &:active:not(:disabled) {
+          transform: translateX(-50%) scale(1.05);
+        }
+      }
+
+      &.btn-1 {
+        // 72度 - 右上（换装按钮）
+        top: calc(50% - 90px);
+        right: calc(50% - 145px);
+        background: linear-gradient(135deg, #e91e63, #c2185b);
+        border: 2px solid rgba(233, 30, 99, 0.6);
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(135deg, #f06292, #e91e63);
+          border-color: rgba(233, 30, 99, 0.8);
+        }
+      }
+
+      &.btn-2 {
+        // 144度 - 右下
+        bottom: calc(50% - 120px);
+        right: calc(50% - 120px);
+        background: linear-gradient(135deg, #6d2c2c, #4a1f1f);
+        border: 2px solid rgba(255, 80, 80, 0.6);
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(135deg, #7d3c3c, #6d2c2c);
+          border-color: rgba(255, 80, 80, 0.8);
+        }
+      }
+
+      &.btn-3 {
+        // 216度 - 左下
+        bottom: calc(50% - 120px);
+        left: calc(50% - 120px);
+        background: linear-gradient(135deg, #e91e63, #c2185b);
+        border: 2px solid rgba(233, 30, 99, 0.6);
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(135deg, #f06292, #e91e63);
+          border-color: rgba(233, 30, 99, 0.8);
+        }
+      }
+
+      &.btn-4 {
+        // 288度 - 左上（手动调教按钮）
+        top: calc(50% - 90px);
+        left: calc(50% - 145px);
+        background: linear-gradient(135deg, #8a3c2c, #65261c);
+        border: 2px solid rgba(255, 120, 60, 0.6);
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(135deg, #9a4c3c, #8a3c2c);
+          border-color: rgba(255, 120, 60, 0.8);
+        }
+      }
+
+      &.btn-5 {
+        // 360度 - 正下方（堕落按钮）
+        bottom: calc(50% - 155px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: linear-gradient(135deg, #ff6b35, #e55a2b);
+        border: 2px solid rgba(255, 107, 53, 0.6);
+        animation: corruptionPulse 2s ease-in-out infinite;
+
+        &:hover:not(:disabled) {
+          background: linear-gradient(135deg, #ff7b45, #ff6b35);
+          border-color: rgba(255, 107, 53, 0.8);
+          transform: translateX(-50%) scale(1.15);
+          animation: none;
+        }
+
+        &:active:not(:disabled) {
+          transform: translateX(-50%) scale(1.05);
+        }
+      }
+    }
+
+    // 调教开关按钮 - 位于调教按钮（btn-4）下方
+    .auto-train-toggle-btn {
+      position: absolute;
+      top: calc(50% - 90px + 95px); // btn-4 的 top + 按钮高度 + 间距
+      left: calc(50% - 145px + 40px); // btn-4 的 left + 按钮宽度的一半 - 开关按钮宽度的一半
+      transform: translateX(-50%);
+      width: 36px;
+      height: 36px;
+      border: 2px solid rgba(205, 133, 63, 0.6);
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));
+      color: #ffe9d2;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      z-index: 15;
+
+      &.enabled {
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(56, 142, 60, 0.95));
+        border-color: rgba(76, 175, 80, 0.8);
+
+        .toggle-icon {
+          color: #fff;
+          font-weight: bold;
+        }
+      }
+
+      &:not(.enabled) {
+        background: linear-gradient(135deg, rgba(158, 158, 158, 0.7), rgba(97, 97, 97, 0.8));
+        border-color: rgba(158, 158, 158, 0.6);
+
+        .toggle-icon {
+          color: #fff;
+          font-weight: bold;
+        }
+      }
+
+      &:hover {
+        transform: translateX(-50%) scale(1.15);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+
+      &:active {
+        transform: translateX(-50%) scale(1.05);
+      }
+
+      .toggle-icon {
+        font-size: 18px;
+        line-height: 1;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+      }
+    }
+
+    // 生育开关按钮 - 位于交配按钮（btn-3）下方
+    .auto-breed-toggle-btn {
+      position: absolute;
+      bottom: calc(50% - 120px - 95px); // btn-3 的 bottom - 按钮高度 - 间距
+      left: calc(50% - 120px + 40px); // btn-3 的 left + 按钮宽度的一半 - 开关按钮宽度的一半
+      transform: translateX(-50%);
+      width: 36px;
+      height: 36px;
+      border: 2px solid rgba(205, 133, 63, 0.6);
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(40, 26, 20, 0.95), rgba(25, 17, 14, 0.98));
+      color: #ffe9d2;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      z-index: 15;
+
+      &.enabled {
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(56, 142, 60, 0.95));
+        border-color: rgba(76, 175, 80, 0.8);
+
+        .toggle-icon {
+          color: #fff;
+          font-weight: bold;
+        }
+      }
+
+      &:not(.enabled) {
+        background: linear-gradient(135deg, rgba(158, 158, 158, 0.7), rgba(97, 97, 97, 0.8));
+        border-color: rgba(158, 158, 158, 0.6);
+
+        .toggle-icon {
+          color: #fff;
+          font-weight: bold;
+        }
+      }
+
+      &:hover {
+        transform: translateX(-50%) scale(1.15);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      }
+
+      &:active {
+        transform: translateX(-50%) scale(1.05);
+      }
+
+      .toggle-icon {
+        font-size: 18px;
+        line-height: 1;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
       }
     }
   }

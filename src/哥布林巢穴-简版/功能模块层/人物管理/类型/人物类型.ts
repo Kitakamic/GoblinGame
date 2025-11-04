@@ -216,6 +216,10 @@ export interface Character {
   rating: CharacterRating;
   /** 是否收藏 */
   favorite?: boolean;
+  /** 是否支持一键调教（默认为 true，关闭时跳过批量调教） */
+  autoTrainEnabled?: boolean;
+  /** 是否支持一键生育（默认为 true，关闭时跳过批量生育） */
+  autoBreedEnabled?: boolean;
 
   // ========== 战斗属性 ==========
   /** 等级（决定可下辖哥布林数量） */
