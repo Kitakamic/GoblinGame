@@ -569,9 +569,15 @@ const handleAIGenerate = async () => {
       aiGenerateDifficulty.value,
     );
 
+    // 读取流式传输设置
+    const globalVars = getVariables({ type: 'global' });
+    const enableStreamOutput =
+      typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
     // 调用AI生成
     const aiResponse = await generateWithChainOfThought(ChainOfThoughtMode.LOCATION_GENERATION, {
       user_input: prompt,
+      should_stream: enableStreamOutput, // 根据设置启用流式传输
     });
 
     if (!aiResponse) {

@@ -53,8 +53,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -131,8 +137,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -199,8 +211,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -267,8 +285,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -335,8 +359,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -403,8 +433,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -475,8 +511,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -547,8 +589,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -618,8 +666,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -689,8 +743,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -755,8 +815,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {
@@ -821,8 +887,14 @@ export const roundStartEvents: RandomEvent[] = [
 `;
 
         try {
+          // 读取流式传输设置
+          const globalVars = getVariables({ type: 'global' });
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           const response = await generateWithChainOfThought(ChainOfThoughtMode.RANDOM_EVENT, {
             user_input: prompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
           return response;
         } catch (error) {

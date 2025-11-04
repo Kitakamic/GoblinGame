@@ -340,9 +340,15 @@ export class AILocationGenerationService {
 
       finalPrompt += customInstruction || '';
 
+      // 读取流式传输设置
+      const globalVars = getVariables({ type: 'global' });
+      const enableStreamOutput =
+        typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
       // 使用带思维链的AI生成（自动切换到据点生成思维链）
       const aiResponse = await generateWithChainOfThought(ChainOfThoughtMode.LOCATION_GENERATION, {
         user_input: finalPrompt,
+        should_stream: enableStreamOutput, // 根据设置启用流式传输
       });
 
       if (!aiResponse) {

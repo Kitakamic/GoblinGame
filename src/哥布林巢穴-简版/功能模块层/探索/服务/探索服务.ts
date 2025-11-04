@@ -279,9 +279,14 @@ export class ExploreService {
 
           console.log('AI英雄生成提示词:', heroPrompt);
 
+          // 读取流式传输设置
+          const enableStreamOutput =
+            typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
           // 使用带思维链的AI生成（人物生成模式）
           const aiResponse = await generateWithChainOfThought(ChainOfThoughtMode.CHARACTER_GENERATION, {
             user_input: heroPrompt,
+            should_stream: enableStreamOutput, // 根据设置启用流式传输
           });
 
           if (!aiResponse) {

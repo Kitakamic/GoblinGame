@@ -119,8 +119,13 @@ export class MessageService {
 
       let response = '';
 
-      // 如果启用流式传输
-      if (enableStream && onStreamUpdate) {
+      // 读取全局流式传输设置
+      const globalVars = getVariables({ type: 'global' });
+      const globalEnableStream =
+        typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
+      // 如果启用流式传输（需要同时满足调用者要求和全局设置）
+      if (enableStream && onStreamUpdate && globalEnableStream) {
         console.log('🌊 启用流式传输');
 
         // 监听流式传输事件

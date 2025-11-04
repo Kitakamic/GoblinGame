@@ -349,10 +349,15 @@ ${basePrompt}`;
 
       console.log(`🤖 发送AI请求: 总结${entryName}...`);
 
+      // 读取流式传输设置
+      const globalVars = getVariables({ type: 'global' });
+      const enableStreamOutput =
+        typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
       // 直接调用AI生成总结，不创建消息
       const aiResponse = await window.TavernHelper.generate({
         user_input: prompt,
-        should_stream: false, // 禁用流式传输
+        should_stream: enableStreamOutput, // 根据设置启用流式传输
       });
 
       // 检查AI回复是否为空或无效

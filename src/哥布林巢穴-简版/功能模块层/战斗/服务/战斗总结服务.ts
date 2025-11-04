@@ -52,9 +52,15 @@ export class BattleSummaryService {
       // 构建战斗总结提示词
       const prompt = this.buildBattleSummaryPrompt(battleData);
 
+      // 读取流式传输设置
+      const globalVars = getVariables({ type: 'global' });
+      const enableStreamOutput =
+        typeof globalVars['enable_stream_output'] === 'boolean' ? globalVars['enable_stream_output'] : false; // 默认关闭
+
       // 使用带思维链的AI生成（自动切换到战斗总结思维链）
       const response = await generateWithChainOfThought(ChainOfThoughtMode.BATTLE_SUMMARY, {
         user_input: prompt,
+        should_stream: enableStreamOutput, // 根据设置启用流式传输
       });
 
       // 应用酒馆正则处理AI回复
