@@ -294,11 +294,6 @@ onMounted(async () => {
   // 启用自动保存
   enableAutoSave();
 
-  // 清理定时器和事件监听器
-  onUnmounted(() => {
-    disableAutoSave();
-  });
-
   // 检查是否有保存的游戏
   if (modularSaveManager.getCurrentGameData() !== null) {
     console.log('检测到保存的游戏数据');
@@ -310,6 +305,10 @@ onMounted(async () => {
   if (checkAndShowWelcome()) {
     showWelcomeModal.value = true;
   }
+});
+
+onUnmounted(() => {
+  disableAutoSave();
 });
 </script>
 
