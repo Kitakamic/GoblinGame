@@ -78,21 +78,35 @@ export class ContinentDataMerger {
         break;
     }
 
-    // 4. 如果有存档数据，优先使用存档数据中的游戏进度
+    // 4. 先标记为合并后的数据（但保留自定义大陆的 source 标记）
+    // 注意：必须在 applySavedProgress 之前标记，以确保后续步骤能正确保留 source
+    const customContinentNames = new Set(markedCustomData.map(c => c.name));
+    console.log(`🔍 [合并数据] 自定义大陆名称集合:`, Array.from(customContinentNames));
+    console.log(
+      `🔍 [合并数据] 合并后的大陆名称:`,
+      mergedContinents.map(c => c.name),
+    );
+    mergedContinents = mergedContinents.map(continent => {
+      // 如果大陆原本是自定义的，保留 custom 标记；否则标记为 merged
+      const isCustom = customContinentNames.has(continent.name);
+      console.log(
+        `🔍 [合并数据] 大陆 "${continent.name}": isCustom=${isCustom}, 将标记为 ${isCustom ? 'custom' : 'merged'}`,
+      );
+      return {
+        ...continent,
+        source: isCustom ? ('custom' as DataSource) : ('merged' as DataSource),
+      };
+    });
+
+    // 5. 如果有存档数据，优先使用存档数据中的游戏进度（此时 source 已被正确标记）
     if (savedData.length > 0) {
       mergedContinents = this.applySavedProgress(mergedContinents, savedData);
     }
 
-    // 5. 如果设置了保留默认数据，确保所有默认数据都被包含
+    // 6. 如果设置了保留默认数据，确保所有默认数据都被包含
     if (preserveDefault) {
       mergedContinents = this.ensureDefaultDataPreserved(mergedContinents, markedDefaultData);
     }
-
-    // 6. 标记为合并后的数据
-    mergedContinents = mergedContinents.map(continent => ({
-      ...continent,
-      source: 'merged' as DataSource,
-    }));
 
     return mergedContinents;
   }
@@ -267,9 +281,16 @@ export class ContinentDataMerger {
     return mergedData.map(continent => {
       const saved = savedMap.get(continent.name);
       if (saved) {
-        // 保留合并后的数据结构和自定义字段，但更新游戏进度
+        // 保留合并后的数据结构和自定义字段（包括 source 标记），但更新游戏进度
+        // 优先使用合并后的 source（因为它已经在步骤 6 被正确标记），如果没有则使用存档中的
+        const preservedSource = continent.source || saved.source;
+        console.log(
+          `🔍 [应用存档进度] 大陆 "${continent.name}": 保留 source=${preservedSource}, 存档中的 source=${saved.source}`,
+        );
         return {
           ...continent,
+          // 保留 source 标记（优先使用合并后的）
+          source: preservedSource,
           // 更新游戏状态
           isUnlocked: saved.isUnlocked,
           isConquered: saved.isConquered,
@@ -280,6 +301,8 @@ export class ContinentDataMerger {
             if (savedRegion) {
               return {
                 ...region,
+                // 保留 source 标记（如果存在）
+                source: region.source || savedRegion.source,
                 isUnlocked: savedRegion.isUnlocked,
                 isConquered: savedRegion.isConquered,
                 conquestProgress: savedRegion.conquestProgress,
@@ -383,10 +406,13 @@ export class ContinentDataMerger {
    */
   static validateAndFixContinent(continent: Continent): Continent | null {
     try {
+      // 先确定大陆名称（用于后续处理区域）
+      const continentName = continent.name || '未命名大陆';
+
       // 基本字段修复
       const fixed: Continent = {
         ...continent,
-        name: continent.name || '未命名大陆',
+        name: continentName,
         description: continent.description || '没有描述',
         difficulty: Math.max(1, Math.min(10, continent.difficulty || 1)),
         icon: continent.icon || '🌍',
@@ -404,7 +430,7 @@ export class ContinentDataMerger {
         conquestProgress: Math.max(0, Math.min(100, continent.conquestProgress || 0)),
         regions: Array.isArray(continent.regions)
           ? (continent.regions
-              .map(region => this.validateAndFixRegion(region, fixed.name))
+              .map(region => this.validateAndFixRegion(region, continentName))
               .filter(r => r !== null) as Region[])
           : [],
       };

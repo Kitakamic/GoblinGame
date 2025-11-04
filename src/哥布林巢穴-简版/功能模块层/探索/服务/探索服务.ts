@@ -655,10 +655,14 @@ export class ExploreService {
   // 保存探索数据
   public async saveExploreData(): Promise<void> {
     try {
-      // 使用模块化存档管理器保存探索数据
+      // 获取当前 exploration 模块的完整数据，保留其他字段（如 customContinents）
+      const currentData = (modularSaveManager.getModuleData({ moduleName: 'exploration' }) || {}) as any;
+
+      // 使用模块化存档管理器保存探索数据（保留其他字段）
       modularSaveManager.updateModuleData({
         moduleName: 'exploration',
         data: {
+          ...currentData, // 保留现有数据（包括 customContinents 等）
           locations: this.locations.value,
           state: this.state.value,
           scoutingLocations: [...this.scoutingLocations],

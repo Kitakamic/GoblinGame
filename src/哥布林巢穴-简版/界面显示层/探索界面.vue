@@ -434,11 +434,10 @@ const handleScoutingModalClose = async () => {
   showScoutingModal.value = false;
 };
 
-// 自定义大陆按钮点击处理（暂时显示开发中提示）
+// 自定义大陆按钮点击处理
 const handleCustomContinentClick = () => {
   toastService.info('自定义大陆功能开发中，敬请期待...', { title: '开发中', duration: 3000 });
-  // 暂时注释掉弹窗打开
-  // showCustomContinentModal.value = true;
+  // showCustomContinentModal.value = true; // 暂时禁用
 };
 
 const handleScoutingModalCancel = async (location: Location, cost: { gold: number; food: number }) => {

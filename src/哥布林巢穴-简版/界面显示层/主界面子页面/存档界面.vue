@@ -213,9 +213,6 @@ const saveToSlot = async (slot: number) => {
       modularSaveManager.updateBaseResources(props.currentResources);
     }
 
-    // 巢穴数据现在由数据库系统处理，不需要单独的模块更新
-    // 建筑槽位和历史记录数据现在由数据库系统管理
-
     // 保存到槽位
     const success = await modularSaveManager.saveCurrentGameData(slot, `存档 ${slot}`);
 

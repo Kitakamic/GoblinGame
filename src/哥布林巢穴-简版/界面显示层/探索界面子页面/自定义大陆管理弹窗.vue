@@ -286,6 +286,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { continentExploreService } from '../../功能模块层/探索/服务/大陆探索服务';
+import { ContinentDataMerger } from '../../功能模块层/探索/服务/大陆数据合并服务';
 import type { Continent } from '../../功能模块层/探索/类型/大陆探索类型';
 import { generateWithChainOfThought } from '../../核心层/服务/世界书管理/工具/AI生成助手';
 import { ChainOfThoughtMode } from '../../核心层/服务/世界书管理/工具/思维链管理器';
@@ -431,6 +432,10 @@ ${customPrompt ? `# 自定义要求：\n${customPrompt}\n` : ''}
 // 解析AI生成的JSON
 const parseAIGeneratedContinent = (aiResponse: string): Continent | null => {
   try {
+    console.log('📋 [AI生成] 开始解析AI响应...');
+    console.log('📋 [AI生成] 原始响应长度:', aiResponse.length);
+    console.log('📋 [AI生成] 原始响应预览:', aiResponse.substring(0, 200));
+
     // 尝试提取JSON代码块
     const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/);
     let jsonStr = jsonMatch ? jsonMatch[1] : aiResponse;
@@ -442,16 +447,37 @@ const parseAIGeneratedContinent = (aiResponse: string): Continent | null => {
 
     // 清理字符串，移除可能的转义字符
     jsonStr = jsonStr.trim();
+    console.log('📋 [AI生成] 提取的JSON字符串长度:', jsonStr.length);
+    console.log('📋 [AI生成] 提取的JSON字符串预览:', jsonStr.substring(0, 200));
 
     // 解析JSON
-    const data = JSON.parse(jsonStr);
+    let data: any;
+    try {
+      data = JSON.parse(jsonStr);
+      console.log('📋 [AI生成] JSON解析成功');
+    } catch (parseError) {
+      console.error('📋 [AI生成] JSON解析失败:', parseError);
+      console.error('📋 [AI生成] 问题JSON字符串:', jsonStr);
+      throw new Error(`JSON解析失败: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+    }
 
     // 验证必要字段
+    console.log('📋 [AI生成] 验证必要字段...');
+    console.log('📋 [AI生成] name:', data.name);
+    console.log('📋 [AI生成] icon:', data.icon);
+    console.log('📋 [AI生成] description:', data.description?.substring(0, 50) || '(空)');
+    console.log('📋 [AI生成] difficulty:', data.difficulty);
+    console.log('📋 [AI生成] regions数量:', data.regions?.length || 0);
+
     if (!data.name || !data.icon) {
+      console.error('📋 [AI生成] ❌ 缺少必要字段');
+      console.error('📋 [AI生成] name存在:', !!data.name, '值:', data.name);
+      console.error('📋 [AI生成] icon存在:', !!data.icon, '值:', data.icon);
       throw new Error('缺少必要字段：name 或 icon');
     }
 
     // 构建完整的Continent对象
+    console.log('📋 [AI生成] 构建Continent对象...');
     const continent: Continent = {
       name: data.name,
       icon: data.icon,
@@ -472,32 +498,48 @@ const parseAIGeneratedContinent = (aiResponse: string): Continent | null => {
       isUnlocked: false,
       isConquered: false,
       conquestProgress: 0,
-      regions: (data.regions || []).map((r: any) => ({
-        name: r.name || '未命名区域',
-        continentName: data.name, // 确保设置正确的大陆名称
-        description: r.description || '',
-        difficulty: r.difficulty || 1,
-        icon: r.icon || '🏘️',
-        isUnlocked: false,
-        isConquered: false,
-        conquestProgress: 0,
-        requiredStars: r.requiredStars || 0,
-        unlockStars: r.unlockStars || 0,
-        capital: r.capital || '',
-        isCapitalConquered: false,
-        threatLevel: 0,
-        locations: [], // 确保 locations 是数组
-      })),
+      regions: (data.regions || []).map((r: any, index: number) => {
+        console.log(`📋 [AI生成] 处理区域 ${index + 1}/${data.regions.length}:`, r.name || '未命名');
+        console.log(`  - name: ${r.name || '(空)'}`);
+        console.log(`  - description: ${r.description?.substring(0, 30) || '(空)'}`);
+        console.log(`  - difficulty: ${r.difficulty || '(空)'}`);
+        console.log(`  - icon: ${r.icon || '(空)'}`);
+        console.log(`  - unlockStars: ${r.unlockStars}`);
+        console.log(`  - requiredStars: ${r.requiredStars}`);
+        console.log(`  - capital: ${r.capital || '(空)'}`);
+
+        return {
+          name: r.name || '未命名区域',
+          continentName: data.name, // 确保设置正确的大陆名称
+          description: r.description || '',
+          difficulty: r.difficulty || 1,
+          icon: r.icon || '🏘️',
+          isUnlocked: false,
+          isConquered: false,
+          conquestProgress: 0,
+          requiredStars: r.requiredStars || 0,
+          unlockStars: r.unlockStars || 0,
+          capital: r.capital || '',
+          isCapitalConquered: false,
+          threatLevel: 0,
+          locations: [], // 确保 locations 是数组
+        };
+      }),
       source: 'custom',
       metadata: {
         createdAt: Date.now(),
       },
     };
 
+    console.log('📋 [AI生成] ✅ Continent对象构建完成');
+    console.log('📋 [AI生成] 大陆名称:', continent.name);
+    console.log('📋 [AI生成] 区域数量:', continent.regions.length);
+    console.log('📋 [AI生成] 完整Continent对象:', JSON.stringify(continent, null, 2));
+
     return continent;
   } catch (error) {
-    console.error('解析AI生成的大陆数据失败:', error);
-    console.error('原始响应:', aiResponse);
+    console.error('📋 [AI生成] ❌ 解析AI生成的大陆数据失败:', error);
+    console.error('📋 [AI生成] 原始响应:', aiResponse);
     throw new Error(`解析失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 };
@@ -537,38 +579,140 @@ const handleAIGenerate = async () => {
     }
 
     // 解析生成的数据
+    console.log('🔍 [AI生成] 开始解析AI响应数据...');
     const continent = parseAIGeneratedContinent(aiResponse);
 
     if (!continent) {
+      console.error('🔍 [AI生成] ❌ 解析生成数据失败，返回null');
       throw new Error('解析生成数据失败');
     }
 
+    console.log('🔍 [AI生成] ✅ 解析完成，开始验证数据...');
+
+    // 手动验证数据，获取详细的验证错误信息
+    console.log('🔍 [AI生成] 开始手动验证大陆数据...');
+    console.log('🔍 [AI生成] 验证前数据:', JSON.stringify(continent, null, 2));
+
+    // 先验证大陆基本信息
+    if (!continent.name) {
+      console.error('🔍 [AI生成] ❌ 验证失败：大陆名称为空');
+      throw new Error('验证失败：大陆名称为空');
+    }
+    if (!continent.description) {
+      console.error('🔍 [AI生成] ❌ 验证失败：大陆描述为空');
+      throw new Error('验证失败：大陆描述为空');
+    }
+    if (continent.difficulty < 1 || continent.difficulty > 10) {
+      console.error('🔍 [AI生成] ❌ 验证失败：大陆难度超出范围', continent.difficulty);
+      throw new Error(`验证失败：大陆难度 ${continent.difficulty} 必须在 1-10 之间`);
+    }
+    if (!continent.explorationCost || typeof continent.explorationCost.gold !== 'number') {
+      console.error('🔍 [AI生成] ❌ 验证失败：探索成本格式错误', continent.explorationCost);
+      throw new Error('验证失败：探索成本格式错误');
+    }
+    if (continent.explorationCost.gold < 0 || continent.explorationCost.food < 0) {
+      console.error('🔍 [AI生成] ❌ 验证失败：探索成本为负数', continent.explorationCost);
+      throw new Error('验证失败：探索成本不能为负数');
+    }
+    if (!Array.isArray(continent.regions)) {
+      console.error('🔍 [AI生成] ❌ 验证失败：regions 不是数组', continent.regions);
+      throw new Error('验证失败：regions 必须是数组');
+    }
+
+    console.log('🔍 [AI生成] ✅ 大陆基本信息验证通过');
+    console.log('🔍 [AI生成] 区域数量:', continent.regions.length);
+
+    // 验证每个区域
+    for (let i = 0; i < continent.regions.length; i++) {
+      const region = continent.regions[i];
+      console.log(`🔍 [AI生成] 验证区域 ${i + 1}/${continent.regions.length}: "${region.name}"`);
+
+      if (!region.name) {
+        console.error(`🔍 [AI生成] ❌ 区域 ${i + 1} 验证失败：名称为空`, region);
+        throw new Error(`验证失败：区域 ${i + 1} 名称为空`);
+      }
+      if (!region.description) {
+        console.error(`🔍 [AI生成] ❌ 区域 ${i + 1} "${region.name}" 验证失败：描述为空`, region);
+        throw new Error(`验证失败：区域 "${region.name}" 描述为空`);
+      }
+      if (region.continentName !== continent.name) {
+        console.error(
+          `🔍 [AI生成] ❌ 区域 ${i + 1} "${region.name}" 验证失败：大陆名称不匹配`,
+          `期望: "${continent.name}", 实际: "${region.continentName}"`,
+        );
+        throw new Error(
+          `验证失败：区域 "${region.name}" 的大陆名称不匹配（期望: "${continent.name}", 实际: "${region.continentName}"）`,
+        );
+      }
+      if (region.difficulty < 1 || region.difficulty > 10) {
+        console.error(`🔍 [AI生成] ❌ 区域 ${i + 1} "${region.name}" 验证失败：难度超出范围`, region.difficulty);
+        throw new Error(`验证失败：区域 "${region.name}" 难度 ${region.difficulty} 必须在 1-10 之间`);
+      }
+      if (region.requiredStars < 0 || region.unlockStars < 0) {
+        console.error(`🔍 [AI生成] ❌ 区域 ${i + 1} "${region.name}" 验证失败：星级为负数`, region);
+        throw new Error(`验证失败：区域 "${region.name}" 星级不能为负数`);
+      }
+      if (!Array.isArray(region.locations)) {
+        console.error(`🔍 [AI生成] ❌ 区域 ${i + 1} "${region.name}" 验证失败：locations 不是数组`, region);
+        throw new Error(`验证失败：区域 "${region.name}" locations 必须是数组`);
+      }
+
+      console.log(`🔍 [AI生成] ✅ 区域 ${i + 1} "${region.name}" 验证通过`);
+    }
+
+    console.log('🔍 [AI生成] ✅ 所有区域验证通过');
+
+    // 使用验证服务进行最终验证
+    console.log('🔍 [AI生成] 调用 ContinentDataMerger.validateContinent 进行最终验证...');
+    const isValid = ContinentDataMerger.validateContinent(continent);
+    if (!isValid) {
+      console.error('🔍 [AI生成] ❌ ContinentDataMerger 验证失败');
+      throw new Error('数据验证失败：请查看控制台获取详细信息');
+    }
+    console.log('🔍 [AI生成] ✅ ContinentDataMerger 验证通过');
+
+    // 使用验证并修复服务
+    console.log('🔍 [AI生成] 调用 ContinentDataMerger.validateAndFixContinent 进行修复和验证...');
+    const validatedContinent = ContinentDataMerger.validateAndFixContinent(continent);
+    if (!validatedContinent) {
+      console.error('🔍 [AI生成] ❌ validateAndFixContinent 返回 null，验证失败');
+      throw new Error('数据验证和修复失败：请查看控制台获取详细信息');
+    }
+    console.log('🔍 [AI生成] ✅ validateAndFixContinent 验证通过');
+    console.log('🔍 [AI生成] 修复后的数据:', JSON.stringify(validatedContinent, null, 2));
+
     // 检查是否已存在同名大陆
-    const existingContinent = continentExploreService.getAllContinents().find(c => c.name === continent.name);
+    const existingContinent = continentExploreService.getAllContinents().find(c => c.name === validatedContinent.name);
     if (existingContinent) {
+      console.log('🔍 [AI生成] ⚠️ 检测到同名大陆:', existingContinent.name);
       const confirmed = await ConfirmService.showWarning(
-        `已存在名为"${continent.name}"的大陆`,
+        `已存在名为"${validatedContinent.name}"的大陆`,
         '重复名称',
         '是否覆盖现有大陆？',
       );
       if (!confirmed) {
+        console.log('🔍 [AI生成] 用户取消覆盖');
         return;
       }
       // 如果是自定义大陆，先删除
       if (existingContinent.source === 'custom') {
-        continentExploreService.removeCustomContinent(continent.name);
+        console.log('🔍 [AI生成] 删除已存在的自定义大陆:', existingContinent.name);
+        await continentExploreService.removeCustomContinent(validatedContinent.name);
       }
     }
 
     // 添加生成的大陆
-    const success = continentExploreService.addCustomContinent(continent);
+    console.log('🔍 [AI生成] 调用 addCustomContinent 添加大陆...');
+    const success = await continentExploreService.addCustomContinent(validatedContinent);
 
     if (success) {
-      toastService.success(`AI已生成大陆 "${continent.name}"`, { title: '生成成功', duration: 3000 });
+      console.log('🔍 [AI生成] ✅ 大陆添加成功:', validatedContinent.name);
+      toastService.success(`AI已生成大陆 "${validatedContinent.name}"`, { title: '生成成功', duration: 3000 });
       loadCustomContinents();
       closeAIGenerateModal();
     } else {
-      throw new Error('添加大陆失败');
+      console.error('🔍 [AI生成] ❌ addCustomContinent 返回 false，添加失败');
+      throw new Error('添加大陆失败：请查看控制台获取详细信息');
     }
   } catch (error) {
     console.error('AI生成大陆失败:', error);
@@ -615,7 +759,7 @@ const handleDeleteContinent = async (continentName: string) => {
   );
 
   if (confirmed) {
-    const success = continentExploreService.removeCustomContinent(continentName);
+    const success = await continentExploreService.removeCustomContinent(continentName);
     if (success) {
       toastService.success(`大陆 "${continentName}" 已删除`, { title: '删除成功', duration: 2000 });
       loadCustomContinents();
@@ -671,8 +815,8 @@ const handleSaveContinent = async () => {
     };
 
     const success = editingContinent.value
-      ? continentExploreService.updateCustomContinent(editingContinent.value.name, continent)
-      : continentExploreService.addCustomContinent(continent);
+      ? await continentExploreService.updateCustomContinent(editingContinent.value.name, continent)
+      : await continentExploreService.addCustomContinent(continent);
 
     if (success) {
       toastService.success(
@@ -816,7 +960,7 @@ const handleFileSelect = async (event: Event) => {
     let failCount = 0;
 
     for (const continent of config.continents) {
-      const success = continentExploreService.addCustomContinent(continent);
+      const success = await continentExploreService.addCustomContinent(continent);
       if (success) {
         successCount++;
       } else {

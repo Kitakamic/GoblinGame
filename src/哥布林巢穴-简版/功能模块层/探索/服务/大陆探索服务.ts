@@ -935,10 +935,18 @@ export class ContinentExploreService {
         const customData = this.loadCustomContinents();
 
         // 加载存档数据（包含游戏进度）
-        const savedData =
+        // 注意：savedData 应该只包含默认大陆的游戏进度，自定义大陆的数据从 customData 加载
+        const allSavedContinents =
           data.continents && Array.isArray(data.continents) && data.continents.length > 0 ? data.continents : [];
 
-        // 合并数据
+        // 从存档数据中过滤掉自定义大陆，只保留默认大陆的游戏进度
+        const savedData = allSavedContinents.filter((c: Continent) => c.source !== 'custom' && c.source !== 'merged');
+
+        console.log(
+          `📋 [加载存档] 存档数据统计: 总大陆=${allSavedContinents.length}, 默认大陆=${savedData.length}, 自定义大陆=${customData.length}`,
+        );
+
+        // 合并数据：默认数据 + 自定义数据 + 存档游戏进度
         const mergedData = ContinentDataMerger.mergeContinents(defaultData, customData, savedData, {
           strategy: 'merge',
           allowOverride: true,
@@ -947,6 +955,49 @@ export class ContinentExploreService {
 
         // 设置合并后的数据
         this.continents.value = mergedData;
+
+        // 恢复自定义大陆的游戏进度（从存档中）
+        if (customData.length > 0 && allSavedContinents.length > 0) {
+          const savedCustomContinents = allSavedContinents.filter((c: Continent) => c.source === 'custom');
+          if (savedCustomContinents.length > 0) {
+            console.log(`📋 [加载存档] 恢复 ${savedCustomContinents.length} 个自定义大陆的游戏进度`);
+            const savedCustomMap = new Map<string, Continent>();
+            savedCustomContinents.forEach((c: Continent) => savedCustomMap.set(c.name, c));
+
+            // 更新自定义大陆的游戏进度
+            this.continents.value = this.continents.value.map(continent => {
+              if (continent.source === 'custom') {
+                const saved = savedCustomMap.get(continent.name);
+                if (saved) {
+                  return {
+                    ...continent,
+                    // 恢复游戏状态
+                    isUnlocked: saved.isUnlocked,
+                    isConquered: saved.isConquered,
+                    conquestProgress: saved.conquestProgress,
+                    // 恢复区域状态
+                    regions: continent.regions.map(region => {
+                      const savedRegion = saved.regions.find(r => r.name === region.name);
+                      if (savedRegion) {
+                        return {
+                          ...region,
+                          isUnlocked: savedRegion.isUnlocked,
+                          isConquered: savedRegion.isConquered,
+                          conquestProgress: savedRegion.conquestProgress,
+                          isCapitalConquered: savedRegion.isCapitalConquered,
+                          threatLevel: savedRegion.threatLevel,
+                          locations: savedRegion.locations,
+                        };
+                      }
+                      return region;
+                    }),
+                  };
+                }
+              }
+              return continent;
+            });
+          }
+        }
 
         // 修复已加载数据的前置关系（兼容旧存档）
         this.fixContinentUnlockConditions();
@@ -1062,11 +1113,16 @@ export class ContinentExploreService {
   // 保存探索数据
   public async saveExploreData(): Promise<void> {
     try {
-      const currentData = modularSaveManager.getModuleData({ moduleName: 'exploration' }) || {};
+      const currentData = (modularSaveManager.getModuleData({ moduleName: 'exploration' }) || {}) as any;
 
       // 数据验证
       const validatedContinents = this.validateContinentsData(this.continents.value);
       const validatedExploreState = this.validateExploreStateData(this.exploreState.value);
+
+      // 获取并保存自定义大陆数据
+      const customContinents = this.getCustomContinents();
+      const customConfigVersion =
+        customContinents.length > 0 ? currentData.customConfigVersion || '1.0.0' : currentData.customConfigVersion;
 
       modularSaveManager.updateModuleData({
         moduleName: 'exploration',
@@ -1074,10 +1130,17 @@ export class ContinentExploreService {
           ...currentData,
           continents: validatedContinents,
           continentExploreState: validatedExploreState,
+          // 保存自定义大陆数据（即使为空数组也要保存，以支持删除操作）
+          customContinents,
+          customConfigVersion,
         },
       });
 
-      console.log('大陆探索数据已保存到数据库');
+      console.log('✅ 大陆探索数据已保存到数据库', {
+        continents: validatedContinents.length,
+        customContinents: customContinents.length,
+        customConfigVersion,
+      });
     } catch (error) {
       console.error('保存大陆探索数据失败:', error);
     }
@@ -1174,7 +1237,17 @@ export class ContinentExploreService {
    * @returns 自定义大陆数组
    */
   public getCustomContinents(): Continent[] {
-    return this.continents.value.filter(c => c.source === 'custom');
+    const custom = this.continents.value.filter(c => c.source === 'custom');
+    console.log(
+      `🔍 [getCustomContinents] 当前大陆总数: ${this.continents.value.length}, 自定义大陆数: ${custom.length}`,
+    );
+    if (custom.length > 0) {
+      console.log(`   📋 自定义大陆列表:`, custom.map(c => `${c.name}(${c.source})`).join(', '));
+    }
+    // 如果 merged 数据中没有找到 custom，尝试从原始数据中获取
+    const allSources = this.continents.value.map(c => ({ name: c.name, source: c.source }));
+    console.log(`   📋 所有大陆的 source:`, allSources);
+    return custom;
   }
 
   /**
@@ -1190,7 +1263,7 @@ export class ContinentExploreService {
    * @param continent 要添加的大陆数据
    * @returns 是否成功添加
    */
-  public addCustomContinent(continent: Continent): boolean {
+  public async addCustomContinent(continent: Continent): Promise<boolean> {
     try {
       // 验证并修复数据
       const validatedContinent = ContinentDataMerger.validateAndFixContinent(continent);
@@ -1255,11 +1328,36 @@ export class ContinentExploreService {
 
         this.continents.value.push(customContinent);
         console.log(`成功添加自定义大陆: ${validatedContinent.name}`);
+        console.log(
+          `🔍 [添加自定义大陆] 添加后验证: continents.value.length=${this.continents.value.length}, 最后一个大陆的 source=${this.continents.value[this.continents.value.length - 1].source}`,
+        );
       }
 
-      // 保存数据
-      this.saveExploreData();
+      // 保存数据到内存
+      // 注意：先保存自定义大陆，再保存探索数据，确保自定义大陆不会被覆盖
+      // 但是 watch 监听器会在 continents.value 变化时自动触发 saveExploreData()
+      // 所以我们需要先禁用 watch，手动保存，然后再启用 watch
+      console.log(
+        `🔍 [添加自定义大陆] 保存前验证: getCustomContinents() 返回`,
+        this.getCustomContinents().length,
+        '个大陆',
+      );
       this.saveCustomContinents();
+      this.saveExploreData();
+
+      // 立即保存到数据库
+      try {
+        await modularSaveManager.saveCurrentGameData(0, '自动存档');
+        console.log('✅ 自定义大陆数据已保存到数据库');
+        console.log(
+          '🔍 [添加自定义大陆] 保存后验证: getCustomContinents() 返回',
+          this.getCustomContinents().length,
+          '个大陆',
+        );
+      } catch (error) {
+        console.error('保存自定义大陆到数据库失败:', error);
+        // 不返回 false，因为内存数据已更新成功
+      }
 
       return true;
     } catch (error) {
@@ -1273,7 +1371,7 @@ export class ContinentExploreService {
    * @param continentName 要移除的大陆名称
    * @returns 是否成功移除
    */
-  public removeCustomContinent(continentName: string): boolean {
+  public async removeCustomContinent(continentName: string): Promise<boolean> {
     try {
       const index = this.continents.value.findIndex(c => c.name === continentName && c.source === 'custom');
 
@@ -1312,9 +1410,19 @@ export class ContinentExploreService {
 
       console.log(`成功移除自定义大陆: ${continentName}`);
 
-      // 保存数据
-      this.saveExploreData();
+      // 保存数据到内存
+      // 注意：先保存自定义大陆，再保存探索数据，确保自定义大陆不会被覆盖
       this.saveCustomContinents();
+      this.saveExploreData();
+
+      // 立即保存到数据库
+      try {
+        await modularSaveManager.saveCurrentGameData(0, '自动存档');
+        console.log('✅ 自定义大陆删除已保存到数据库');
+      } catch (error) {
+        console.error('保存删除操作到数据库失败:', error);
+        // 不返回 false，因为内存数据已更新成功
+      }
 
       return true;
     } catch (error) {
@@ -1329,7 +1437,7 @@ export class ContinentExploreService {
    * @param updates 要更新的字段
    * @returns 是否成功更新
    */
-  public updateCustomContinent(continentName: string, updates: Partial<Continent>): boolean {
+  public async updateCustomContinent(continentName: string, updates: Partial<Continent>): Promise<boolean> {
     try {
       const index = this.continents.value.findIndex(c => c.name === continentName && c.source === 'custom');
 
@@ -1370,9 +1478,19 @@ export class ContinentExploreService {
 
       console.log(`成功更新自定义大陆: ${continentName}`);
 
-      // 保存数据
-      this.saveExploreData();
+      // 保存数据到内存
+      // 注意：先保存自定义大陆，再保存探索数据，确保自定义大陆不会被覆盖
       this.saveCustomContinents();
+      this.saveExploreData();
+
+      // 立即保存到数据库
+      try {
+        await modularSaveManager.saveCurrentGameData(0, '自动存档');
+        console.log('✅ 自定义大陆更新已保存到数据库');
+      } catch (error) {
+        console.error('保存更新操作到数据库失败:', error);
+        // 不返回 false，因为内存数据已更新成功
+      }
 
       return true;
     } catch (error) {
@@ -1387,14 +1505,24 @@ export class ContinentExploreService {
   private loadCustomContinents(): Continent[] {
     try {
       const exploreData = modularSaveManager.getModuleData({ moduleName: 'exploration' });
-      if (exploreData && (exploreData as any).customContinents) {
-        const customContinents = (exploreData as any).customContinents as Continent[];
-        console.log(`加载了 ${customContinents.length} 个自定义大陆`);
-        return customContinents;
+      console.log('🔍 [加载自定义大陆] exploreData:', exploreData ? '存在' : '不存在');
+      if (exploreData) {
+        console.log('🔍 [加载自定义大陆] exploreData.keys:', Object.keys(exploreData));
+        if ((exploreData as any).customContinents) {
+          const customContinents = (exploreData as any).customContinents as Continent[];
+          console.log(`✅ [加载自定义大陆] 加载了 ${customContinents.length} 个自定义大陆`);
+          if (customContinents.length > 0) {
+            console.log(`   📋 自定义大陆列表:`, customContinents.map(c => c.name).join(', '));
+          }
+          return customContinents;
+        } else {
+          console.log('⚠️ [加载自定义大陆] exploreData.customContinents 不存在');
+        }
       }
+      console.log('⚠️ [加载自定义大陆] 未找到自定义大陆数据，返回空数组');
       return [];
     } catch (error) {
-      console.error('加载自定义大陆数据失败:', error);
+      console.error('❌ [加载自定义大陆] 加载自定义大陆数据失败:', error);
       return [];
     }
   }
@@ -1405,18 +1533,22 @@ export class ContinentExploreService {
   private saveCustomContinents(): void {
     try {
       const customContinents = this.getCustomContinents();
-      const currentData = modularSaveManager.getModuleData({ moduleName: 'exploration' }) || {};
+      const currentData = (modularSaveManager.getModuleData({ moduleName: 'exploration' }) || {}) as any;
 
       modularSaveManager.updateModuleData({
         moduleName: 'exploration',
         data: {
           ...currentData,
           customContinents,
-          customConfigVersion: '1.0.0',
+          customConfigVersion: customContinents.length > 0 ? '1.0.0' : currentData.customConfigVersion,
         },
       });
 
-      console.log(`保存了 ${customContinents.length} 个自定义大陆`);
+      console.log(`✅ [保存自定义大陆] 保存了 ${customContinents.length} 个自定义大陆到存档`);
+      if (customContinents.length > 0) {
+        console.log(`   📋 自定义大陆列表:`, customContinents.map(c => c.name).join(', '));
+        console.log(`   💾 保存后的数据:`, JSON.stringify(customContinents, null, 2).substring(0, 500));
+      }
     } catch (error) {
       console.error('保存自定义大陆数据失败:', error);
     }
