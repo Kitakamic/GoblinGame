@@ -264,10 +264,14 @@ export class BattleSummaryService {
       responsePreview: response?.substring(0, 100) || '无内容',
     });
 
-    // 移除可能的JSON标记
-    let summary = response.replace(/\[OPTIONS_JSON\][\s\S]*?\[\/OPTIONS_JSON\]/gi, '').trim();
+    // 先提取content标签包裹的内容
+    const contentMatch = response.match(/<content[^>]*>([\s\S]*?)<\/content>/i);
+    let summary = contentMatch && contentMatch[1] ? contentMatch[1].trim() : response;
 
-    // 移除可能的XML标签
+    // 移除可能的JSON标记
+    summary = summary.replace(/\[OPTIONS_JSON\][\s\S]*?\[\/OPTIONS_JSON\]/gi, '').trim();
+
+    // 移除其他可能的XML标签（但保留content标签内的内容）
     summary = summary.replace(/<[^>]+>/g, '');
 
     console.log('🔧 解析后的战斗总结:', {

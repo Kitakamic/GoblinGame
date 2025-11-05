@@ -52,14 +52,6 @@
         <button class="header-btn edit-btn" title="编辑当前页消息" @click="editCurrentPageMessage()">
           <span class="btn-icon">✏️</span>
         </button>
-        <!-- 删除按钮已隐藏 -->
-        <!-- <button class="header-btn delete-btn" title="删除当前页消息" @click="deleteCurrentPageMessage()">
-          <span class="btn-icon">🗑️</span>
-        </button> -->
-        <!-- 酒馆正则应用按钮已隐藏 -->
-        <!-- <button class="header-btn regex-btn" title="重新应用酒馆正则" @click="reapplyTavernRegex()">
-          <span class="btn-icon">🔧</span>
-        </button> -->
         <button class="header-btn style-btn" title="文字样式设置" @click="showStyleSettings = true">
           <span class="btn-icon">🎨</span>
         </button>
@@ -216,19 +208,6 @@
       @cancel="cancelCloseTraining"
     />
 
-    <!-- 删除消息确认框 -->
-    <CustomConfirm
-      :show="showDeleteConfirm"
-      title="删除消息"
-      message="确定要删除这条消息吗？"
-      details="删除后无法恢复，请谨慎操作。"
-      confirm-text="确定删除"
-      cancel-text="取消"
-      type="danger"
-      @confirm="confirmDeleteMessage"
-      @cancel="cancelDeleteMessage"
-    />
-
     <!-- 自定义弹窗提示 -->
     <ToastContainer ref="toastRef" />
 
@@ -338,7 +317,6 @@ const toastRef = ref<InstanceType<typeof ToastContainer>>();
 
 // 确认框状态
 const showCloseConfirm = ref(false);
-const showDeleteConfirm = ref(false);
 
 // 人物卡显示状态
 const showCharacterDetail = ref(false);
@@ -419,7 +397,9 @@ const nextPage = () => {
 const pushAIPage = (raw: string) => {
   // 先清理AI内容，再进行格式化
   const cleanedContent = cleanAIContent(raw);
-  const html = safeFormatMessage(filterXmlTags(cleanedContent));
+  // 先提取content标签
+  const contentExtracted = extractContentTag(cleanedContent);
+  const html = safeFormatMessage(contentExtracted);
   pages.value.push({ html });
   currentPageIndex.value = pages.value.length - 1;
 };
@@ -599,6 +579,7 @@ const buildUserPrompt = (): string => {
 
 1. ***正文末尾必须按照示例输出 JSON 格式的选项和忠诚度（堕落进度）以及体力值变化，并用 [OPTIONS_JSON] 标签包裹***
 2. 此时女性人物已然被俘，但根据其性格和身份，每个人有着鲜明的态度表现和心理活动，*避免完全的抵抗/顺从/投降心理*
+3. ***剧情正文请使用content的xml标签包裹***
 
 
 示例：
@@ -713,7 +694,9 @@ const loadCharacterTrainingMessages = async () => {
 
           // 处理AI回复内容（清理和格式化）
           const cleanedContent = cleanAIContent(record.content);
-          const formattedContent = safeFormatMessage(filterXmlTags(cleanedContent));
+          // 先提取content标签
+          const contentExtracted = extractContentTag(cleanedContent);
+          const formattedContent = safeFormatMessage(contentExtracted);
           pageHtml += formattedContent;
 
           // 创建页面（直接使用HTML，不再经过 pushAIPage 的处理）
@@ -845,12 +828,18 @@ const generateAndHandleAIReply = async () => {
       // 应用酒馆正则处理
       const formatted = formatAsTavernRegexedString(fullText, 'ai_output', 'display');
 
+      // 提取content标签包裹的内容
+      const contentExtracted = extractContentTag(formatted);
+
+      // 格式化
+      const finalFormatted = safeFormatMessage(contentExtracted);
+
       // 如果有临时页面，更新它；否则创建新页面
       if (currentStreamingPageIndex.value >= 0) {
-        pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formatted);
+        pages.value[currentStreamingPageIndex.value].html = finalFormatted;
       } else {
         currentStreamingPageIndex.value = pages.value.length;
-        pages.value.push({ html: safeFormatMessage(formatted) });
+        pages.value.push({ html: finalFormatted });
         currentPageIndex.value = currentStreamingPageIndex.value;
       }
 
@@ -1039,15 +1028,19 @@ const generateAndHandleAIReply = async () => {
     const cleanedResponse = removeJsonFromResponse(tavernProcessedResponse);
     console.log('🧹 清理后的回复内容:', cleanedResponse);
 
+    // 提取content标签包裹的内容（在最后处理）
+    const contentExtracted = extractContentTag(cleanedResponse);
+    console.log('📦 提取content标签后的内容:', contentExtracted.substring(0, 100) + '...');
+
     // 不再重复应用酒馆正则，因为已经处理过了
-    const formattedResponse = cleanedResponse;
+    const formattedResponse = contentExtracted;
     console.log('🎨 最终显示内容:', formattedResponse);
 
     addAIMessageWithGameTime(formattedResponse, props.character.name);
 
     // 如果流式传输已经创建了页面，就更新它；否则创建新页面
     if (currentStreamingPageIndex.value >= 0 && currentStreamingPageIndex.value < pages.value.length) {
-      // 更新流式传输创建的页面
+      // 更新流式传输创建的页面（已经提取了content标签）
       pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formattedResponse);
       currentPageIndex.value = currentStreamingPageIndex.value;
       lastGeneratedPageIndex.value = currentStreamingPageIndex.value; // 记录创建的页面索引
@@ -1572,95 +1565,16 @@ const editCurrentPageMessage = () => {
   }
 };
 
-// 重新应用酒馆正则到当前页文本
-const reapplyTavernRegex = () => {
-  if (currentPageIndex.value < 0 || currentPageIndex.value >= pages.value.length) {
-    console.warn('当前页索引无效，无法重新应用酒馆正则');
-    return;
-  }
-
-  const currentPage = pages.value[currentPageIndex.value];
-  if (!currentPage || !currentPage.html) {
-    console.warn('当前页内容为空，无法重新应用酒馆正则');
-    return;
-  }
-
-  console.log('🔧 [重新应用酒馆正则] 开始处理当前页文本...');
-
-  // 从HTML中提取纯文本
-  const rawText = extractTextFromHtml(currentPage.html);
-  console.log('📝 [重新应用酒馆正则] 提取的原始文本长度:', rawText.length);
-
-  // 解析页面内容，分离用户选择部分和AI回复部分
-  // 页面结构：可能包含用户选择（choice-line）和AI回复内容
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = currentPage.html;
-
-  // 查找用户选择部分（choice-line）
-  const choiceLine = tempDiv.querySelector('.choice-line');
-  let userChoiceHtml = '';
-  let aiContentText = rawText;
-
-  if (choiceLine) {
-    // 提取用户选择的文本（去掉"→"前缀）
-    const choiceText = choiceLine.textContent?.replace(/^→\s*/, '').trim() || '';
-    userChoiceHtml = `<div class="choice-line"><span class="choice-prefix">→</span> ${safeFormatMessage(choiceText)}</div>`;
-
-    // 从总文本中移除用户选择部分
-    aiContentText = rawText.replace(/^→\s*.*?\n\n?/s, '').trim();
-  }
-
-  // 重新应用酒馆正则在AI回复部分
-  // 注意：safeFormatMessage 内部已经调用了 formatAsTavernRegexedString，所以不需要重复调用
-  // 但是我们需要先清理和过滤，然后让 safeFormatMessage 处理格式化
-  const cleanedContent = cleanAIContent(aiContentText);
-  const filteredContent = filterXmlTags(cleanedContent);
-
-  // 使用 safeFormatMessage 进行格式化（它会自动应用酒馆正则）
-  const formattedContent = safeFormatMessage(filteredContent);
-  console.log('🎨 [重新应用酒馆正则] 格式化后的内容长度:', formattedContent.length);
-
-  // 更新页面HTML（保留用户选择部分，更新AI回复部分）
-  const newHtml = userChoiceHtml ? `${userChoiceHtml}${formattedContent}` : formattedContent;
-  currentPage.html = newHtml;
-
-  console.log('✅ [重新应用酒馆正则] 已重新应用酒馆正则在当前页文本');
-};
-
-// 删除当前页消息
-// const deleteCurrentPageMessage = () => {
-//   if (currentPageIndex.value >= 0 && currentPageIndex.value < pages.value.length) {
-//     showDeleteConfirm.value = true;
-//   }
-// };
-
-// 确认删除消息
-const confirmDeleteMessage = () => {
-  if (currentPageIndex.value >= 0 && currentPageIndex.value < pages.value.length) {
-    // 直接删除当前页面
-    pages.value.splice(currentPageIndex.value, 1);
-
-    // 调整当前页面索引
-    if (currentPageIndex.value >= pages.value.length) {
-      currentPageIndex.value = Math.max(0, pages.value.length - 1);
-    }
-
-    // 消息已通过世界书服务自动保存
-  }
-  showDeleteConfirm.value = false;
-};
-
-// 取消删除消息
-const cancelDeleteMessage = () => {
-  showDeleteConfirm.value = false;
-};
-
 // 工具函数
-const filterXmlTags = (content: string) => {
-  return content
-    .replace(/<content[^>]*>(.*?)<\/content>/gi, '$1')
-    .replace(/<message[^>]*>(.*?)<\/message>/gi, '$1')
-    .replace(/<[^>]+>/g, '');
+// 提取content标签包裹的内容
+const extractContentTag = (content: string): string => {
+  const contentMatch = content.match(/<content[^>]*>([\s\S]*?)<\/content>/i);
+  if (contentMatch && contentMatch[1]) {
+    console.log('📦 找到content标签，提取内容:', contentMatch[1].substring(0, 100) + '...');
+    return contentMatch[1].trim();
+  }
+  console.log('ℹ️ 未找到content标签，返回原始内容');
+  return content;
 };
 
 const removeJsonFromResponse = (response: string): string => {
@@ -2667,10 +2581,6 @@ const handleImageError = (event: Event) => {
   background: rgba(60, 100, 200, 0.3);
 }
 
-.delete-btn:hover {
-  background: rgba(200, 60, 60, 0.3);
-}
-
 .message-body {
   padding: 12px;
   color: #f7efd9;
@@ -2862,10 +2772,6 @@ const handleImageError = (event: Event) => {
 
 .edit-btn:hover {
   background: rgba(60, 100, 200, 0.3);
-}
-
-.delete-btn:hover {
-  background: rgba(200, 60, 60, 0.3);
 }
 
 /* 编辑对话框 */

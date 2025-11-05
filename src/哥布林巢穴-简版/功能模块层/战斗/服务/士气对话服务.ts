@@ -155,10 +155,16 @@ export class MoraleDialogueService {
       throw new Error('AI回复为空，请重试');
     }
 
-    // 解析AI输出并处理士气变化
+    // 提取content标签包裹的内容
+    const contentMatch = response.match(/<content[^>]*>([\s\S]*?)<\/content>/i);
+    const extractedResponse = contentMatch && contentMatch[1] ? contentMatch[1].trim() : response;
+    console.log('📦 [战前对话] 提取content标签后的内容:', extractedResponse.substring(0, 100) + '...');
+
+    // 解析AI输出并处理士气变化（使用原始响应，因为需要解析JSON）
     this.processMoraleChange(response, actualCurrentMorale, onMoraleChange);
 
-    return response;
+    // 返回提取后的内容（去除content标签）
+    return extractedResponse;
   }
 
   /**
@@ -285,13 +291,14 @@ export class MoraleDialogueService {
 
     prompt += `## 战前对话模式规则:
 
-1. 注意：morale_changes.morale 应该是士气变化值（负数表示士气下降，正数表示士气上升，0表示无变化），范围建议在-10到+10之间。
-2. 回复时请考虑敌方角色身份性格等信息，根据对话内容合理设置士气变化：
+1. ***剧情正文请使用content的xml标签包裹***
+2. 注意：morale_changes.morale 应该是士气变化值（负数表示士气下降，正数表示士气上升，0表示无变化），范围建议在-10到+10之间。
+3. 回复时请考虑敌方角色身份性格等信息，根据对话内容合理设置士气变化：
    - 心理战术等可能降低敌方士气（负值）
    - 但敌方也可能因为你的话语而更加愤怒和坚定（正值）
    - 某些情况下对话可能对士气没有明显影响（0值）
-3. 根据据点难度和双方部队对比来调整对话内容和士气影响
-4. 剧情末尾必须包含以下json格式的选项内容（根据剧情发展，设置合适的选项）和士气变化值
+4. 根据据点难度和双方部队对比来调整对话内容和士气影响
+5. 剧情末尾必须包含以下json格式的选项内容（根据剧情发展，设置合适的选项）和士气变化值
 
 [OPTIONS_JSON]
 {

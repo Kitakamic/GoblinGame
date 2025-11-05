@@ -282,7 +282,10 @@ const nextPage = () => {
 
 // 将一条AI消息渲染为书页（不自动滚动到底部）
 const pushAIPageWithoutScroll = (raw: string) => {
-  const html = safeFormatMessage(filterXmlTags(raw));
+  // 先提取content标签
+  const contentMatch = raw.match(/<content[^>]*>([\s\S]*?)<\/content>/i);
+  const contentExtracted = contentMatch && contentMatch[1] ? contentMatch[1].trim() : raw;
+  const html = safeFormatMessage(filterXmlTags(contentExtracted));
   pages.value.push({ html });
 };
 
@@ -468,12 +471,16 @@ const generateAndHandleAIReply = async () => {
       // 应用酒馆正则处理
       const formatted = formatAsTavernRegexedString(fullText, 'ai_output', 'display');
 
+      // 提取content标签包裹的内容
+      const contentMatch = formatted.match(/<content[^>]*>([\s\S]*?)<\/content>/i);
+      const contentExtracted = contentMatch && contentMatch[1] ? contentMatch[1].trim() : formatted;
+
       // 如果有临时页面，更新它；否则创建新页面
       if (currentStreamingPageIndex.value >= 0) {
-        pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(formatted);
+        pages.value[currentStreamingPageIndex.value].html = safeFormatMessage(contentExtracted);
       } else {
         currentStreamingPageIndex.value = pages.value.length;
-        pages.value.push({ html: safeFormatMessage(formatted) });
+        pages.value.push({ html: safeFormatMessage(contentExtracted) });
         currentPageIndex.value = currentStreamingPageIndex.value;
       }
 
@@ -566,8 +573,13 @@ const generateAndHandleAIReply = async () => {
     const cleanedResponse = removeJsonFromResponse(tavernProcessedResponse);
     console.log('🧹 清理后的回复内容:', cleanedResponse);
 
+    // 提取content标签包裹的内容（在最后处理）
+    const contentMatch = cleanedResponse.match(/<content[^>]*>([\s\S]*?)<\/content>/i);
+    const contentExtracted = contentMatch && contentMatch[1] ? contentMatch[1].trim() : cleanedResponse;
+    console.log('📦 [通用对话] 提取content标签后的内容:', contentExtracted.substring(0, 100) + '...');
+
     // 不再重复应用酒馆正则，因为已经处理过了
-    const formattedResponse = cleanedResponse;
+    const formattedResponse = contentExtracted;
     console.log('🎨 最终显示内容:', formattedResponse);
 
     addAIMessage(formattedResponse, 'AI');

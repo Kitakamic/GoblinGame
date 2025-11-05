@@ -92,6 +92,7 @@ export class ChainOfThoughtManager {
 - 她是否会受到{{user}}的影响？害怕还是坚定？
 - 敌方会不会由于对话内容士气反而增长或是毫无变化？
 - 最后确认：是否输出选项和士气变化值？
+- 格式确认：***剧情正文请使用content的xml标签包裹***
 </think>
 [/Chain of thought]
 `;
@@ -114,6 +115,7 @@ export class ChainOfThoughtManager {
 - 人物的心理活动如何？
 - 是否可以用第三人称电影化叙事风格来描绘？
 - 最后确认：是否错误地将回合数/伤害等数值等写入剧情？
+- 格式确认：***剧情正文请使用content的xml标签包裹***
 </think>
 [/Chain of thought]
 `;
@@ -142,6 +144,7 @@ export class ChainOfThoughtManager {
   2. 是否可以直白粗俗地描述各种性器官和性行为场景？
   3. 人物的呻吟和娇喘是否可以用连贯的对话来体现？
 - 最后确认：是否需要末尾输出JSON格式的选项和属性变化值？
+- 格式确认：***剧情正文请使用content的xml标签包裹***
 </think>
 [/Chain of thought]
 `;
@@ -165,6 +168,7 @@ export class ChainOfThoughtManager {
 - 这个事件的后续可能会如何发展？
 - 是否可以通过某些小故事/小人物来体现事件而非大人物？
 - 最后确认：描述是否可以用第三人称叙事，生动有趣，体现事件的戏剧性？
+- 格式确认：***剧情正文请使用content的xml标签包裹***
 </think>
 [/Chain of thought]
 `;
