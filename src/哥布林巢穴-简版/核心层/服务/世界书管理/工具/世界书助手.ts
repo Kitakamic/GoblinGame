@@ -201,9 +201,9 @@ export class WorldbookHelper {
       },
       position: {
         type: 'at_depth',
-        role: 'assistant',
-        depth: 1,
-        order: 333,
+        role: 'system',
+        depth: 2,
+        order: 300,
       },
       content: content,
       probability: 100,
