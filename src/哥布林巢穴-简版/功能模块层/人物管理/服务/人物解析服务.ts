@@ -75,6 +75,17 @@ export interface ParsedCharacterData {
   canCombat: boolean;
   unitType?: 'physical' | 'magical';
 
+  // 完全自定义模式的属性（可选）
+  customAttributes?: {
+    attack?: number;
+    defense?: number;
+    intelligence?: number;
+    speed?: number;
+    health?: number;
+  };
+  customStamina?: number;
+  customFertility?: number;
+
   // 外貌数据
   appearance: ParsedAppearance;
 
@@ -346,6 +357,7 @@ export class CharacterParser {
     pictureResource?: PictureResource,
     rawText?: string,
     onRetry?: (editedText: string) => Promise<void>,
+    isFullCustom: boolean = false,
   ): Promise<ParsedCharacterData | null> {
     // 清空错误收集器
     this.errorCollector.clear();
@@ -555,6 +567,47 @@ export class CharacterParser {
       console.log('🏗️ [人物解析] 开始构建解析后的数据对象...');
       console.log('🔍 [人物解析] 开始严格验证基础信息...');
 
+      // 完全自定义模式：解析战斗属性、体力、生育力
+      let customAttributes: ParsedCharacterData['customAttributes'] | undefined;
+      let customStamina: number | undefined;
+      let customFertility: number | undefined;
+      let canCombat: boolean;
+
+      if (isFullCustom) {
+        console.log('🎨 [人物解析] 完全自定义模式：解析AI生成的属性');
+
+        // 默认可战斗为true
+        canCombat = true;
+
+        // 解析战斗属性
+        if (data.基础信息?.战斗属性) {
+          const attr = data.基础信息.战斗属性;
+          customAttributes = {
+            attack: typeof attr.攻击 === 'number' ? attr.攻击 : undefined,
+            defense: typeof attr.防御 === 'number' ? attr.防御 : undefined,
+            intelligence: typeof attr.智力 === 'number' ? attr.智力 : undefined,
+            speed: typeof attr.速度 === 'number' ? attr.速度 : undefined,
+            health: typeof attr.生命 === 'number' ? attr.生命 : undefined,
+          };
+          console.log('📊 [人物解析] 完全自定义模式 - 解析的战斗属性:', customAttributes);
+        }
+
+        // 解析体力
+        if (typeof data.基础信息?.体力 === 'number') {
+          customStamina = data.基础信息.体力;
+          console.log('💪 [人物解析] 完全自定义模式 - 解析的体力:', customStamina);
+        }
+
+        // 解析生育力
+        if (typeof data.基础信息?.生育力 === 'number') {
+          customFertility = data.基础信息.生育力;
+          console.log('🌱 [人物解析] 完全自定义模式 - 解析的生育力:', customFertility);
+        }
+      } else {
+        // 普通模式：使用原有逻辑
+        canCombat = this.validateCanCombat(data.基础信息.可战斗, '基础信息');
+      }
+
       const parsedData: ParsedCharacterData = {
         // 基础信息（严格验证，不允许保底）
         name: this.validateRequiredString(data.基础信息.姓名, '姓名', '基础信息'),
@@ -564,8 +617,13 @@ export class CharacterParser {
         identity: this.validateRequiredString(data.基础信息.身份, '身份', '基础信息'),
         background: this.validateBackground(data.基础信息.出身, '基础信息'),
         personality: this.validatePersonality(data.基础信息.性格, '基础信息'),
-        canCombat: this.validateCanCombat(data.基础信息.可战斗, '基础信息'),
+        canCombat,
         unitType: this.validateUnitType(data.基础信息.单位类型),
+
+        // 完全自定义模式的属性（可选）
+        customAttributes,
+        customStamina,
+        customFertility,
 
         // 外貌数据（严格验证）
         appearance: {
@@ -1112,6 +1170,7 @@ export class CharacterParser {
     pictureResource?: PictureResource,
     rawText?: string,
     onRetry?: (editedText: string) => Promise<void>,
+    isFullCustom: boolean = false,
   ): Promise<ParsedCharacterData | null> {
     // 清空错误收集器
     this.errorCollector.clear();
@@ -1336,6 +1395,47 @@ export class CharacterParser {
       console.log('🏗️ [人物解析] 开始构建解析后的数据对象...');
       console.log('🔍 [人物解析] 开始严格验证基础信息...');
 
+      // 完全自定义模式：解析战斗属性、体力、生育力
+      let customAttributes: ParsedCharacterData['customAttributes'] | undefined;
+      let customStamina: number | undefined;
+      let customFertility: number | undefined;
+      let canCombat: boolean;
+
+      if (isFullCustom) {
+        console.log('🎨 [人物解析] 完全自定义模式：解析AI生成的属性');
+
+        // 默认可战斗为true
+        canCombat = true;
+
+        // 解析战斗属性
+        if (data.基础信息?.战斗属性) {
+          const attr = data.基础信息.战斗属性;
+          customAttributes = {
+            attack: typeof attr.攻击 === 'number' ? attr.攻击 : undefined,
+            defense: typeof attr.防御 === 'number' ? attr.防御 : undefined,
+            intelligence: typeof attr.智力 === 'number' ? attr.智力 : undefined,
+            speed: typeof attr.速度 === 'number' ? attr.速度 : undefined,
+            health: typeof attr.生命 === 'number' ? attr.生命 : undefined,
+          };
+          console.log('📊 [人物解析] 完全自定义模式 - 解析的战斗属性:', customAttributes);
+        }
+
+        // 解析体力
+        if (typeof data.基础信息?.体力 === 'number') {
+          customStamina = data.基础信息.体力;
+          console.log('💪 [人物解析] 完全自定义模式 - 解析的体力:', customStamina);
+        }
+
+        // 解析生育力
+        if (typeof data.基础信息?.生育力 === 'number') {
+          customFertility = data.基础信息.生育力;
+          console.log('🌱 [人物解析] 完全自定义模式 - 解析的生育力:', customFertility);
+        }
+      } else {
+        // 普通模式：使用原有逻辑
+        canCombat = this.validateCanCombat(data.基础信息.可战斗, '基础信息');
+      }
+
       const parsedData: ParsedCharacterData = {
         // 基础信息（严格验证，不允许保底）
         name: this.validateRequiredString(data.基础信息.姓名, '姓名', '基础信息'),
@@ -1345,8 +1445,13 @@ export class CharacterParser {
         identity: this.validateRequiredString(data.基础信息.身份, '身份', '基础信息'),
         background: this.validateBackground(data.基础信息.出身, '基础信息'),
         personality: this.validatePersonality(data.基础信息.性格, '基础信息'),
-        canCombat: this.validateCanCombat(data.基础信息.可战斗, '基础信息'),
+        canCombat,
         unitType: this.validateUnitType(data.基础信息.单位类型),
+
+        // 完全自定义模式的属性（可选）
+        customAttributes,
+        customStamina,
+        customFertility,
 
         // 外貌数据（严格验证）
         appearance: {

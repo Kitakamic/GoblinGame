@@ -55,6 +55,43 @@
               <option value="yaml">YAML</option>
             </select>
           </div>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">侦察时输入额外提示词</span>
+              <span class="label-desc">侦察据点发现人物时，允许提前输入额外提示词来影响人物生成</span>
+            </label>
+            <label class="switch-container">
+              <input
+                v-model="enableScoutPromptInput"
+                type="checkbox"
+                class="switch-input"
+                @change="updateScoutPromptInputSetting"
+              />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">完全自定义模式</span>
+              <span class="label-desc"
+                >开启后，人物生成时只使用格式要求和您的自定义提示词，避免据点信息干扰（适合生成其他世界观或动漫人物）<br /><span
+                  class="label-hint"
+                  >💡 开启此选项将自动开启"侦察时输入额外提示词"</span
+                ></span
+              >
+            </label>
+            <label class="switch-container">
+              <input
+                v-model="enableFullCustomMode"
+                type="checkbox"
+                class="switch-input"
+                @change="updateFullCustomModeSetting"
+              />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
         </div>
 
         <!-- 分隔线 -->
@@ -236,6 +273,12 @@ const heroGenerationModifier = ref(0);
 // 人物生成格式
 const characterFormat = ref('json');
 
+// 侦察时输入额外提示词
+const enableScoutPromptInput = ref(false);
+
+// 完全自定义模式
+const enableFullCustomMode = ref(false);
+
 // 思维链格式自定义
 const selectedChainMode = ref<ChainOfThoughtMode>(ChainOfThoughtMode.LOCATION_GENERATION);
 const currentChainFormat = ref('');
@@ -280,6 +323,20 @@ const loadSettings = () => {
       characterFormat.value = 'json'; // 默认为 JSON
     }
 
+    // 加载侦察时输入额外提示词设置，默认为 false
+    if (typeof globalVars['enable_scout_prompt_input'] === 'boolean') {
+      enableScoutPromptInput.value = globalVars['enable_scout_prompt_input'];
+    } else {
+      enableScoutPromptInput.value = false; // 默认关闭
+    }
+
+    // 加载完全自定义模式设置，默认为 false
+    if (typeof globalVars['enable_full_custom_mode'] === 'boolean') {
+      enableFullCustomMode.value = globalVars['enable_full_custom_mode'];
+    } else {
+      enableFullCustomMode.value = false; // 默认关闭
+    }
+
     // 加载玩家角色信息
     loadPlayerInfo();
 
@@ -290,6 +347,8 @@ const loadSettings = () => {
       enableStream: enableStream.value,
       heroModifier: heroGenerationModifier.value,
       characterFormat: characterFormat.value,
+      enableScoutPromptInput: enableScoutPromptInput.value,
+      enableFullCustomMode: enableFullCustomMode.value,
     });
   } catch (error) {
     console.error('加载游戏设置失败:', error);
@@ -352,6 +411,46 @@ const updateCharacterFormat = () => {
     console.log('💾 人物生成格式已保存:', characterFormat.value);
   } catch (error) {
     console.error('保存人物生成格式失败:', error);
+  }
+};
+
+// 保存侦察时输入额外提示词设置
+const updateScoutPromptInputSetting = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    globalVars['enable_scout_prompt_input'] = enableScoutPromptInput.value;
+
+    // 如果关闭了"侦察时输入额外提示词"，且"完全自定义模式"是开启的，则自动关闭"完全自定义模式"
+    if (!enableScoutPromptInput.value && enableFullCustomMode.value) {
+      enableFullCustomMode.value = false;
+      globalVars['enable_full_custom_mode'] = false;
+      console.log('💡 已自动关闭"完全自定义模式"（需要先开启"侦察时输入额外提示词"）');
+    }
+
+    replaceVariables(globalVars, { type: 'global' });
+    console.log('💾 侦察时输入额外提示词设置已保存:', enableScoutPromptInput.value);
+  } catch (error) {
+    console.error('保存侦察时输入额外提示词设置失败:', error);
+  }
+};
+
+// 保存完全自定义模式设置
+const updateFullCustomModeSetting = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    globalVars['enable_full_custom_mode'] = enableFullCustomMode.value;
+
+    // 如果开启"完全自定义模式"，则自动开启"侦察时输入额外提示词"
+    if (enableFullCustomMode.value && !enableScoutPromptInput.value) {
+      enableScoutPromptInput.value = true;
+      globalVars['enable_scout_prompt_input'] = true;
+      console.log('💡 已自动开启"侦察时输入额外提示词"（完全自定义模式需要此功能）');
+    }
+
+    replaceVariables(globalVars, { type: 'global' });
+    console.log('💾 完全自定义模式设置已保存:', enableFullCustomMode.value);
+  } catch (error) {
+    console.error('保存完全自定义模式设置失败:', error);
   }
 };
 
@@ -829,40 +928,6 @@ const openTextStyleSettings = () => {
 const openTutorial = () => {
   emit('open-tutorial');
 };
-
-// 强制刷新页面（清除缓存）
-const forceRefresh = async () => {
-  const confirmed = await ConfirmService.showConfirm({
-    title: '确认刷新',
-    message: '清除缓存并刷新',
-    details: '此操作将清除页面缓存并重新加载最新版本。未保存的数据可能会丢失，请确认是否继续？',
-    type: 'warning',
-  });
-
-  if (!confirmed) {
-    return;
-  }
-
-  try {
-    // 获取当前 iframe 的 URL
-    const currentUrl = window.location.href;
-
-    // 如果当前 URL 中已经有查询参数，先解析
-    const url = new URL(currentUrl);
-
-    // 添加时间戳参数来绕过缓存
-    url.searchParams.set('_t', Date.now().toString());
-
-    // 重新加载页面（使用 replace 避免产生历史记录）
-    window.location.replace(url.toString());
-  } catch (error) {
-    console.error('强制刷新失败:', error);
-    // 如果解析 URL 失败，直接使用 location.reload(true) 的方式
-    // 注意：现代浏览器可能不支持 reload 的强制刷新参数，所以添加时间戳更可靠
-    window.location.href = window.location.href.split('?')[0] + '?_t=' + Date.now();
-  }
-};
-
 // 关闭面板
 const close = () => {
   emit('close');
@@ -1025,6 +1090,15 @@ onMounted(() => {
   .label-desc {
     color: #9ca3af;
     font-size: 12px;
+    line-height: 1.5;
+
+    .label-hint {
+      color: #fbbf24;
+      font-size: 11px;
+      font-style: italic;
+      margin-top: 4px;
+      display: inline-block;
+    }
   }
 }
 

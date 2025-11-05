@@ -205,7 +205,11 @@ export class ExploreService {
   // ==================== 侦察功能 ====================
 
   // 侦察据点
-  public async scoutLocation(locationId: string): Promise<ScoutResult> {
+  public async scoutLocation(
+    locationId: string,
+    extraPrompt: string = '',
+    isFullCustom: boolean = false,
+  ): Promise<ScoutResult> {
     const location = this.getAllLocations().find(loc => loc.id === locationId);
     if (!location) {
       throw new Error('据点不存在');
@@ -257,25 +261,74 @@ export class ExploreService {
 
           console.log('📋 使用人物生成格式:', format);
 
-          // 根据设置生成不同格式的英雄提示词
-          const heroPrompt =
-            format === 'yaml'
-              ? HeroDeterminationService.generateHeroPromptYaml(
-                  location.type,
-                  location.difficulty,
-                  location.description,
-                  location.continent,
-                  location.region,
-                  location.pictureResource,
-                )
-              : HeroDeterminationService.generateHeroPrompt(
-                  location.type,
-                  location.difficulty,
-                  location.description,
-                  location.continent,
-                  location.region,
-                  location.pictureResource,
-                );
+          let heroPrompt: string;
+
+          // 完全自定义模式：只使用格式要求和用户输入的提示词
+          if (isFullCustom && extraPrompt && extraPrompt.trim()) {
+            console.log('🎨 [完全自定义模式] 使用完全自定义提示词');
+
+            // 获取格式模板（纯格式定义，不包含据点信息）
+            const formatTemplate = HeroDeterminationService.getCharacterFormatTemplate(format);
+
+            // 获取大陆和区域描述信息
+            let locationInfo = '';
+            if (location.continent || location.region) {
+              const continentData = continentExploreService.continents.value.find(c => c.name === location.continent);
+              const regionData = continentData?.regions.find(r => r.name === location.region);
+
+              locationInfo = '\n\n据点信息（仅供参考，不影响角色生成）：';
+              if (location.continent) {
+                locationInfo += `\n- 大陆：${location.continent}`;
+                if (continentData?.description) {
+                  locationInfo += `（${continentData.description}）`;
+                }
+              }
+              if (location.region) {
+                locationInfo += `\n- 区域：${location.region}`;
+                if (regionData?.description) {
+                  locationInfo += `（${regionData.description}）`;
+                }
+              }
+              if (location.name) {
+                locationInfo += `\n- 据点名称：${location.name}`;
+              }
+              if (location.description) {
+                locationInfo += `\n- 据点描述：${location.description}`;
+              }
+            }
+
+            // 构建完全自定义的提示词：格式定义 + 据点信息 + 用户自定义内容
+            heroPrompt = `${formatTemplate}\n\n<herorules>\n请为这个角色生成人物信息，严格按照${format === 'yaml' ? 'YAML' : 'JSON'}格式输出，不要添加任何其他内容。${locationInfo}\n\n***参考玩家指导：\n\n${extraPrompt.trim()}***\n</herorules>`;
+
+            console.log('📝 [完全自定义模式] 生成的提示词:', heroPrompt);
+          } else {
+            // 普通模式：使用据点信息生成提示词
+            // 根据设置生成不同格式的英雄提示词
+            heroPrompt =
+              format === 'yaml'
+                ? HeroDeterminationService.generateHeroPromptYaml(
+                    location.type,
+                    location.difficulty,
+                    location.description,
+                    location.continent,
+                    location.region,
+                    location.pictureResource,
+                  )
+                : HeroDeterminationService.generateHeroPrompt(
+                    location.type,
+                    location.difficulty,
+                    location.description,
+                    location.continent,
+                    location.region,
+                    location.pictureResource,
+                  );
+
+            // 如果有额外提示词，添加到提示词末尾
+            if (extraPrompt && extraPrompt.trim()) {
+              heroPrompt += `\n\n# ***额外要求（最高优先级，允许无视上文其他人物描述相关设定，请务必遵守）***：\n${extraPrompt.trim()}`;
+              console.log('📝 已添加额外提示词:', extraPrompt.trim());
+            }
+          }
 
           console.log('AI英雄生成提示词:', heroPrompt);
 
@@ -323,6 +376,7 @@ export class ExploreService {
               location.type,
               location.pictureResource,
               onCharacterUpdated,
+              isFullCustom,
             );
 
             if (character) {

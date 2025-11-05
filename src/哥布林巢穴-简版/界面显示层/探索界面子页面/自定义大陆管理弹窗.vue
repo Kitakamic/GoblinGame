@@ -135,8 +135,8 @@
                 </div>
               </div>
 
-              <!-- 解锁条件 -->
-              <div class="form-section">
+              <!-- 解锁条件（暂时禁用：自定义大陆默认解锁） -->
+              <!-- <div class="form-section">
                 <h5>解锁条件</h5>
                 <div class="form-group">
                   <label>前置大陆（可选）</label>
@@ -157,7 +157,7 @@
                     placeholder="50"
                   />
                 </div>
-              </div>
+              </div> -->
 
               <!-- 区域列表 -->
               <div class="form-section">
@@ -196,10 +196,11 @@
                           <label>难度</label>
                           <input v-model.number="region.difficulty" type="number" min="1" max="10" placeholder="1" />
                         </div>
-                        <div class="form-group">
+                        <!-- 解锁星级和征服星级（暂时禁用：自定义区域默认解锁） -->
+                        <!-- <div class="form-group">
                           <label>解锁星级</label>
                           <input v-model.number="region.unlockStars" type="number" min="0" placeholder="0" />
-                        </div>
+                        </div> -->
                         <div class="form-group">
                           <label>征服星级</label>
                           <input v-model.number="region.requiredStars" type="number" min="0" placeholder="0" />
@@ -284,7 +285,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { continentExploreService } from '../../功能模块层/探索/服务/大陆探索服务';
 import { ContinentDataMerger } from '../../功能模块层/探索/服务/大陆数据合并服务';
 import type { Continent } from '../../功能模块层/探索/类型/大陆探索类型';
@@ -340,7 +341,8 @@ const formData = ref<Partial<Continent>>({
 });
 
 // 计算属性
-const allContinents = computed(() => continentExploreService.getAllContinents());
+// 暂时禁用：解锁条件功能已禁用，此属性不再使用
+// const allContinents = computed(() => continentExploreService.getAllContinents());
 
 // 监听显示状态，加载自定义大陆列表
 watch(
@@ -388,20 +390,21 @@ const closeAIGenerateModal = () => {
 // AI生成提示词模板
 const generateContinentPrompt = (customPrompt: string, regionCount: number, difficulty: number): string => {
   return `# 大陆生成模式规则：
-1. 生成一个符合哥布林巢穴游戏设定的大陆数据
+1. 生成一个新的大陆/世界
 2. 大陆应该包含 ${regionCount} 个区域
 3. 大陆难度等级为 ${difficulty}（1-10）
 4. ***此模式只输出JSON数据，无需输出剧情正文***
 5. ***必须严格遵守JSON格式***
+6. ***必须遵守要求***
 
-${customPrompt ? `# 自定义要求：\n${customPrompt}\n` : ''}
+${customPrompt ? `# ***自定义要求（最高优先级）***：\n${customPrompt}\n` : ''}
 
 # 输出格式：
 \`\`\`json
 {
-  "name": "{大陆名称，要符合游戏设定}",
-  "icon": "{emoji图标，如🌍}",
-  "description": "{大陆描述，要体现大陆的特色和背景}",
+  "name": "{世界/大陆名称}",
+  "icon": "{emoji图标，必须，如🌍，禁止文字}",
+  "description": "{100字左右，详细描述此世界背景，尤其是文学动漫作品中的世界}",
   "difficulty": ${difficulty},
   "explorationCost": {
     "gold": {金币数量，根据难度合理设定，建议200-2000},
@@ -414,9 +417,9 @@ ${customPrompt ? `# 自定义要求：\n${customPrompt}\n` : ''}
   },
   "regions": [
     {
-      "name": "{区域名称}",
-      "icon": "{emoji图标}",
-      "description": "{区域描述}",
+      "name": "{区域名称，必须符合世界设定}",
+      "icon": "{必须emoji图标，禁止文字}",
+      "description": "{60-100字，详细区域描述，尤其是文学动漫作品中的世界}",
       "difficulty": {区域难度，1-10},
       "unlockStars": {解锁所需星级，建议0-5},
       "requiredStars": {征服所需星级，建议1-10},
@@ -426,7 +429,7 @@ ${customPrompt ? `# 自定义要求：\n${customPrompt}\n` : ''}
 }
 \`\`\`
 
-请生成符合要求的大陆数据JSON。`;
+请生成符合要求的世界或大陆的数据JSON。`;
 };
 
 // 解析AI生成的JSON
@@ -495,7 +498,7 @@ const parseAIGeneratedContinent = (aiResponse: string): Continent | null => {
             : undefined,
         conquestPercentage: data.unlockCondition?.conquestPercentage || 50,
       },
-      isUnlocked: false,
+      isUnlocked: true, // 自定义大陆默认解锁
       isConquered: false,
       conquestProgress: 0,
       regions: (data.regions || []).map((r: any, index: number) => {
@@ -514,7 +517,7 @@ const parseAIGeneratedContinent = (aiResponse: string): Continent | null => {
           description: r.description || '',
           difficulty: r.difficulty || 1,
           icon: r.icon || '🏘️',
-          isUnlocked: false,
+          isUnlocked: true, // 自定义区域默认解锁
           isConquered: false,
           conquestProgress: 0,
           requiredStars: r.requiredStars || 0,
@@ -698,6 +701,7 @@ const handleAIGenerate = async () => {
       );
       if (!confirmed) {
         console.log('🔍 [AI生成] 用户取消覆盖');
+        closeAIGenerateModal(); // 用户取消时也关闭窗口
         return;
       }
       // 如果是自定义大陆，先删除
@@ -715,6 +719,8 @@ const handleAIGenerate = async () => {
       console.log('🔍 [AI生成] ✅ 大陆添加成功:', validatedContinent.name);
       toastService.success(`AI已生成大陆 "${validatedContinent.name}"`, { title: '生成成功', duration: 3000 });
       loadCustomContinents();
+      // 先重置生成状态，再关闭窗口
+      isAIGenerating.value = false;
       closeAIGenerateModal();
     } else {
       console.error('🔍 [AI生成] ❌ addCustomContinent 返回 false，添加失败');
@@ -799,7 +805,7 @@ const handleSaveContinent = async () => {
         previousContinentName: formData.value.unlockCondition?.previousContinentName,
         conquestPercentage: formData.value.unlockCondition?.conquestPercentage || 50,
       },
-      isUnlocked: false,
+      isUnlocked: true, // 自定义大陆默认解锁
       isConquered: false,
       conquestProgress: 0,
       regions: (formData.value.regions || []).map(r => ({
@@ -808,7 +814,7 @@ const handleSaveContinent = async () => {
         description: r.description || '',
         difficulty: r.difficulty || 1,
         icon: r.icon || '🏘️',
-        isUnlocked: false,
+        isUnlocked: true, // 自定义区域默认解锁
         isConquered: false,
         conquestProgress: 0,
         requiredStars: r.requiredStars || 0,
@@ -865,7 +871,7 @@ const resetFormData = () => {
       previousContinentName: undefined,
       conquestPercentage: 50,
     },
-    isUnlocked: false,
+    isUnlocked: true, // 自定义大陆默认解锁
     isConquered: false,
     conquestProgress: 0,
     regions: [],
@@ -883,7 +889,7 @@ const handleAddRegion = () => {
     description: '',
     difficulty: 1,
     icon: '🏘️',
-    isUnlocked: false,
+    isUnlocked: true, // 自定义区域默认解锁
     isConquered: false,
     conquestProgress: 0,
     requiredStars: 0,

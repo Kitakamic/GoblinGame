@@ -1835,6 +1835,22 @@ const generateImageForAvatar = async () => {
   }
 };
 
+// 同步头像更新到人物列表和选中人物（辅助函数）
+const syncAvatarUpdate = (character: Character) => {
+  // 更新人物列表中的数据
+  const index = characters.value.findIndex(c => c.id === character.id);
+  if (index > -1) {
+    characters.value[index] = { ...character };
+    console.log('✅ [头像编辑] 已更新人物列表中的数据');
+  }
+
+  // 更新选中的人物（如果当前编辑的人物是选中的人物）
+  if (selectedCharacter.value?.id === character.id) {
+    selectedCharacter.value = { ...character };
+    console.log('✅ [头像编辑] 已更新选中的人物数据');
+  }
+};
+
 // 应用生成的图片
 const applyGeneratedImage = () => {
   if (!editingCharacter.value || !generatedImagePreview.value) {
@@ -1855,6 +1871,9 @@ const applyGeneratedImage = () => {
 
   // 更新世界书
   WorldbookService.updateCharacterEntry(editingCharacter.value);
+
+  // 同步更新到人物列表和选中人物
+  syncAvatarUpdate(editingCharacter.value);
 
   // 保存数据
   saveTrainingData();
@@ -1885,6 +1904,9 @@ const setAvatarFromUrl = () => {
     // 更新世界书
     WorldbookService.updateCharacterEntry(editingCharacter.value);
 
+    // 同步更新到人物列表和选中人物
+    syncAvatarUpdate(editingCharacter.value);
+
     // 保存数据
     saveTrainingData();
 
@@ -1910,6 +1932,9 @@ const handleFileUpload = (event: Event) => {
 
         // 更新世界书
         WorldbookService.updateCharacterEntry(editingCharacter.value);
+
+        // 同步更新到人物列表和选中人物
+        syncAvatarUpdate(editingCharacter.value);
 
         // 保存数据
         saveTrainingData();
@@ -1950,6 +1975,9 @@ const setRandomAvatarByRace = () => {
 
   // 更新世界书
   WorldbookService.updateCharacterEntry(editingCharacter.value);
+
+  // 同步更新到人物列表和选中人物
+  syncAvatarUpdate(editingCharacter.value);
 
   // 保存数据
   saveTrainingData();
@@ -2001,6 +2029,9 @@ const resetAvatarToOriginal = () => {
   // 更新世界书
   WorldbookService.updateCharacterEntry(editingCharacter.value);
 
+  // 同步更新到人物列表和选中人物
+  syncAvatarUpdate(editingCharacter.value);
+
   // 保存数据
   saveTrainingData();
 
@@ -2027,11 +2058,18 @@ const forceRefreshCharacterAvatar = (characterId: string, newAvatarUrl: string) 
     if (characterElement) {
       const imgElement = characterElement.querySelector('.character-portrait img') as HTMLImageElement;
       if (imgElement) {
-        // 添加时间戳防止缓存
-        const timestamp = new Date().getTime();
-        const separator = newAvatarUrl?.includes('?') ? '&' : '?';
-        imgElement.src = `${newAvatarUrl}${separator}t=${timestamp}`;
-        console.log(`🔄 强制刷新人物 ${characterId} 的头像显示`);
+        // 检查是否是base64 data URL，如果是就不添加时间戳（data URL不支持查询参数）
+        if (newAvatarUrl?.startsWith('data:')) {
+          // base64 data URL直接使用，不添加时间戳
+          imgElement.src = newAvatarUrl;
+          console.log(`🔄 强制刷新人物 ${characterId} 的头像显示（base64格式）`);
+        } else {
+          // 普通URL添加时间戳防止缓存
+          const timestamp = new Date().getTime();
+          const separator = newAvatarUrl?.includes('?') ? '&' : '?';
+          imgElement.src = `${newAvatarUrl}${separator}t=${timestamp}`;
+          console.log(`🔄 强制刷新人物 ${characterId} 的头像显示`);
+        }
       }
     }
   });

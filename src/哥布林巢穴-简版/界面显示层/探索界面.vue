@@ -92,6 +92,14 @@
 
     <!-- 自定义大陆管理弹窗 -->
     <CustomContinentModal :show="showCustomContinentModal" @close="showCustomContinentModal = false" />
+
+    <!-- 侦察提示词输入弹窗 -->
+    <ScoutPromptInputModal
+      :show="showScoutPromptModal"
+      :location="currentScoutingLocation"
+      @confirm="handleScoutPromptConfirm"
+      @cancel="handleScoutPromptCancel"
+    />
   </div>
 </template>
 
@@ -118,6 +126,7 @@ import { actionPointsService } from '../核心层/服务/通用服务/行动力�
 import { ResourceFormatService } from '../核心层/服务/通用服务/资源格式化服务';
 
 // 子组件
+import ScoutPromptInputModal from './探索界面子页面/侦察提示词输入弹窗.vue';
 import ScoutingStatusModal from './探索界面子页面/侦察状态弹窗.vue';
 import LocationList from './探索界面子页面/据点列表组件.vue';
 import ExploreTabs from './探索界面子页面/探索选项卡组件.vue';
@@ -153,6 +162,11 @@ const scoutingLoadingMessage = ref('正在侦察中...');
 const scoutingFailureData = ref<{ location: Location; originalCost: { gold: number; food: number } } | null>(null);
 const currentScoutingLocation = ref<Location | null>(null);
 const scoutLocationAbortController = ref<AbortController | null>(null);
+
+// 侦察提示词输入弹窗
+const showScoutPromptModal = ref(false);
+const pendingScoutLocation = ref<Location | null>(null);
+const extraPromptForScout = ref<string>('');
 
 // 据点筛选
 const selectedStatusFilter = ref('all');
@@ -298,47 +312,66 @@ const scoutLocation = async (location: Location) => {
     // 检查据点是否需要AI生成英雄
     const needsAIHero = (location as any).needsAIHero || location.description.includes('[AI_HERO_GENERATE]');
 
+    // 检查是否启用侦察时输入额外提示词
+    const globalVars = getVariables({ type: 'global' });
+    const enablePromptInput =
+      typeof globalVars['enable_scout_prompt_input'] === 'boolean' ? globalVars['enable_scout_prompt_input'] : false;
+
+    // 如果需要生成英雄且启用了提示词输入，先显示输入框
+    if (needsAIHero && enablePromptInput) {
+      pendingScoutLocation.value = location;
+      currentScoutingLocation.value = location;
+      showScoutPromptModal.value = true;
+      extraPromptForScout.value = '';
+      // 等待用户输入提示词，不继续执行
+      return;
+    }
+
+    // 如果没有启用提示词输入或不需要生成英雄，直接执行侦察
+    await executeScout(location, '');
+  } catch (error) {
+    // 发生错误，清理状态
+    scoutingLocations.value.delete(location.id);
+    scoutingAnimation.value.delete(location.id);
+    actionPointsService.refundActionPoints('scoutLocation');
+    await ConfirmService.showDanger(`侦察失败：${error}`, '侦察失败', '请检查资源是否充足');
+  }
+};
+
+// 执行侦察（实际执行侦察逻辑）
+const executeScout = async (location: Location, extraPrompt: string = '', isFullCustom: boolean = false) => {
+  try {
     // 如果需要生成英雄，显示加载弹窗
+    const needsAIHero = (location as any).needsAIHero || location.description.includes('[AI_HERO_GENERATE]');
     if (needsAIHero) {
       scoutingLoadingMessage.value = `发现英雄！正在生成 "${location.name}" 的英雄信息...`;
       scoutingModalState.value = 'loading';
       showScoutingModal.value = true;
-      currentScoutingLocation.value = location; // 记录当前正在侦察的据点
-      scoutLocationAbortController.value = new AbortController(); // 创建取消控制器
+      currentScoutingLocation.value = location;
+      scoutLocationAbortController.value = new AbortController();
     }
 
-    const result = await exploreService.scoutLocation(location.id);
+    const result = await exploreService.scoutLocation(location.id, extraPrompt, isFullCustom);
 
     // 检查是否需要用户决策（AI生成失败）
-    // 无论是因为解析错误还是其他错误，都会返回 needsUserDecision
-    // 解析错误时，用户会先看到 GenerationErrorService 的错误弹窗（可以编辑和重新解析）
-    // 关闭错误弹窗后，会统一显示 scoutingModal 的失败状态，让用户选择放弃或重新侦察
     if (result.needsUserDecision && result.aiFailureData) {
-      // 移除侦察状态
       scoutingLocations.value.delete(location.id);
       scoutingAnimation.value.delete(location.id);
-
-      // 返还行动力（AI生成失败）
       actionPointsService.refundActionPoints('scoutLocation');
-
-      // 切换弹窗状态为失败模式
-      // 注意：如果用户刚才在 GenerationErrorService 的错误弹窗中已经关闭了弹窗，
-      // 现在会显示 scoutingModal 的失败状态，让用户选择放弃英雄或重新侦察
       scoutingModalState.value = 'failure';
       scoutingFailureData.value = {
         location: result.aiFailureData.location,
         originalCost: result.aiFailureData.originalCost,
       };
-      currentScoutingLocation.value = null; // 清除当前侦察据点（因为已经失败）
-      scoutLocationAbortController.value = null; // 清除取消控制器
-      // 弹窗继续显示，不关闭
+      currentScoutingLocation.value = null;
+      scoutLocationAbortController.value = null;
       return;
     }
 
     // 隐藏加载弹窗
     showScoutingModal.value = false;
-    currentScoutingLocation.value = null; // 清除当前侦察据点
-    scoutLocationAbortController.value = null; // 清除取消控制器
+    currentScoutingLocation.value = null;
+    scoutLocationAbortController.value = null;
 
     // 等待一小段时间确保UI更新，然后移除侦察状态
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -352,7 +385,6 @@ const scoutLocation = async (location: Location) => {
         duration: 3000,
       });
     } else {
-      // 侦察失败，返还行动力
       actionPointsService.refundActionPoints('scoutLocation');
       await ConfirmService.showDanger(
         `据点 "${location.name}" 侦察失败`,
@@ -361,20 +393,45 @@ const scoutLocation = async (location: Location) => {
       );
     }
   } catch (error) {
-    // 隐藏加载弹窗
     showScoutingModal.value = false;
-    currentScoutingLocation.value = null; // 清除当前侦察据点
-    scoutLocationAbortController.value = null; // 清除取消控制器
-
-    // 侦察失败，移除侦察状态并显示错误信息
+    currentScoutingLocation.value = null;
+    scoutLocationAbortController.value = null;
     scoutingLocations.value.delete(location.id);
     scoutingAnimation.value.delete(location.id);
-
-    // 返还行动力（发生错误）
     actionPointsService.refundActionPoints('scoutLocation');
-
     await ConfirmService.showDanger(`侦察失败：${error}`, '侦察失败', '请检查资源是否充足');
   }
+};
+
+// 处理侦察提示词确认
+const handleScoutPromptConfirm = async (prompt: string, isFullCustom: boolean) => {
+  if (!pendingScoutLocation.value) return;
+
+  extraPromptForScout.value = prompt;
+  showScoutPromptModal.value = false;
+  const location = pendingScoutLocation.value;
+  pendingScoutLocation.value = null;
+
+  // 执行侦察
+  await executeScout(location, prompt, isFullCustom);
+};
+
+// 处理侦察提示词取消
+const handleScoutPromptCancel = async () => {
+  if (!pendingScoutLocation.value) return;
+
+  const location = pendingScoutLocation.value;
+  pendingScoutLocation.value = null;
+  showScoutPromptModal.value = false;
+  currentScoutingLocation.value = null;
+
+  // 移除侦察状态
+  scoutingLocations.value.delete(location.id);
+  scoutingAnimation.value.delete(location.id);
+
+  // 返还行动力
+  actionPointsService.refundActionPoints('scoutLocation');
+  extraPromptForScout.value = '';
 };
 
 // 侦察弹窗处理
@@ -436,8 +493,8 @@ const handleScoutingModalClose = async () => {
 
 // 自定义大陆按钮点击处理
 const handleCustomContinentClick = () => {
-  toastService.info('自定义大陆功能开发中，敬请期待...', { title: '开发中', duration: 3000 });
-  // showCustomContinentModal.value = true; // 暂时禁用
+  // toastService.info('自定义大陆功能开发中，敬请期待...', { title: '开发中', duration: 3000 });
+  showCustomContinentModal.value = true; // 暂时禁用
 };
 
 const handleScoutingModalCancel = async (location: Location, cost: { gold: number; food: number }) => {

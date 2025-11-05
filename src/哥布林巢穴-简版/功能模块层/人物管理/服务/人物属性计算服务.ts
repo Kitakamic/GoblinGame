@@ -779,6 +779,7 @@ export class CharacterAttributeCalculator {
     locationId?: string,
     locationType?: string,
     difficulty?: number,
+    isFullCustom: boolean = false,
   ): Promise<Character | null> {
     try {
       console.log('🔧 [属性计算] 开始构建人物对象...');
@@ -788,6 +789,7 @@ export class CharacterAttributeCalculator {
         年龄: parsedData.age,
         出身: parsedData.background,
         据点类型: locationType || '未指定',
+        完全自定义模式: isFullCustom,
       });
 
       // 验证解析数据
@@ -801,29 +803,98 @@ export class CharacterAttributeCalculator {
       console.log('🆔 [属性计算] 生成唯一ID:', id);
 
       // 计算评级
-      console.log('⭐ [属性计算] 开始计算人物评级...');
-      const rating = this.calculateRating(
-        parsedData.race,
-        parsedData.age,
-        parsedData.appearance,
-        parsedData.background,
-        difficulty,
-      );
-      console.log('🎯 [属性计算] 评级计算完成:', rating);
+      let rating: CharacterRating;
+      if (isFullCustom) {
+        // 完全自定义模式：评级默认为S
+        rating = 'S';
+        console.log('⭐ [属性计算] 完全自定义模式：评级固定为S');
+      } else {
+        console.log('⭐ [属性计算] 开始计算人物评级...');
+        rating = this.calculateRating(
+          parsedData.race,
+          parsedData.age,
+          parsedData.appearance,
+          parsedData.background,
+          difficulty,
+        );
+        console.log('🎯 [属性计算] 评级计算完成:', rating);
+      }
 
-      // 计算战斗属性（完全由系统计算，确保平衡性）
-      console.log('⚔️ [属性计算] 开始计算战斗属性...');
-      const attributes = this.calculateAttributes(parsedData.race, parsedData.age, rating, locationType);
-      console.log('🛡️ [属性计算] 战斗属性计算完成:', attributes);
+      // 计算战斗属性
+      let attributes: CharacterAttributes;
+      if (isFullCustom) {
+        // 完全自定义模式：从AI生成的数据中解析，失败则随机70-100
+        console.log('⚔️ [属性计算] 完全自定义模式：从AI生成的数据中解析战斗属性...');
+        const customAttr = parsedData.customAttributes;
+        if (
+          customAttr &&
+          customAttr.attack !== undefined &&
+          customAttr.defense !== undefined &&
+          customAttr.intelligence !== undefined &&
+          customAttr.speed !== undefined &&
+          customAttr.health !== undefined
+        ) {
+          attributes = {
+            attack: customAttr.attack,
+            defense: customAttr.defense,
+            intelligence: customAttr.intelligence,
+            speed: customAttr.speed,
+            health: customAttr.health,
+          };
+          console.log('✅ [属性计算] 完全自定义模式 - 使用AI生成的属性:', attributes);
+        } else {
+          // 解析失败，随机70-100
+          const randomValue = () => Math.floor(Math.random() * 31) + 70; // 70-100
+          attributes = {
+            attack: randomValue(),
+            defense: randomValue(),
+            intelligence: randomValue(),
+            speed: randomValue(),
+            health: randomValue(),
+          };
+          console.log('⚠️ [属性计算] 完全自定义模式 - AI生成的属性解析失败，使用随机值70-100:', attributes);
+        }
+      } else {
+        // 普通模式：完全由系统计算，确保平衡性
+        console.log('⚔️ [属性计算] 开始计算战斗属性...');
+        attributes = this.calculateAttributes(parsedData.race, parsedData.age, rating, locationType);
+        console.log('🛡️ [属性计算] 战斗属性计算完成:', attributes);
+      }
 
       // 计算体力和生育力
-      console.log('💪 [属性计算] 开始计算体力和生育力...');
-      const stamina = this.calculateStamina(parsedData.race, parsedData.age, rating, parsedData.appearance);
-      const fertility = this.calculateFertility(parsedData.race, parsedData.age, rating, parsedData.appearance);
-      console.log('📊 [属性计算] 体力和生育力计算完成:', {
-        体力: stamina,
-        生育力: fertility,
-      });
+      let stamina: number;
+      let fertility: number;
+      if (isFullCustom) {
+        // 完全自定义模式：从AI生成的数据中解析，失败则随机150-200
+        console.log('💪 [属性计算] 完全自定义模式：从AI生成的数据中解析体力和生育力...');
+
+        if (parsedData.customStamina !== undefined) {
+          stamina = parsedData.customStamina;
+          console.log('✅ [属性计算] 完全自定义模式 - 使用AI生成的体力:', stamina);
+        } else {
+          // 解析失败，随机150-200
+          stamina = Math.floor(Math.random() * 51) + 150; // 150-200
+          console.log('⚠️ [属性计算] 完全自定义模式 - AI生成的体力解析失败，使用随机值150-200:', stamina);
+        }
+
+        if (parsedData.customFertility !== undefined) {
+          fertility = parsedData.customFertility;
+          console.log('✅ [属性计算] 完全自定义模式 - 使用AI生成的生育力:', fertility);
+        } else {
+          // 解析失败，随机150-200
+          fertility = Math.floor(Math.random() * 51) + 150; // 150-200
+          console.log('⚠️ [属性计算] 完全自定义模式 - AI生成的生育力解析失败，使用随机值150-200:', fertility);
+        }
+      } else {
+        // 普通模式：由系统计算
+        console.log('💪 [属性计算] 开始计算体力和生育力...');
+        stamina = this.calculateStamina(parsedData.race, parsedData.age, rating, parsedData.appearance);
+        fertility = this.calculateFertility(parsedData.race, parsedData.age, rating, parsedData.appearance);
+        console.log('📊 [属性计算] 体力和生育力计算完成:', {
+          体力: stamina,
+          生育力: fertility,
+        });
+      }
 
       // 提取敏感点名称
       console.log('🎯 [属性计算] 开始提取敏感点信息...');

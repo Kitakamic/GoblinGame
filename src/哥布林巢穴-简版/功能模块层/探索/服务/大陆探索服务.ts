@@ -233,6 +233,53 @@ export class ContinentExploreService {
       const wasUnlocked = continent.isUnlocked;
       const shouldBeUnlocked = this.checkUnlockConditions(continent);
 
+      // 对于自定义大陆，如果已经解锁，优先保留解锁状态（避免因进度同步问题导致锁定）
+      if (continent.source === 'custom' && wasUnlocked) {
+        // 自定义大陆已经解锁，检查是否满足解锁条件
+        if (shouldBeUnlocked) {
+          // 满足条件，保持解锁状态
+          unlockedCount++;
+          // 确保探索状态中的解锁列表与大陆状态同步
+          if (!this.exploreState.value.unlockedContinents.includes(continent.name)) {
+            this.exploreState.value.unlockedContinents.push(continent.name);
+          }
+          return; // 跳过后续验证，保持解锁状态
+        } else {
+          // 不满足条件，但自定义大陆已经解锁，可能是进度同步问题
+          // 记录警告但不强制锁定，保持解锁状态
+          const previousProgress =
+            this.exploreState.value.continentProgress[continent.unlockCondition.previousContinentName || ''] || 0;
+          console.warn(
+            `⚠️ [解锁验证] 自定义大陆 ${continent.name} 已解锁但前置大陆进度不足 (需要 >= ${continent.unlockCondition.conquestPercentage}%, 当前: ${previousProgress.toFixed(1)}%)，保持解锁状态`,
+          );
+          unlockedCount++;
+          // 确保探索状态中的解锁列表与大陆状态同步
+          if (!this.exploreState.value.unlockedContinents.includes(continent.name)) {
+            this.exploreState.value.unlockedContinents.push(continent.name);
+          }
+          return; // 跳过后续验证，保持解锁状态
+        }
+      }
+
+      // 对于自定义大陆，如果未解锁，默认解锁
+      if (continent.source === 'custom' && !wasUnlocked) {
+        continent.isUnlocked = true;
+        if (!this.exploreState.value.unlockedContinents.includes(continent.name)) {
+          this.exploreState.value.unlockedContinents.push(continent.name);
+        }
+        // 确保所有区域也解锁
+        continent.regions.forEach(region => {
+          region.isUnlocked = true;
+        });
+        unlockedCount++;
+        fixedCount++;
+        console.log(`✅ [解锁验证] 自定义大陆 ${continent.name} 默认解锁`);
+        // 大陆解锁后，检查并解锁符合条件的区域
+        this.checkAndUnlockRegionsForContinent(continent.name);
+        return; // 跳过后续验证
+      }
+
+      // 对于默认大陆，正常验证解锁条件
       // 如果状态不一致，修复它
       if (wasUnlocked !== shouldBeUnlocked) {
         if (shouldBeUnlocked && !wasUnlocked) {
@@ -250,7 +297,7 @@ export class ContinentExploreService {
           // 大陆解锁后，检查并解锁符合条件的区域
           this.checkAndUnlockRegionsForContinent(continent.name);
         } else if (!shouldBeUnlocked && wasUnlocked) {
-          // 不应该解锁但已解锁 - 锁定
+          // 不应该解锁但已解锁 - 锁定（仅对默认大陆）
           continent.isUnlocked = false;
           const index = this.exploreState.value.unlockedContinents.indexOf(continent.name);
           if (index !== -1) {
@@ -971,17 +1018,17 @@ export class ContinentExploreService {
                 if (saved) {
                   return {
                     ...continent,
-                    // 恢复游戏状态
-                    isUnlocked: saved.isUnlocked,
+                    // 恢复游戏状态，但自定义大陆默认解锁
+                    isUnlocked: saved.isUnlocked !== undefined ? saved.isUnlocked : true,
                     isConquered: saved.isConquered,
                     conquestProgress: saved.conquestProgress,
-                    // 恢复区域状态
+                    // 恢复区域状态，但自定义区域默认解锁
                     regions: continent.regions.map(region => {
                       const savedRegion = saved.regions.find(r => r.name === region.name);
                       if (savedRegion) {
                         return {
                           ...region,
-                          isUnlocked: savedRegion.isUnlocked,
+                          isUnlocked: savedRegion.isUnlocked !== undefined ? savedRegion.isUnlocked : true,
                           isConquered: savedRegion.isConquered,
                           conquestProgress: savedRegion.conquestProgress,
                           isCapitalConquered: savedRegion.isCapitalConquered,
@@ -989,8 +1036,22 @@ export class ContinentExploreService {
                           locations: savedRegion.locations,
                         };
                       }
-                      return region;
+                      // 如果没有存档数据，默认解锁
+                      return {
+                        ...region,
+                        isUnlocked: true,
+                      };
                     }),
+                  };
+                } else {
+                  // 如果没有存档数据，默认解锁
+                  return {
+                    ...continent,
+                    isUnlocked: true,
+                    regions: continent.regions.map(region => ({
+                      ...region,
+                      isUnlocked: true,
+                    })),
                   };
                 }
               }
@@ -1283,6 +1344,8 @@ export class ContinentExploreService {
             ...validatedContinent,
             source: 'custom',
             version: '1.0.0',
+            // 自定义大陆默认解锁
+            isUnlocked: true,
             metadata: {
               ...validatedContinent.metadata,
               createdAt: existing.metadata?.createdAt || Date.now(),
@@ -1292,6 +1355,8 @@ export class ContinentExploreService {
               ...region,
               source: 'custom' as const,
               continentName: validatedContinent.name,
+              // 自定义区域默认解锁
+              isUnlocked: true,
               metadata: {
                 ...region.metadata,
                 createdAt: region.metadata?.createdAt || Date.now(),
@@ -1309,6 +1374,8 @@ export class ContinentExploreService {
           ...validatedContinent,
           source: 'custom',
           version: '1.0.0',
+          // 自定义大陆默认解锁
+          isUnlocked: true,
           metadata: {
             createdAt: Date.now(),
             modifiedAt: Date.now(),
@@ -1318,6 +1385,8 @@ export class ContinentExploreService {
             ...region,
             source: 'custom' as const,
             continentName: validatedContinent.name,
+            // 自定义区域默认解锁
+            isUnlocked: true,
             metadata: {
               createdAt: Date.now(),
               modifiedAt: Date.now(),
@@ -1358,6 +1427,9 @@ export class ContinentExploreService {
         console.error('保存自定义大陆到数据库失败:', error);
         // 不返回 false，因为内存数据已更新成功
       }
+
+      // 验证并修复解锁状态（确保新添加的自定义大陆如果满足条件会立即解锁）
+      this.validateAndFixUnlockStatus();
 
       return true;
     } catch (error) {
@@ -1469,11 +1541,26 @@ export class ContinentExploreService {
         ...validatedContinent,
         source: 'custom',
         version: continent.version || '1.0.0',
+        // 自定义大陆默认解锁
+        isUnlocked: true,
         metadata: {
           ...validatedContinent.metadata,
           createdAt: continent.metadata?.createdAt || Date.now(),
           modifiedAt: Date.now(),
         },
+        // 确保所有区域也解锁
+        regions: validatedContinent.regions.map(region => ({
+          ...region,
+          source: 'custom' as const,
+          continentName: validatedContinent.name,
+          // 自定义区域默认解锁
+          isUnlocked: true,
+          metadata: {
+            ...region.metadata,
+            createdAt: region.metadata?.createdAt || Date.now(),
+            modifiedAt: Date.now(),
+          },
+        })),
       };
 
       console.log(`成功更新自定义大陆: ${continentName}`);
@@ -1491,6 +1578,9 @@ export class ContinentExploreService {
         console.error('保存更新操作到数据库失败:', error);
         // 不返回 false，因为内存数据已更新成功
       }
+
+      // 验证并修复解锁状态（确保更新后的自定义大陆如果满足条件会立即解锁）
+      this.validateAndFixUnlockStatus();
 
       return true;
     } catch (error) {
