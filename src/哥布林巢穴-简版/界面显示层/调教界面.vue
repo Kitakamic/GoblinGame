@@ -140,7 +140,7 @@
           <button
             class="wheel-btn danger"
             :class="{ 'btn-2': true }"
-            title="处决"
+            title="释放"
             @click="selectedCharacter && executeCharacter(selectedCharacter)"
           >
             <span class="btn-icon">⚔️</span>
@@ -1676,15 +1676,15 @@ const playCorruptionAnimation = async (character: Character): Promise<void> => {
   });
 };
 
-// 处决人物
+// 释放人物
 const executeCharacter = async (character: Character) => {
   const confirmed = await ConfirmService.showDanger(
-    `确定要处决 ${character.name} 吗？`,
-    '确认处决',
-    `处决后将获得资源奖励，但人物将永久消失！\n\n人物评级：${character.rating || '未评级'}`,
+    `确定要释放 ${character.name} 吗？`,
+    '确认释放',
+    `释放后将获得人物赠礼，但人物将永久消失！\n\n人物评级：${character.rating || '未评级'}`,
   );
   if (confirmed) {
-    // 计算处决奖励（根据人物稀有度）
+    // 计算释放奖励（根据人物稀有度）
     const rewardMultiplier = {
       S: 3,
       A: 2.5,
@@ -1701,9 +1701,9 @@ const executeCharacter = async (character: Character) => {
     const goldReward = Math.floor(baseGold * multiplier);
     const foodReward = Math.floor(baseFood * multiplier);
 
-    // 添加资源奖励（处决不再增加威胁度）
-    modularSaveManager.addResource('gold', goldReward, `处决${character.name}获得`);
-    modularSaveManager.addResource('food', foodReward, `处决${character.name}获得`);
+    // 添加资源奖励（释放不再增加威胁度）
+    modularSaveManager.addResource('gold', goldReward, `释放${character.name}获得`);
+    modularSaveManager.addResource('food', foodReward, `释放${character.name}获得`);
 
     // 从人物列表中移除
     const index = characters.value.findIndex(c => c.id === character.id);
@@ -1727,10 +1727,10 @@ const executeCharacter = async (character: Character) => {
     showCharacterMenu.value = false;
     closeCharacterModal();
 
-    // 显示处决成功消息
+    // 显示释放成功消息
     toastRef.value?.success(
-      `处决成功！获得奖励：💰 金币 +${goldReward}，🍖 食物 +${foodReward}。${character.name} 已被永久处决。`,
-      { title: '处决完成', duration: 5000 },
+      `释放成功！获得奖励：💰 金币 +${goldReward}，🍖 食物 +${foodReward}。${character.name} 已被永久释放。`,
+      { title: '释放完成', duration: 5000 },
     );
 
     // 直接更新界面，不需要重新加载数据
