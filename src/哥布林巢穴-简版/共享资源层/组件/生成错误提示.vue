@@ -75,20 +75,57 @@ const handleRetry = async () => {
     return;
   }
 
+  // 检查编辑后的文本是否与原始文本相同
+  if (editedText.value === errorState.value.rawText) {
+    toast.warning('内容未修改，请编辑后再重新解析', { title: '提示' });
+    return;
+  }
+
   isRetrying.value = true;
 
   // 保存当前错误弹窗的内容，用于检测是否有新的错误弹窗被打开
   const previousRawText = errorState.value.rawText;
   const previousTitle = errorState.value.title;
 
+  console.log('🔄 [生成错误] 开始重新解析...');
+  console.log('📝 [生成错误] 编辑后的文本长度:', editedText.value.length);
+  console.log('📝 [生成错误] 原始文本长度:', previousRawText?.length || 0);
+
   try {
+    // 调用重新解析回调函数
     await errorState.value.onRetry(editedText.value);
-    // 如果成功，关闭弹窗
-    handleClose();
-    toast.success('重新解析成功', { title: '解析成功' });
+
+    console.log('✅ [生成错误] 重新解析回调执行完成');
+
+    // 检查错误弹窗是否仍然显示（如果显示，说明可能有新的错误）
+    const stillShowing = errorState.value.show;
+    const errorDialogContentChanged =
+      errorState.value.rawText !== previousRawText || errorState.value.title !== previousTitle;
+
+    if (stillShowing && errorDialogContentChanged) {
+      // 错误弹窗内容已更新，说明新的错误信息已经通过错误弹窗显示了
+      // 不关闭弹窗，更新编辑文本为新的原始文本
+      console.log('⚠️ [生成错误] 重新解析后出现新错误，更新编辑文本');
+      if (errorState.value.rawText) {
+        editedText.value = errorState.value.rawText;
+      }
+      // 不显示成功提示，因为出现了新错误
+    } else if (!stillShowing) {
+      // 错误弹窗已关闭，说明重新解析成功
+      console.log('✅ [生成错误] 重新解析成功，关闭弹窗');
+      handleClose();
+      toast.success('重新解析成功', { title: '解析成功' });
+    } else {
+      // 错误弹窗仍然显示但内容未变化，可能是静默成功
+      // 这种情况下，我们仍然关闭弹窗并显示成功提示
+      console.log('✅ [生成错误] 重新解析成功（静默），关闭弹窗');
+      handleClose();
+      toast.success('重新解析成功', { title: '解析成功' });
+    }
   } catch (error) {
+    console.error('❌ [生成错误] 重新解析失败:', error);
+
     // 检查错误弹窗的内容是否发生了变化
-    // 如果 rawText 或 title 发生了变化，说明新的错误弹窗已经显示了
     const errorDialogContentChanged =
       errorState.value.rawText !== previousRawText || errorState.value.title !== previousTitle;
 
@@ -96,16 +133,19 @@ const handleRetry = async () => {
       // 错误弹窗内容已更新，说明新的错误信息已经通过错误弹窗显示了
       // 不显示提示，避免重复提示
       // 同时更新编辑文本为新的原始文本
+      console.log('⚠️ [生成错误] 重新解析失败，出现新错误，更新编辑文本');
       if (errorState.value.rawText) {
         editedText.value = errorState.value.rawText;
       }
     } else {
       // 其他类型的错误（如构建失败等），显示提示
+      console.error('❌ [生成错误] 重新解析失败，显示错误提示');
       toast.error('重新解析失败，请检查错误信息', { title: '解析失败' });
     }
     // 不关闭弹窗，让用户继续编辑
   } finally {
     isRetrying.value = false;
+    console.log('🔄 [生成错误] 重新解析流程结束');
   }
 };
 </script>
