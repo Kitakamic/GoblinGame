@@ -75,6 +75,7 @@ export default [
     },
   },
   eslintConfigPrettier,
+<<<<<<< HEAD
   globalIgnores([
     'dist/**',
     'node_modules/**',
@@ -83,4 +84,7 @@ export default [
     'webpack.config.ts',
     'scripts/**',
   ]),
+=======
+  globalIgnores(['dist/**', 'node_modules/**', 'eslint.config.mjs', 'postcss.config.js', 'webpack.config.ts']),
+>>>>>>> 863524288243b48f95f2dcf78eac2a71cc5b2777
 ];
