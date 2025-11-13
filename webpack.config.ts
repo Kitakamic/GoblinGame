@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 import { globSync } from 'glob';
+=======
+>>>>>>> 4dd206c0dc4e487a36681a4080d0394c48b95fc5
 import HtmlInlineScriptWebpackPlugin from 'html-inline-script-webpack-plugin';
 import HtmlWebpackPlugin from 'html-webpack-plugin';
 import MiniCssExtractPlugin from 'mini-css-extract-plugin';
@@ -51,9 +54,15 @@ function common_path(lhs: string, rhs: string) {
 }
 
 function glob_script_files() {
+<<<<<<< HEAD
   const files: string[] = globSync(`src/**/index.{ts,js}`).filter(
     (file: string) => process.env.CI !== 'true' || !fs.readFileSync(path.join(__dirname, file)).includes('@no-ci'),
   );
+=======
+  const files: string[] = fs
+    .globSync(`src/**/index.{ts,tsx,js,jsx}`)
+    .filter(file => process.env.CI !== 'true' || !fs.readFileSync(path.join(__dirname, file)).includes('@no-ci'));
+>>>>>>> 4dd206c0dc4e487a36681a4080d0394c48b95fc5
 
   const results: string[] = [];
   const handle = (file: string) => {
@@ -111,7 +120,11 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
     experiments: {
       outputModule: true,
     },
+<<<<<<< HEAD
     devtool: argv.mode === 'production' ? false : 'eval-source-map',
+=======
+    devtool: argv.mode === 'production' ? 'source-map' : 'eval-source-map',
+>>>>>>> 4dd206c0dc4e487a36681a4080d0394c48b95fc5
     watchOptions: {
       ignored: ['**/dist', '**/node_modules'],
     },
@@ -252,7 +265,11 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
             },
           ].concat(
             entry.html === undefined
+<<<<<<< HEAD
               ? <any[]>[
+=======
+              ? [
+>>>>>>> 4dd206c0dc4e487a36681a4080d0394c48b95fc5
                   {
                     test: /\.vue\.s(a|c)ss$/,
                     use: [
@@ -287,8 +304,13 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
                     use: ['style-loader', { loader: 'css-loader', options: { url: false } }, 'postcss-loader'],
                     exclude: /node_modules/,
                   },
+<<<<<<< HEAD
                 ]
               : <any[]>[
+=======
+                ] as any[]
+              : [
+>>>>>>> 4dd206c0dc4e487a36681a4080d0394c48b95fc5
                   {
                     test: /\.s(a|c)ss$/,
                     use: [
@@ -308,7 +330,11 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
                     ],
                     exclude: /node_modules/,
                   },
+<<<<<<< HEAD
                 ],
+=======
+                ] as any[],
+>>>>>>> 4dd206c0dc4e487a36681a4080d0394c48b95fc5
           ),
         },
       ],
@@ -352,14 +378,24 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
             'pinia',
             '@vueuse/core',
             { from: 'dedent', imports: [['default', 'dedent']] },
+<<<<<<< HEAD
+=======
+            { from: 'klona', imports: ['klona'] },
+            { from: 'vue-final-modal', imports: ['useModal'] },
+>>>>>>> 4dd206c0dc4e487a36681a4080d0394c48b95fc5
             { from: 'zod', imports: ['z'] },
           ],
         }),
         unpluginVueComponents({
           dts: true,
           syncMode: 'overwrite',
+<<<<<<< HEAD
           resolvers: [VueUseComponentsResolver(), VueUseDirectiveResolver()],
           // globs: ['src/panel/component/*.vue'],
+=======
+          // globs: ['src/panel/component/*.vue'],
+          resolvers: [VueUseComponentsResolver(), VueUseDirectiveResolver()],
+>>>>>>> 4dd206c0dc4e487a36681a4080d0394c48b95fc5
         }),
         new webpack.optimize.LimitChunkCountPlugin({ maxChunks: 1 }),
         new webpack.DefinePlugin({
@@ -443,9 +479,19 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
       if (argv.mode !== 'production' && ['vue', 'pixi'].some(key => request.includes(key))) {
         return callback();
       }
+<<<<<<< HEAD
       const global = {
         jquery: '$',
         lodash: '_',
+=======
+      if (['react'].some(key => request.includes(key))) {
+        return callback();
+      }
+      const global = {
+        jquery: '$',
+        lodash: '_',
+        showdown: 'showdown',
+>>>>>>> 4dd206c0dc4e487a36681a4080d0394c48b95fc5
         toastr: 'toastr',
         vue: 'Vue',
         'vue-router': 'VueRouter',
