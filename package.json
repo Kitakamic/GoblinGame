@@ -5,7 +5,12 @@
     "watch": "webpack --mode development --watch --progress",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,css,scss,html,vue}\"",
     "lint": "eslint",
+<<<<<<< HEAD
     "lint:fix": "eslint --fix"
+=======
+    "lint:fix": "eslint --fix",
+    "dump": "node dump_schema.ts"
+>>>>>>> 4d711bd501f9f52d211bfb86391113e9f3d8504e
   },
   "browserslist": [
     "defaults and partially supports es6-module"
@@ -13,14 +18,27 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@tailwindcss/postcss": "^4.1.17",
+<<<<<<< HEAD
     "@types/glob": "^9.0.0",
     "@types/jquery": "^3.5.33",
     "@types/jqueryui": "^1.12.24",
     "@types/lodash": "^4.17.20",
+=======
+    "@types/jquery": "^3.5.33",
+    "@types/jqueryui": "^1.12.24",
+    "@types/lodash": "^4.17.20",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@types/showdown": "^2.0.6",
+>>>>>>> 4d711bd501f9f52d211bfb86391113e9f3d8504e
     "@types/toastr": "^2.1.43",
     "@types/webpack": "^5.28.5",
     "@typescript-eslint/parser": "^8.46.4",
     "autoprefixer": "^10.4.22",
+<<<<<<< HEAD
+=======
+    "chokidar": "^4.0.3",
+>>>>>>> 4d711bd501f9f52d211bfb86391113e9f3d8504e
     "css-loader": "^7.1.2",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
@@ -30,7 +48,10 @@
     "eslint-plugin-pinia": "^0.4.1",
     "eslint-plugin-vue": "^10.5.1",
     "eslint-webpack-plugin": "^5.0.2",
+<<<<<<< HEAD
     "glob": "^11.0.3",
+=======
+>>>>>>> 4d711bd501f9f52d211bfb86391113e9f3d8504e
     "globals": "^16.5.0",
     "html-inline-css-loader": "^0.2.1",
     "html-inline-css-webpack-plugin": "^1.11.2",
@@ -42,6 +63,10 @@
     "mini-css-extract-plugin": "^2.9.4",
     "postcss": "^8.5.6",
     "postcss-cli": "^11.0.1",
+<<<<<<< HEAD
+=======
+    "postcss-load-config": "^6.0.1",
+>>>>>>> 4d711bd501f9f52d211bfb86391113e9f3d8504e
     "postcss-loader": "^8.2.0",
     "postcss-minify": "^1.2.0",
     "prettier": "^3.6.2",
@@ -71,6 +96,11 @@
     "webpack-obfuscator": "^3.5.1"
   },
   "dependencies": {
+<<<<<<< HEAD
+=======
+    "@pixi/react": "8.0.0-beta.25",
+    "@vueuse/components": "^14.0.0",
+>>>>>>> 4d711bd501f9f52d211bfb86391113e9f3d8504e
     "@vueuse/core": "^13.9.0",
     "@vueuse/integrations": "^13.9.0",
     "@vueuse/shared": "^13.9.0",
@@ -78,11 +108,23 @@
     "gsap": "^3.13.0",
     "jquery": "^3.7.1",
     "jqueryui": "^1.11.1",
+<<<<<<< HEAD
     "lodash": "^4.17.21",
     "pinia": "^3.0.4",
     "pixi.js": "^8.14.1",
     "toastr": "^2.1.4",
     "vue": "^3.5.24",
+=======
+    "klona": "^2.0.6",
+    "lodash": "^4.17.21",
+    "pinia": "^3.0.4",
+    "pixi.js": "^8.14.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "toastr": "^2.1.4",
+    "vue": "^3.5.24",
+    "vue-final-modal": "^4.5.5",
+>>>>>>> 4d711bd501f9f52d211bfb86391113e9f3d8504e
     "vue-router": "^4.6.3",
     "vue3-pixi": "1.0.0-beta.3",
     "yaml": "^2.8.1",
@@ -92,6 +134,10 @@
     "onlyBuiltDependencies": [
       "@parcel/watcher",
       "@tailwindcss/oxide",
+<<<<<<< HEAD
+=======
+      "electron",
+>>>>>>> 4d711bd501f9f52d211bfb86391113e9f3d8504e
       "esbuild",
       "javascript-obfuscator",
       "unrs-resolver",
