@@ -1,7 +1,10 @@
 node_modules
+<<<<<<< HEAD
 imageGenerate
 scripts
 otherfiles
+=======
+>>>>>>> ba6a8cbd65eb2331437d53a70aa6035251541b2e
 
 .DS_Store
 Thumbs.db
@@ -10,4 +13,9 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
+pnpm-debug.log*<<<<<<< HEAD
+=======
+
+auto-imports.d.ts
+components.d.ts
+>>>>>>> ba6a8cbd65eb2331437d53a70aa6035251541b2e

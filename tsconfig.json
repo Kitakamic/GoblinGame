@@ -1,11 +1,31 @@
 {
   "compilerOptions": {
+<<<<<<< HEAD
     "types": ["jquery", "jqueryui", "lodash", "toastr", "type-fest", "yaml", "zod"],
+=======
+    "types": [
+      "jquery",
+      "jqueryui",
+      "lodash",
+      "toastr",
+      "type-fest",
+      "yaml",
+      "zod",
+    ],
+>>>>>>> ba6a8cbd65eb2331437d53a70aa6035251541b2e
     "target": "ESNext",
     "module": "ESNext",
     "outDir": "dist",
     "baseUrl": "src",
+<<<<<<< HEAD
     "paths": {},
+=======
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+>>>>>>> ba6a8cbd65eb2331437d53a70aa6035251541b2e
     "moduleDetection": "auto",
     "moduleResolution": "bundler",
     "allowUmdGlobalAccess": true,
@@ -15,14 +35,32 @@
     "checkJs": false,
     "sourceMap": true,
     "strict": true,
+<<<<<<< HEAD
+=======
+    "jsx": "react-jsx",
+>>>>>>> ba6a8cbd65eb2331437d53a70aa6035251541b2e
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "esModuleInterop": true,
+<<<<<<< HEAD
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
   "include": ["@types", "src", "*.d.ts", "auto-imports.d.ts", "components.d.ts"],
   "exclude": ["**/dist/**", "**/node_modules/**"]
+=======
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "@types",
+    "src",
+    "*.d.ts",
+  ],
+  "exclude": [
+    "**/dist/**",
+    "**/node_modules/**",
+  ]
+>>>>>>> ba6a8cbd65eb2331437d53a70aa6035251541b2e
 }

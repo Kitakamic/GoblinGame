@@ -56,6 +56,10 @@ export default [
       'import-x/no-cycle': 'error',
       'import-x/no-dynamic-require': 'warn',
       'import-x/no-nodejs-modules': 'warn',
+<<<<<<< HEAD
+=======
+      'import-x/no-unresolved': [2, { ignore: ['^http'] }],
+>>>>>>> ba6a8cbd65eb2331437d53a70aa6035251541b2e
       'no-dupe-class-members': 'off',
       'no-empty-function': 'off',
       'no-floating-decimal': 'error',
@@ -66,6 +70,10 @@ export default [
       'no-undef': 'off',
       'no-unused-vars': 'off',
       'no-var': 'error',
+<<<<<<< HEAD
+=======
+      'pinia/no-duplicate-store-ids': 'off',
+>>>>>>> ba6a8cbd65eb2331437d53a70aa6035251541b2e
       'pinia/require-setup-store-properties-export': 'off',
       'prefer-const': 'warn',
       'vue/multi-word-component-names': 'off',
@@ -75,6 +83,7 @@ export default [
     },
   },
   eslintConfigPrettier,
+<<<<<<< HEAD
   globalIgnores([
     'dist/**',
     'node_modules/**',
@@ -83,4 +92,7 @@ export default [
     'webpack.config.ts',
     'scripts/**',
   ]),
+=======
+  globalIgnores(['dist/**', 'node_modules/**', 'eslint.config.mjs', 'postcss.config.js', 'webpack.config.ts']),
+>>>>>>> ba6a8cbd65eb2331437d53a70aa6035251541b2e
 ];
