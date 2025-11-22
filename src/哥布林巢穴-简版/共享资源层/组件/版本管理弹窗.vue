@@ -48,7 +48,8 @@
               <select v-else v-model="selectedVersionNumber" class="version-select">
                 <option value="" disabled>请选择版本</option>
                 <option v-for="version in availableVersions" :key="version.version" :value="version.version">
-                  {{ version.version }} - {{ version.description }} ({{ version.date }})
+                  {{ version.version }} {{ version.type === 'beta' ? '[测试版]' : '[稳定版]' }} -
+                  {{ version.description }} ({{ version.date }})
                 </option>
               </select>
             </div>
@@ -105,6 +106,7 @@ interface VersionInfo {
   version: string;
   description: string;
   date: string;
+  type?: 'stable' | 'beta';
 }
 
 interface VersionList {

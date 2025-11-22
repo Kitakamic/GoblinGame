@@ -234,8 +234,9 @@ async function switchToVersion(version: string): Promise<void> {
  * @param newVersion 新版本信息
  */
 export async function showUpdateNotification(newVersion: VersionInfo): Promise<void> {
+  const versionTypeLabel = newVersion.type === 'beta' ? '[测试版]' : '[稳定版]';
   const message =
-    `发现新版本 ${newVersion.version}！\n\n` +
+    `发现新版本 ${newVersion.version} ${versionTypeLabel}！\n\n` +
     `更新时间：${newVersion.date}\n` +
     `更新说明：${newVersion.description}\n\n` +
     `是否直接更新到最新版本？\n（也可以前往版本管理页面选择其他版本）`;
@@ -245,7 +246,7 @@ export async function showUpdateNotification(newVersion: VersionInfo): Promise<v
     message: message,
     confirmText: '直接更新',
     cancelText: '前往版本管理',
-    details: `当前版本：${FRONTEND_VERSION}\n最新版本：${newVersion.version}`,
+    details: `当前版本：${FRONTEND_VERSION} (${FRONTEND_VERSION_TYPE === 'beta' ? '测试版' : '稳定版'})\n最新版本：${newVersion.version} ${versionTypeLabel}`,
   });
 
   // 处理不同的用户操作

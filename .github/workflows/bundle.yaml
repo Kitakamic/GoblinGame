@@ -129,7 +129,7 @@ jobs:
           # 读取版本号、日期、描述和类型
           VERSION_DATE=$(grep -oP "export const FRONTEND_UPDATE_DATE = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
           VERSION_DESC=$(grep -oP "export const FRONTEND_DESCRIPTION = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
-          VERSION_TYPE=$(grep -oP "export const FRONTEND_VERSION_TYPE: 'stable' | 'beta' = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
+          VERSION_TYPE=$(grep "export const FRONTEND_VERSION_TYPE" src/哥布林巢穴-简版/version.ts | grep -oP "= '([^']+)'" | tr -d "='")
 
           # 如果描述为空，使用默认值
           if [ -z "$VERSION_DESC" ]; then
@@ -147,12 +147,9 @@ jobs:
             aws s3 cp "s3://${R2_BUCKET}/versions.json" versions.json \
               --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
             
-            # 检查版本是否已存在
-            if grep -q "\"version\": \"${VERSION}\"" versions.json; then
-              echo "版本 ${VERSION} 已存在于版本列表中，跳过添加"
-            else
-              # 使用 Python 更新 JSON（更可靠）
-              python3 << EOF
+            # 使用 Python 更新 JSON（更可靠）
+            # 即使版本已存在，也更新其信息（类型、描述、日期等）
+            python3 << EOF
           import json
 
           with open('versions.json', 'r', encoding='utf-8') as f:
@@ -165,7 +162,7 @@ jobs:
               "type": "${VERSION_TYPE}"
           }
 
-          # 移除已存在的相同版本
+          # 移除已存在的相同版本（如果存在）
           data["versions"] = [v for v in data["versions"] if v["version"] != "${VERSION}"]
 
           # 添加到列表开头（最新版本在前）
@@ -175,8 +172,7 @@ jobs:
           with open('versions.json', 'w', encoding='utf-8') as f:
               json.dump(data, f, indent=2, ensure_ascii=False)
           EOF
-              echo "✓ 已添加版本 ${VERSION} 到版本列表"
-            fi
+            echo "✓ 已更新版本 ${VERSION} (类型: ${VERSION_TYPE}) 到版本列表"
           else
             echo "版本列表文件不存在，创建新文件..."
             cat > versions.json << EOF
