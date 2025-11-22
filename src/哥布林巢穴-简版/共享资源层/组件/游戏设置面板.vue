@@ -7,24 +7,28 @@
       </div>
 
       <div class="panel-content">
+        <!-- 选项卡导航 -->
+        <div class="tabs-nav">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="tab-button"
+            :class="{ active: activeTab === tab.id }"
+            @click="activeTab = tab.id"
+          >
+            <span class="tab-icon">{{ tab.icon }}</span>
+            <span class="tab-label">{{ tab.label }}</span>
+          </button>
+        </div>
+
         <!-- 版本管理 -->
-        <div class="settings-section">
+        <div v-show="activeTab === 'version'" class="settings-section">
           <h4 class="section-title">版本管理</h4>
 
-          <div class="setting-item">
-            <div class="version-info-display">
-              <div class="version-info-row">
-                <span class="version-info-label">当前版本：</span>
-                <span class="version-info-value">{{ FRONTEND_VERSION }}</span>
-              </div>
-              <div class="version-info-row">
-                <span class="version-info-label">更新时间：</span>
-                <span class="version-info-value">{{ FRONTEND_UPDATE_DATE }}</span>
-              </div>
-            </div>
-            <button class="version-button" @click="openVersionManager">🔖 版本管理</button>
-            <div class="setting-desc">切换版本、查看版本列表</div>
-          </div>
+          <!-- 版本管理内容 -->
+          <VersionManagerContent ref="versionManagerRef" :auto-load="false" :visible="activeTab === 'version'" />
+
+          <div class="divider" style="margin: 24px 0"></div>
 
           <div class="setting-item">
             <label class="setting-label">
@@ -43,11 +47,8 @@
           </div>
         </div>
 
-        <!-- 分隔线 -->
-        <div class="divider"></div>
-
-        <!-- 流式传输设置 -->
-        <div class="settings-section">
+        <!-- AI 输出设置 -->
+        <div v-show="activeTab === 'ai'" class="settings-section">
           <h4 class="section-title">AI 输出设置</h4>
 
           <div class="setting-item">
@@ -63,7 +64,7 @@
         </div>
 
         <!-- 游戏机制设置 -->
-        <div class="settings-section">
+        <div v-show="activeTab === 'game'" class="settings-section">
           <h4 class="section-title">游戏机制设置</h4>
 
           <div class="setting-item">
@@ -147,11 +148,8 @@
           </div>
         </div>
 
-        <!-- 分隔线 -->
-        <div class="divider"></div>
-
         <!-- 思维链格式自定义 -->
-        <div class="settings-section">
+        <div v-show="activeTab === 'chain'" class="settings-section">
           <h4 class="section-title">思维链格式自定义</h4>
           <div class="setting-item">
             <label class="setting-label">
@@ -210,11 +208,8 @@
           </div>
         </div>
 
-        <!-- 分隔线 -->
-        <div class="divider"></div>
-
         <!-- 玩家角色设置 -->
-        <div class="settings-section">
+        <div v-show="activeTab === 'player'" class="settings-section">
           <h4 class="section-title">玩家角色设置</h4>
 
           <div class="setting-item">
@@ -263,23 +258,16 @@
           </div>
         </div>
 
-        <!-- 分隔线 -->
-        <div class="divider"></div>
-
-        <!-- 文字样式设置按钮 -->
-        <div class="settings-section">
+        <!-- 其他设置 -->
+        <div v-show="activeTab === 'other'" class="settings-section">
           <h4 class="section-title">界面设置</h4>
 
           <div class="setting-item">
             <button class="style-button" @click="openTextStyleSettings">🎨 对话文字颜色和字体设置</button>
           </div>
-        </div>
 
-        <!-- 分隔线 -->
-        <div class="divider"></div>
+          <div class="divider" style="margin: 24px 0"></div>
 
-        <!-- 帮助和教程 -->
-        <div class="settings-section">
           <h4 class="section-title">帮助</h4>
 
           <div class="setting-item">
@@ -289,18 +277,14 @@
       </div>
     </div>
   </div>
-
-  <!-- 版本管理弹窗 -->
-  <component :is="VersionManagerModal" :show="showVersionManager" @close="closeVersionManager" />
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
-import { FRONTEND_UPDATE_DATE, FRONTEND_VERSION } from '../../version';
+import { nextTick, onMounted, ref, watch } from 'vue';
 import { ChainOfThoughtManager, ChainOfThoughtMode } from '../../核心层/服务/世界书管理/工具/思维链管理器';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
 import { ConfirmService } from '../../核心层/服务/通用服务/确认框服务';
-import VersionManagerModal from './版本管理弹窗.vue';
+import VersionManagerContent from './版本管理内容.vue';
 
 interface Props {
   show: boolean;
@@ -312,9 +296,6 @@ const emit = defineEmits<{
   (e: 'open-text-style'): void;
   (e: 'open-tutorial'): void;
 }>();
-
-// 版本管理弹窗状态
-const showVersionManager = ref(false);
 
 // 检查测试版更新设置
 const checkBetaVersion = ref(false);
@@ -350,6 +331,9 @@ const playerAvatar = ref('https://files.catbox.moe/x4g8t7.jpg');
 
 // 文件上传相关
 const fileInput = ref<HTMLInputElement | null>(null);
+
+// 版本管理组件引用
+const versionManagerRef = ref<InstanceType<typeof VersionManagerContent> | null>(null);
 
 // 保存状态，防止重复点击
 const isSaving = ref(false);
@@ -1038,20 +1022,26 @@ const openTutorial = () => {
   emit('open-tutorial');
 };
 
-// 打开版本管理
-const openVersionManager = () => {
-  showVersionManager.value = true;
-};
-
-// 关闭版本管理
-const closeVersionManager = () => {
-  showVersionManager.value = false;
-};
-
 // 关闭面板
 const close = () => {
   emit('close');
 };
+
+// 选项卡类型定义
+type TabId = 'version' | 'ai' | 'game' | 'chain' | 'player' | 'other';
+
+// 选项卡定义
+const tabs: Array<{ id: TabId; icon: string; label: string }> = [
+  { id: 'version', icon: '🔖', label: '版本管理' },
+  { id: 'ai', icon: '🤖', label: 'AI 输出' },
+  { id: 'game', icon: '⚙️', label: '游戏机制' },
+  { id: 'chain', icon: '🔗', label: '思维链' },
+  { id: 'player', icon: '👤', label: '玩家角色' },
+  { id: 'other', icon: '⚙️', label: '其他设置' },
+];
+
+// 当前激活的选项卡
+const activeTab = ref<TabId>('version');
 
 // 监听显示状态
 watch(
@@ -1063,25 +1053,70 @@ watch(
   },
 );
 
+// 监听选项卡切换，当切换到版本管理时确保数据已加载（但不强制重新加载）
+watch(
+  () => activeTab.value,
+  newTab => {
+    if (newTab === 'version') {
+      // 延迟一点确保组件已渲染和可见
+      nextTick(() => {
+        setTimeout(() => {
+          if (versionManagerRef.value) {
+            // 检查是否有数据，如果没有才加载
+            if (versionManagerRef.value.availableVersions.length === 0) {
+              console.log('📥 切换到版本管理选项卡，数据为空，开始加载版本列表...');
+              if (typeof versionManagerRef.value.loadVersionList === 'function') {
+                versionManagerRef.value.loadVersionList();
+              }
+            } else {
+              console.log('✅ 切换到版本管理选项卡，数据已存在，无需重新加载');
+            }
+          } else {
+            console.warn('⚠️ 版本管理组件引用不存在，延迟重试...');
+            // 如果组件还没准备好，再等一会儿重试
+            setTimeout(() => {
+              if (versionManagerRef.value) {
+                if (versionManagerRef.value.availableVersions.length === 0) {
+                  if (typeof versionManagerRef.value.loadVersionList === 'function') {
+                    console.log('📥 延迟重试：切换到版本管理选项卡，开始加载版本列表...');
+                    versionManagerRef.value.loadVersionList();
+                  }
+                }
+              }
+            }, 500);
+          }
+        }, 300);
+      });
+    }
+  },
+  { immediate: false }, // 不立即执行，等待组件挂载完成
+);
+
+// 组件挂载后，如果默认就是版本管理选项卡，则检查是否需要加载
+onMounted(() => {
+  if (activeTab.value === 'version') {
+    nextTick(() => {
+      setTimeout(() => {
+        if (versionManagerRef.value) {
+          // 检查是否有数据，如果没有才加载
+          if (versionManagerRef.value.availableVersions.length === 0) {
+            console.log('📥 组件挂载完成，默认选项卡是版本管理，数据为空，开始加载版本列表...');
+            if (typeof versionManagerRef.value.loadVersionList === 'function') {
+              versionManagerRef.value.loadVersionList();
+            }
+          } else {
+            console.log('✅ 组件挂载完成，默认选项卡是版本管理，数据已存在，无需重新加载');
+          }
+        }
+      }, 400);
+    });
+  }
+});
+
 // 监听选择的思维链模式变化
 watch(selectedChainMode, () => {
   loadChainFormat();
 });
-
-// 监听打开版本管理的事件（从 app.vue 触发）
-watch(
-  () => props.show,
-  newVal => {
-    if (newVal) {
-      // 设置面板打开时，检查是否有打开版本管理的请求
-      const handleOpenVersionManager = () => {
-        openVersionManager();
-        window.removeEventListener('open-settings-version-manager', handleOpenVersionManager);
-      };
-      window.addEventListener('open-settings-version-manager', handleOpenVersionManager);
-    }
-  },
-);
 
 // 初始化
 onMounted(() => {
@@ -1181,6 +1216,112 @@ onMounted(() => {
   }
 }
 
+/* 选项卡导航 */
+.tabs-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid rgba(205, 133, 63, 0.3);
+
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+
+  @media (min-width: 481px) and (max-width: 768px) {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+
+  @media (min-width: 769px) and (max-width: 1024px) {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  @media (min-width: 1025px) {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+.tab-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(205, 133, 63, 0.2);
+  border-radius: 8px;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  width: 100%;
+  min-height: 60px;
+
+  .tab-icon {
+    font-size: 20px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+    line-height: 1;
+  }
+
+  .tab-label {
+    font-size: 11px;
+    line-height: 1.2;
+    word-break: keep-all;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+
+    @media (max-width: 480px) {
+      font-size: 10px;
+    }
+  }
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: rgba(205, 133, 63, 0.4);
+    color: #d1d5db;
+    transform: translateY(-1px);
+  }
+
+  &.active {
+    background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(205, 133, 63, 0.2));
+    border-color: rgba(205, 133, 63, 0.6);
+    color: #ffd7a1;
+    box-shadow: 0 2px 8px rgba(205, 133, 63, 0.3);
+
+    .tab-icon {
+      filter: drop-shadow(0 2px 4px rgba(205, 133, 63, 0.5));
+      transform: scale(1.1);
+    }
+
+    &:hover {
+      background: linear-gradient(135deg, rgba(205, 133, 63, 0.4), rgba(205, 133, 63, 0.3));
+      border-color: rgba(205, 133, 63, 0.7);
+    }
+  }
+
+  @media (max-width: 480px) {
+    padding: 8px 4px;
+    min-height: 56px;
+    gap: 3px;
+
+    .tab-icon {
+      font-size: 18px;
+    }
+  }
+}
+
 .divider {
   height: 1px;
   background: rgba(205, 133, 63, 0.3);
@@ -1215,36 +1356,6 @@ onMounted(() => {
   font-size: 12px;
   line-height: 1.5;
   margin-top: 8px;
-}
-
-.version-info-display {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 12px;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(167, 139, 250, 0.3);
-  border-radius: 6px;
-}
-
-.version-info-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.version-info-label {
-  font-size: 13px;
-  color: #d1d5db;
-  font-weight: 500;
-  min-width: 80px;
-}
-
-.version-info-value {
-  font-size: 13px;
-  color: #fff;
-  font-weight: 600;
 }
 
 .setting-label {

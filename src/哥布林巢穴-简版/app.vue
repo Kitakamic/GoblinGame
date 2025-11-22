@@ -282,10 +282,7 @@ onMounted(async () => {
   const handleOpenVersionManager = () => {
     // 先打开设置面板
     openSettings();
-    // 然后触发打开版本管理弹窗（通过设置面板）
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('open-settings-version-manager'));
-    }, 300); // 延迟一点，确保设置面板已经打开
+    // 版本管理内容已直接显示在设置面板的版本管理选项卡中
   };
 
   window.addEventListener('open-version-manager', handleOpenVersionManager);

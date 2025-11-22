@@ -104,9 +104,17 @@ async function getLatestVersion(stableOnly: boolean = true): Promise<VersionInfo
       }
     }
 
-    // 版本列表已经按版本号降序排列（最新版本在前）
-    const latestVersion = versionsToCheck[0];
+    // 按版本号降序排列（最新版本在前），确保返回的是最新版本
+    const sortedVersions = versionsToCheck.sort((a, b) => {
+      return compareVersions(b.version, a.version); // 降序排列（b > a 时返回 1）
+    });
+
+    const latestVersion = sortedVersions[0];
     console.log('✅ [版本检测] 获取到最新版本:', latestVersion);
+    console.log(
+      '📋 [版本检测] 排序后的版本列表:',
+      sortedVersions.map(v => v.version),
+    );
 
     return latestVersion;
   } catch (error) {

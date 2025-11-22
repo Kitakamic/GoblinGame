@@ -5,7 +5,7 @@ import { CharacterWorldbookManager } from '../管理器/人物信息管理器';
 import { PreBattleDialogueManager } from '../管理器/人物剧情/战前对话管理器';
 import { BattleSummaryManager } from '../管理器/人物剧情/战斗总结管理器';
 import { TrainingRecordManager } from '../管理器/人物剧情/调教记录管理器';
-import { GameEventLorebookManager } from '../管理器/冒头事件管理器';
+import { GameEventLorebookManager } from '../管理器/历史记录/冒头事件管理器';
 import { ConquestRecordManager } from '../管理器/历史记录/据点征服管理器';
 import { ResourcesWorldbookManager } from '../管理器/历史记录/资源同步管理器';
 import type { HistoryRecord } from '../类型/世界书类型定义';
