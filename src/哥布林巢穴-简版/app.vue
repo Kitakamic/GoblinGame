@@ -75,7 +75,7 @@
     />
 
     <!-- 全局悬浮球 -->
-    <GlobalFAB @open-settings="openSettings" @open-debug="openDebug" />
+    <GlobalFAB @open-settings="openSettings" @open-debug="openDebug" @open-worldbook="openWorldbook" />
 
     <!-- 欢迎提示弹窗 -->
     <WelcomeModal :show="showWelcomeModal" @confirm="handleWelcomeConfirm" @close="handleWelcomeClose" />
@@ -85,11 +85,15 @@
 
     <!-- 生成错误提示 -->
     <GenerationErrorPanel />
+
+    <!-- 世界书管理界面 -->
+    <WorldbookManager :show="showWorldbookManager" @close="closeWorldbook" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
+import WorldbookManager from './共享资源层/组件/世界书管理界面.vue';
 import GlobalFAB from './共享资源层/组件/全局悬浮球.vue';
 import TextStyleSettings from './共享资源层/组件/文字样式设置.vue';
 import WelcomeModal from './共享资源层/组件/欢迎提示弹窗.vue';
@@ -137,6 +141,7 @@ const disableAutoSave = () => {
 const showSettings = ref(false);
 const showTextStyleSettings = ref(false);
 const showDebugPanel = ref(false);
+const showWorldbookManager = ref(false);
 
 // 设置相关函数
 function openSettings() {
@@ -168,6 +173,15 @@ function openDebug() {
 
 function closeDebug() {
   showDebugPanel.value = false;
+}
+
+// 世界书管理界面相关函数
+function openWorldbook() {
+  showWorldbookManager.value = true;
+}
+
+function closeWorldbook() {
+  showWorldbookManager.value = false;
 }
 
 // 教程确认框状态
