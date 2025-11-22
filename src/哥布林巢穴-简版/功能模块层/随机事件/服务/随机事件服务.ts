@@ -251,12 +251,12 @@ export class RandomEventService {
    * 清理过期的CD记录（可选优化）
    */
   public cleanupExpiredCooldowns(currentRound: number): void {
-    this.eventHistory = this.eventHistory.filter(history => {
+    this.eventHistory.forEach(history => {
       if (history.cooldownUntil && currentRound >= history.cooldownUntil) {
         console.log(`清理过期CD: ${history.eventId} (CD已结束)`);
-        return false;
+        // 只清除CD信息，保留触发历史记录
+        history.cooldownUntil = undefined;
       }
-      return true;
     });
   }
 

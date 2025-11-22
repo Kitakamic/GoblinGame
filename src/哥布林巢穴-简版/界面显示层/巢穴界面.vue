@@ -50,16 +50,17 @@
 
 <script setup lang="ts">
 import { computed, onActivated, onMounted, ref, watch } from 'vue';
-import SacrificeDialog from '../共享资源层/组件/献祭对话框.vue';
+import { SacrificeService, type SacrificeAmounts } from '../功能模块层/巢穴/服务/献祭服务';
 import { modularSaveManager } from '../核心层/服务/存档系统/模块化存档服务';
 import type { NestModuleData } from '../核心层/服务/存档系统/模块化存档类型';
-import { SacrificeService, type SacrificeAmounts } from '../核心层/服务/通用服务/献祭服务';
 import { PlayerLevelService } from '../核心层/服务/通用服务/玩家等级服务';
 import { ConfirmService } from '../核心层/服务/通用服务/确认框服务';
+// 巢穴界面子页面
 import NestHeader from './巢穴界面子页面/巢穴头部.vue';
 import BuildingTabs from './巢穴界面子页面/建筑标签页.vue';
 import BuildingSlotGrid from './巢穴界面子页面/建筑槽位网格.vue';
 import BuildingMenu from './巢穴界面子页面/建筑选择菜单.vue';
+import SacrificeDialog from './巢穴界面子页面/献祭对话框.vue';
 
 // ==================== 类型定义 ====================
 

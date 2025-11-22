@@ -2,6 +2,10 @@ node_modules
 imageGenerate
 scripts
 otherfiles
+.cursor
+.kilocode
+.vscode
+@types
 
 .DS_Store
 Thumbs.db
