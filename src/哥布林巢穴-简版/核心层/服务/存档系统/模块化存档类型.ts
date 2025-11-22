@@ -97,6 +97,12 @@ export const INITIAL_NEST_DATA: NestModuleData = {
       unlocked: false,
     },
   ],
+  globalSlots: [
+    {
+      building: null,
+      unlocked: false,
+    },
+  ],
   activeTab: 'breeding',
   totalIncome: {
     gold: 30, // 贸易间收入
@@ -464,7 +470,7 @@ export interface NestModuleData {
       icon: string;
       description: string;
       cost: { gold: number; food: number };
-      category: 'breeding' | 'resource';
+      category: 'breeding' | 'resource' | 'global';
       income?: { gold?: number; food?: number };
       effects: { type: string; icon: string; description: string }[];
     } | null;
@@ -477,14 +483,27 @@ export interface NestModuleData {
       icon: string;
       description: string;
       cost: { gold: number; food: number };
-      category: 'breeding' | 'resource';
+      category: 'breeding' | 'resource' | 'global';
+      income?: { gold?: number; food?: number };
+      effects: { type: string; icon: string; description: string }[];
+    } | null;
+    unlocked: boolean;
+  }[];
+  globalSlots: {
+    building: {
+      id: string;
+      name: string;
+      icon: string;
+      description: string;
+      cost: { gold: number; food: number };
+      category: 'breeding' | 'resource' | 'global';
       income?: { gold?: number; food?: number };
       effects: { type: string; icon: string; description: string }[];
     } | null;
     unlocked: boolean;
   }[];
   // 界面状态
-  activeTab: 'breeding' | 'resource';
+  activeTab: 'breeding' | 'resource' | 'global';
   // 巢穴收入总值（每回合计算后存储）
   totalIncome: {
     gold: number;

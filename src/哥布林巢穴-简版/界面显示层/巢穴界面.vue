@@ -32,6 +32,18 @@
         @remove-building="(index: number) => removeBuilding(index, 'resource')"
         @sacrifice-click="openSacrificeDialog"
       />
+
+      <!-- 全局建筑槽位 -->
+      <BuildingSlotGrid
+        v-if="activeTab === 'global'"
+        :slots="globalSlots"
+        :slot-type="'global'"
+        :get-slot-cost="getSlotCost"
+        :is-next-unlock-slot="(index: number) => isNextUnlockSlot(index, 'global')"
+        @slot-click="(index: number) => handleSlotClick(index, 'global')"
+        @remove-building="(index: number) => removeBuilding(index, 'global')"
+        @sacrifice-click="() => {}"
+      />
     </div>
 
     <!-- 建筑选择菜单 -->
@@ -55,74 +67,15 @@ import { modularSaveManager } from '../核心层/服务/存档系统/模块化�
 import type { NestModuleData } from '../核心层/服务/存档系统/模块化存档类型';
 import { PlayerLevelService } from '../核心层/服务/通用服务/玩家等级服务';
 import { ConfirmService } from '../核心层/服务/通用服务/确认框服务';
+// 建筑类型和数据
+import { breedingBuildings, globalBuildings, resourceBuildings } from '../功能模块层/巢穴/数据/建筑数据';
+import type { Building, BuildingSlot, SlotCost, SlotType } from '../功能模块层/巢穴/类型/建筑类型';
 // 巢穴界面子页面
 import NestHeader from './巢穴界面子页面/巢穴头部.vue';
 import BuildingTabs from './巢穴界面子页面/建筑标签页.vue';
 import BuildingSlotGrid from './巢穴界面子页面/建筑槽位网格.vue';
 import BuildingMenu from './巢穴界面子页面/建筑选择菜单.vue';
 import SacrificeDialog from './巢穴界面子页面/献祭对话框.vue';
-
-// ==================== 类型定义 ====================
-
-/**
- * 建筑效果接口
- */
-interface BuildingEffect {
-  type: string;
-  icon: string;
-  description: string;
-}
-
-/**
- * 建筑成本接口
- */
-interface BuildingCost {
-  gold: number;
-  food: number;
-}
-
-/**
- * 建筑收入接口
- */
-interface BuildingIncome {
-  gold?: number;
-  food?: number;
-}
-
-/**
- * 建筑接口定义
- */
-interface Building {
-  id: string;
-  name: string;
-  icon: string;
-  description: string;
-  cost: BuildingCost;
-  category: 'breeding' | 'resource';
-  income?: BuildingIncome; // 每回合收入
-  effects: BuildingEffect[];
-}
-
-/**
- * 建筑槽位接口定义
- */
-interface BuildingSlot {
-  building: Building | null;
-  unlocked: boolean;
-}
-
-/**
- * 槽位类型
- */
-type SlotType = 'breeding' | 'resource';
-
-/**
- * 槽位成本接口
- */
-interface SlotCost {
-  gold: number;
-  food: number;
-}
 
 // ==================== 资源管理 ====================
 
@@ -182,6 +135,7 @@ const selectedSlotType = ref<SlotType>('breeding');
 // 建筑槽位数据
 const breedingSlots = ref<BuildingSlot[]>([]);
 const resourceSlots = ref<BuildingSlot[]>([]);
+const globalSlots = ref<BuildingSlot[]>([]);
 
 // 人物数据
 const characters = ref<any[]>([]);
@@ -192,75 +146,8 @@ const characters = ref<any[]>([]);
 const showSacrificeDialog = ref(false);
 const currentSacrificeSlotIndex = ref(-1);
 
-// ==================== 建筑数据定义 ====================
-
-/**
- * 繁殖间建筑列表
- */
-const breedingBuildings: Building[] = [
-  {
-    id: 'breeding',
-    name: '繁殖间',
-    icon: '👶',
-    description: '用于俘虏生育哥布林',
-    cost: { gold: 50, food: 30 },
-    category: 'breeding',
-    effects: [{ type: 'breeding', icon: '👶', description: '俘虏生育哥布林' }],
-  },
-];
-
-/**
- * 资源建筑列表
- */
-const resourceBuildings: Building[] = [
-  {
-    id: 'food',
-    name: '食物间',
-    icon: '🍖',
-    description: '每回合+20食物',
-    cost: { gold: 100, food: 50 },
-    category: 'resource',
-    income: { food: 20 },
-    effects: [{ type: 'food', icon: '🍖', description: '每回合+20食物' }],
-  },
-  {
-    id: 'trade',
-    name: '贸易间',
-    icon: '💰',
-    description: '每回合+30金钱',
-    cost: { gold: 150, food: 30 },
-    category: 'resource',
-    income: { gold: 30 },
-    effects: [{ type: 'gold', icon: '💰', description: '每回合+30金钱' }],
-  },
-  {
-    id: 'food_warehouse',
-    name: '食物仓库',
-    icon: '🏚️',
-    description: '提高食物储存，食物总收入+10%',
-    cost: { gold: 200, food: 120 },
-    category: 'resource',
-    effects: [{ type: 'food_multiplier', icon: '🍖', description: '食物收入+10%' }],
-  },
-  {
-    id: 'gold_hall',
-    name: '金币大厅',
-    icon: '🏦',
-    description: '改善金币储存，金币总收入+10%',
-    cost: { gold: 260, food: 80 },
-    category: 'resource',
-    effects: [{ type: 'gold_multiplier', icon: '💰', description: '金钱收入+10%' }],
-  },
-  {
-    id: 'sacrifice_altar',
-    name: '献祭祭坛',
-    icon: '🔥',
-    description: '献祭哥布林升级人物等级',
-    cost: { gold: 3000, food: 1500 },
-    category: 'resource',
-    effects: [{ type: 'sacrifice', icon: '🔥', description: '献祭哥布林升级等级' }],
-  },
-];
+// ==================== 建筑数据 ====================
+// 建筑数据已从 '../功能模块层/巢穴/数据/建筑数据' 导入
 
 // ==================== 计算属性 ====================
 
@@ -268,7 +155,14 @@ const resourceBuildings: Building[] = [
  * 当前可用建筑列表（根据选中的标签页）
  */
 const availableBuildings = computed(() => {
-  const buildings = activeTab.value === 'breeding' ? breedingBuildings : resourceBuildings;
+  let buildings: Building[];
+  if (activeTab.value === 'breeding') {
+    buildings = breedingBuildings;
+  } else if (activeTab.value === 'resource') {
+    buildings = resourceBuildings;
+  } else {
+    buildings = globalBuildings;
+  }
 
   // 为繁殖间计算动态成本
   if (activeTab.value === 'breeding') {
@@ -288,14 +182,19 @@ const availableBuildings = computed(() => {
   }
 
   // 资源建筑：过滤掉已存在的献祭祭坛（只允许建造1个）
-  return buildings.filter(building => {
-    if (building.id === 'sacrifice_altar') {
-      // 检查是否已经有献祭祭坛
-      const existingAltarCount = resourceSlots.value.filter(slot => slot.building?.id === 'sacrifice_altar').length;
-      return existingAltarCount === 0; // 如果已经有1个或以上，则不显示
-    }
-    return true;
-  });
+  if (activeTab.value === 'resource') {
+    return buildings.filter(building => {
+      if (building.id === 'sacrifice_altar') {
+        // 检查是否已经有献祭祭坛
+        const existingAltarCount = resourceSlots.value.filter(slot => slot.building?.id === 'sacrifice_altar').length;
+        return existingAltarCount === 0; // 如果已经有1个或以上，则不显示
+      }
+      return true;
+    });
+  }
+
+  // 全局建筑：直接返回所有建筑
+  return buildings;
 });
 
 /**
@@ -315,6 +214,14 @@ const totalIncome = computed(() => {
 
   // 计算资源建筑收入
   resourceSlots.value.forEach(slot => {
+    if (slot.building && slot.building.income) {
+      if (slot.building.income.gold) totalGold += slot.building.income.gold;
+      if (slot.building.income.food) totalFood += slot.building.income.food;
+    }
+  });
+
+  // 计算全局建筑收入
+  globalSlots.value.forEach(slot => {
     if (slot.building && slot.building.income) {
       if (slot.building.income.gold) totalGold += slot.building.income.gold;
       if (slot.building.income.food) totalFood += slot.building.income.food;
@@ -373,9 +280,18 @@ const initializeSlots = () => {
     unlocked: false,
   });
 
+  // 初始化全局建筑槽位
+  globalSlots.value = [];
+  // 添加一个可开通的槽位
+  globalSlots.value.push({
+    building: null,
+    unlocked: false,
+  });
+
   console.log('槽位初始化完成:');
   console.log('繁殖间槽位:', breedingSlots.value);
   console.log('资源建筑槽位:', resourceSlots.value);
+  console.log('全局建筑槽位:', globalSlots.value);
 };
 
 /**
@@ -387,8 +303,13 @@ const addNewSlot = (type: SlotType) => {
       building: null,
       unlocked: false,
     });
-  } else {
+  } else if (type === 'resource') {
     resourceSlots.value.push({
+      building: null,
+      unlocked: false,
+    });
+  } else if (type === 'global') {
+    globalSlots.value.push({
       building: null,
       unlocked: false,
     });
@@ -415,7 +336,8 @@ const getSlotCost = (index: number): SlotCost => {
  * 处理槽位点击事件
  */
 const handleSlotClick = (index: number, type: SlotType) => {
-  const slots = type === 'breeding' ? breedingSlots.value : resourceSlots.value;
+  const slots =
+    type === 'breeding' ? breedingSlots.value : type === 'resource' ? resourceSlots.value : globalSlots.value;
   const slot = slots[index];
 
   if (!slot.unlocked) {
@@ -486,19 +408,27 @@ const canUnlockSlot = (index: number, type: SlotType) => {
  * 检查是否是下一个可开通的槽位
  */
 const isNextUnlockSlot = (index: number, type: SlotType) => {
-  const slots = type === 'breeding' ? breedingSlots.value : resourceSlots.value;
+  const slots =
+    type === 'breeding' ? breedingSlots.value : type === 'resource' ? resourceSlots.value : globalSlots.value;
   if (slots[index].unlocked) return false;
 
   if (type === 'breeding') {
-    // 繁殖间：与资源建筑相同，从索引2开始查找第一个未开通的槽位
+    // 繁殖间：从索引2开始查找第一个未开通的槽位
+    for (let i = 2; i < slots.length; i++) {
+      if (!slots[i].unlocked) {
+        return i === index;
+      }
+    }
+  } else if (type === 'resource') {
+    // 资源建筑：从索引2开始查找第一个未开通的槽位
     for (let i = 2; i < slots.length; i++) {
       if (!slots[i].unlocked) {
         return i === index;
       }
     }
   } else {
-    // 资源建筑：从索引2开始查找第一个未开通的槽位
-    for (let i = 2; i < slots.length; i++) {
+    // 全局建筑：从索引1开始查找第一个未开通的槽位
+    for (let i = 1; i < slots.length; i++) {
       if (!slots[i].unlocked) {
         return i === index;
       }
@@ -603,7 +533,12 @@ const selectBuilding = (building: Building) => {
 
     // 消耗资源并建设建筑
     if (payForBuilding(actualCost, building.name)) {
-      const slots = selectedSlotType.value === 'breeding' ? breedingSlots.value : resourceSlots.value;
+      const slots =
+        selectedSlotType.value === 'breeding'
+          ? breedingSlots.value
+          : selectedSlotType.value === 'resource'
+            ? resourceSlots.value
+            : globalSlots.value;
       slots[selectedSlotIndex.value].building = building;
       // 立即保存，确保数据不丢失
       saveBuildingData();
@@ -617,7 +552,8 @@ const selectBuilding = (building: Building) => {
  * 拆除建筑
  */
 const removeBuilding = async (slotIndex: number, type: SlotType) => {
-  const slots = type === 'breeding' ? breedingSlots.value : resourceSlots.value;
+  const slots =
+    type === 'breeding' ? breedingSlots.value : type === 'resource' ? resourceSlots.value : globalSlots.value;
   const building = slots[slotIndex].building;
   if (!building) return;
 
@@ -648,6 +584,7 @@ const saveBuildingData = (): void => {
     const nestData: NestModuleData = {
       breedingSlots: breedingSlots.value,
       resourceSlots: resourceSlots.value,
+      globalSlots: globalSlots.value,
       activeTab: activeTab.value,
       totalIncome: currentTotalIncome,
       breedingRoomInfo: [], // 繁殖间信息由调教界面同步管理
@@ -685,6 +622,7 @@ const loadBuildingData = (): void => {
       // 更新界面数据
       breedingSlots.value = nestData.breedingSlots || [];
       resourceSlots.value = nestData.resourceSlots || [];
+      globalSlots.value = nestData.globalSlots || [];
       activeTab.value = nestData.activeTab || 'breeding';
 
       console.log('巢穴数据加载成功');
@@ -695,6 +633,7 @@ const loadBuildingData = (): void => {
       if (initialNestData) {
         breedingSlots.value = initialNestData.breedingSlots;
         resourceSlots.value = initialNestData.resourceSlots;
+        globalSlots.value = initialNestData.globalSlots || [];
         activeTab.value = initialNestData.activeTab;
         console.log('使用初始巢穴数据');
       } else {
@@ -709,6 +648,7 @@ const loadBuildingData = (): void => {
       if (initialNestData) {
         breedingSlots.value = initialNestData.breedingSlots;
         resourceSlots.value = initialNestData.resourceSlots;
+        globalSlots.value = initialNestData.globalSlots || [];
         activeTab.value = initialNestData.activeTab;
         console.log('使用初始数据作为后备方案');
       }

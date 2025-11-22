@@ -48,7 +48,7 @@ interface Building {
   icon: string;
   description: string;
   cost: BuildingCost;
-  category: 'breeding' | 'resource';
+  category: 'breeding' | 'resource' | 'global';
   income?: BuildingIncome;
   effects: BuildingEffect[];
 }
