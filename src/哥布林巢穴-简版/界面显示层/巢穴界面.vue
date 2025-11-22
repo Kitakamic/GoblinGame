@@ -33,16 +33,16 @@
         @sacrifice-click="openSacrificeDialog"
       />
 
-      <!-- 全局建筑槽位 -->
-      <BuildingSlotGrid
+      <!-- 全局建筑（点建式） -->
+      <GlobalBuildingsGrid
         v-if="activeTab === 'global'"
-        :slots="globalSlots"
-        :slot-type="'global'"
-        :get-slot-cost="getSlotCost"
-        :is-next-unlock-slot="(index: number) => isNextUnlockSlot(index, 'global')"
-        @slot-click="(index: number) => handleSlotClick(index, 'global')"
-        @remove-building="(index: number) => removeBuilding(index, 'global')"
-        @sacrifice-click="() => {}"
+        :available-buildings="globalBuildings"
+        :built-buildings="builtGlobalBuildings"
+        :is-unlocked="checkGlobalBuildingUnlock"
+        :can-build="canBuildGlobalBuilding"
+        @build="handleBuildGlobalBuilding"
+        @remove="handleRemoveGlobalBuilding"
+        @interact="handleGlobalBuildingInteract"
       />
     </div>
 
@@ -71,6 +71,7 @@ import { ConfirmService } from '../核心层/服务/通用服务/确认框服务
 import { breedingBuildings, globalBuildings, resourceBuildings } from '../功能模块层/巢穴/数据/建筑数据';
 import type { Building, BuildingSlot, SlotCost, SlotType } from '../功能模块层/巢穴/类型/建筑类型';
 // 巢穴界面子页面
+import GlobalBuildingsGrid from './巢穴界面子页面/全局建筑网格.vue';
 import NestHeader from './巢穴界面子页面/巢穴头部.vue';
 import BuildingTabs from './巢穴界面子页面/建筑标签页.vue';
 import BuildingSlotGrid from './巢穴界面子页面/建筑槽位网格.vue';
@@ -135,7 +136,8 @@ const selectedSlotType = ref<SlotType>('breeding');
 // 建筑槽位数据
 const breedingSlots = ref<BuildingSlot[]>([]);
 const resourceSlots = ref<BuildingSlot[]>([]);
-const globalSlots = ref<BuildingSlot[]>([]);
+// 全局建筑使用点建式，记录已建造数量
+const builtGlobalBuildings = ref<Record<string, number>>({});
 
 // 人物数据
 const characters = ref<any[]>([]);
@@ -220,11 +222,12 @@ const totalIncome = computed(() => {
     }
   });
 
-  // 计算全局建筑收入
-  globalSlots.value.forEach(slot => {
-    if (slot.building && slot.building.income) {
-      if (slot.building.income.gold) totalGold += slot.building.income.gold;
-      if (slot.building.income.food) totalFood += slot.building.income.food;
+  // 计算全局建筑收入（点建式）
+  globalBuildings.forEach(building => {
+    const count = builtGlobalBuildings.value[building.id] || 0;
+    if (count > 0 && building.income) {
+      if (building.income.gold) totalGold += building.income.gold * count;
+      if (building.income.food) totalFood += building.income.food * count;
     }
   });
 
@@ -280,18 +283,13 @@ const initializeSlots = () => {
     unlocked: false,
   });
 
-  // 初始化全局建筑槽位
-  globalSlots.value = [];
-  // 添加一个可开通的槽位
-  globalSlots.value.push({
-    building: null,
-    unlocked: false,
-  });
+  // 初始化全局建筑（点建式，不需要槽位）
+  builtGlobalBuildings.value = {};
 
   console.log('槽位初始化完成:');
   console.log('繁殖间槽位:', breedingSlots.value);
   console.log('资源建筑槽位:', resourceSlots.value);
-  console.log('全局建筑槽位:', globalSlots.value);
+  console.log('全局建筑（点建式）:', builtGlobalBuildings.value);
 };
 
 /**
@@ -308,12 +306,8 @@ const addNewSlot = (type: SlotType) => {
       building: null,
       unlocked: false,
     });
-  } else if (type === 'global') {
-    globalSlots.value.push({
-      building: null,
-      unlocked: false,
-    });
   }
+  // 全局建筑使用点建式，不需要添加槽位
 };
 
 /**
@@ -336,8 +330,11 @@ const getSlotCost = (index: number): SlotCost => {
  * 处理槽位点击事件
  */
 const handleSlotClick = (index: number, type: SlotType) => {
-  const slots =
-    type === 'breeding' ? breedingSlots.value : type === 'resource' ? resourceSlots.value : globalSlots.value;
+  // 全局建筑使用点建式，不在这里处理
+  if (type === 'global') {
+    return;
+  }
+  const slots = type === 'breeding' ? breedingSlots.value : resourceSlots.value;
   const slot = slots[index];
 
   if (!slot.unlocked) {
@@ -377,10 +374,25 @@ const handleSlotClick = (index: number, type: SlotType) => {
  * 检查是否可以开通槽位（按顺序开通）
  */
 const canUnlockSlot = (index: number, type: SlotType) => {
+  // 全局建筑使用点建式，不在这里处理
+  if (type === 'global') {
+    return false;
+  }
   const slots = type === 'breeding' ? breedingSlots.value : resourceSlots.value;
 
   if (type === 'breeding') {
-    // 繁殖间：与资源建筑相同，前2个槽位默认开通
+    // 繁殖间：前2个槽位默认开通
+    if (index < 2) return true;
+
+    // 检查前面的槽位是否都已开通
+    for (let i = 2; i < index; i++) {
+      if (!slots[i].unlocked) {
+        return false;
+      }
+    }
+    return true;
+  } else if (type === 'resource') {
+    // 资源建筑：前2个槽位默认开通
     if (index < 2) return true;
 
     // 检查前面的槽位是否都已开通
@@ -391,11 +403,11 @@ const canUnlockSlot = (index: number, type: SlotType) => {
     }
     return true;
   } else {
-    // 资源建筑：前2个槽位默认开通
-    if (index < 2) return true;
+    // 全局建筑：前1个槽位默认开通
+    if (index < 1) return true;
 
     // 检查前面的槽位是否都已开通
-    for (let i = 2; i < index; i++) {
+    for (let i = 1; i < index; i++) {
       if (!slots[i].unlocked) {
         return false;
       }
@@ -408,8 +420,11 @@ const canUnlockSlot = (index: number, type: SlotType) => {
  * 检查是否是下一个可开通的槽位
  */
 const isNextUnlockSlot = (index: number, type: SlotType) => {
-  const slots =
-    type === 'breeding' ? breedingSlots.value : type === 'resource' ? resourceSlots.value : globalSlots.value;
+  // 全局建筑使用点建式，不在这里处理
+  if (type === 'global') {
+    return false;
+  }
+  const slots = type === 'breeding' ? breedingSlots.value : resourceSlots.value;
   if (slots[index].unlocked) return false;
 
   if (type === 'breeding') {
@@ -533,12 +548,13 @@ const selectBuilding = (building: Building) => {
 
     // 消耗资源并建设建筑
     if (payForBuilding(actualCost, building.name)) {
-      const slots =
-        selectedSlotType.value === 'breeding'
-          ? breedingSlots.value
-          : selectedSlotType.value === 'resource'
-            ? resourceSlots.value
-            : globalSlots.value;
+      // 全局建筑使用点建式，不在这里处理
+      if (selectedSlotType.value === 'global') {
+        console.warn('全局建筑应使用点建式，不应通过菜单建造');
+        return;
+      }
+
+      const slots = selectedSlotType.value === 'breeding' ? breedingSlots.value : resourceSlots.value;
       slots[selectedSlotIndex.value].building = building;
       // 立即保存，确保数据不丢失
       saveBuildingData();
@@ -552,9 +568,8 @@ const selectBuilding = (building: Building) => {
  * 拆除建筑
  */
 const removeBuilding = async (slotIndex: number, type: SlotType) => {
-  const slots =
-    type === 'breeding' ? breedingSlots.value : type === 'resource' ? resourceSlots.value : globalSlots.value;
-  const building = slots[slotIndex].building;
+  const slots = type === 'breeding' ? breedingSlots.value : type === 'resource' ? resourceSlots.value : [];
+  const building = slots[slotIndex]?.building;
   if (!building) return;
 
   const confirmed = await ConfirmService.showWarning(
@@ -571,6 +586,114 @@ const removeBuilding = async (slotIndex: number, type: SlotType) => {
   }
 };
 
+// ==================== 全局建筑点建式管理 ====================
+
+/**
+ * 检查全局建筑是否解锁（简化版：只检查建筑前置和布尔值）
+ */
+const checkGlobalBuildingUnlock = (building: Building): boolean => {
+  if (!building.unlockCondition) {
+    return true; // 没有解锁条件，默认解锁
+  }
+
+  const condition = building.unlockCondition;
+
+  // 检查布尔值解锁状态（由外部逻辑设置）
+  if (condition.isUnlocked !== undefined) {
+    return condition.isUnlocked;
+  }
+
+  // 检查需要建造的其他建筑
+  if (condition.requiredBuildings && condition.requiredBuildings.length > 0) {
+    for (const requiredId of condition.requiredBuildings) {
+      const count = builtGlobalBuildings.value[requiredId] || 0;
+      if (count === 0) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
+/**
+ * 检查是否可以建造全局建筑
+ */
+const canBuildGlobalBuilding = (building: Building): boolean => {
+  // 检查是否解锁
+  if (!checkGlobalBuildingUnlock(building)) {
+    return false;
+  }
+
+  // 全局建筑每个只能建造一个（maxCount = 1）
+  const currentCount = builtGlobalBuildings.value[building.id] || 0;
+  if (currentCount >= 1) {
+    return false;
+  }
+
+  // 检查资源是否足够
+  return canAffordBuilding(building.cost);
+};
+
+/**
+ * 建造全局建筑
+ */
+const handleBuildGlobalBuilding = (building: Building) => {
+  if (!canBuildGlobalBuilding(building)) {
+    const message = getInsufficientResourcesMessage([
+      { type: 'gold', amount: building.cost.gold, reason: `建设${building.name}` },
+      { type: 'food', amount: building.cost.food, reason: `建设${building.name}` },
+    ]);
+    console.log(message);
+    return;
+  }
+
+  // 消耗资源
+  if (payForBuilding(building.cost, building.name)) {
+    // 全局建筑每个只能建造一个
+    builtGlobalBuildings.value[building.id] = 1;
+
+    // 立即保存
+    saveBuildingData();
+    console.log(`全局建筑 ${building.name} 建造成功`);
+  }
+};
+
+/**
+ * 拆除全局建筑
+ */
+const handleRemoveGlobalBuilding = async (building: Building) => {
+  const currentCount = builtGlobalBuildings.value[building.id] || 0;
+  if (currentCount === 0) return;
+
+  const confirmed = await ConfirmService.showWarning(
+    `确定要拆除一个 ${building.name} 吗？`,
+    '确认拆除',
+    `当前已建造 ${currentCount} 个，拆除后将失去该建筑的所有效果。`,
+  );
+
+  if (confirmed) {
+    builtGlobalBuildings.value[building.id] = currentCount - 1;
+    if (builtGlobalBuildings.value[building.id] === 0) {
+      delete builtGlobalBuildings.value[building.id];
+    }
+    // 立即保存
+    saveBuildingData();
+    console.log(`全局建筑 ${building.name} 拆除成功，剩余数量: ${builtGlobalBuildings.value[building.id] || 0}`);
+  }
+};
+
+/**
+ * 处理全局建筑互动
+ * 未来会打开该建筑的独立互动弹窗
+ */
+const handleGlobalBuildingInteract = (building: Building) => {
+  // TODO: 未来实现各建筑的独立互动弹窗
+  console.log(`进入 ${building.name} 进行互动`);
+  // 这里将来会根据 building.id 打开不同的互动弹窗
+  // 例如：if (building.id === 'brothel') { openBrothelDialog(); }
+};
+
 // ==================== 数据持久化 ====================
 
 /**
@@ -584,7 +707,8 @@ const saveBuildingData = (): void => {
     const nestData: NestModuleData = {
       breedingSlots: breedingSlots.value,
       resourceSlots: resourceSlots.value,
-      globalSlots: globalSlots.value,
+      globalSlots: [], // 全局建筑改为点建式，不再使用槽位
+      builtGlobalBuildings: builtGlobalBuildings.value,
       activeTab: activeTab.value,
       totalIncome: currentTotalIncome,
       breedingRoomInfo: [], // 繁殖间信息由调教界面同步管理
@@ -622,7 +746,34 @@ const loadBuildingData = (): void => {
       // 更新界面数据
       breedingSlots.value = nestData.breedingSlots || [];
       resourceSlots.value = nestData.resourceSlots || [];
-      globalSlots.value = nestData.globalSlots || [];
+
+      // 加载全局建筑（点建式）
+      if (nestData.builtGlobalBuildings) {
+        builtGlobalBuildings.value = nestData.builtGlobalBuildings;
+      } else if (nestData.globalSlots && nestData.globalSlots.length > 0) {
+        // 旧存档迁移：如果使用旧的 globalSlots，转换为点建式
+        console.log('检测到旧存档，迁移全局建筑数据');
+        const migrated: Record<string, number> = {};
+        nestData.globalSlots.forEach(slot => {
+          if (slot.building) {
+            migrated[slot.building.id] = (migrated[slot.building.id] || 0) + 1;
+          }
+        });
+        builtGlobalBuildings.value = migrated;
+        // 立即保存更新后的数据
+        saveBuildingData();
+      } else {
+        builtGlobalBuildings.value = {};
+      }
+
+      // 确保谒见厅默认存在（新建筑迁移）
+      if (!builtGlobalBuildings.value['audience_hall']) {
+        builtGlobalBuildings.value['audience_hall'] = 1;
+        // 立即保存更新后的数据
+        saveBuildingData();
+        console.log('为旧存档添加默认谒见厅');
+      }
+
       activeTab.value = nestData.activeTab || 'breeding';
 
       console.log('巢穴数据加载成功');
@@ -633,7 +784,12 @@ const loadBuildingData = (): void => {
       if (initialNestData) {
         breedingSlots.value = initialNestData.breedingSlots;
         resourceSlots.value = initialNestData.resourceSlots;
-        globalSlots.value = initialNestData.globalSlots || [];
+        // 全局建筑使用点建式
+        builtGlobalBuildings.value = initialNestData.builtGlobalBuildings || {};
+        // 确保谒见厅默认存在
+        if (!builtGlobalBuildings.value['audience_hall']) {
+          builtGlobalBuildings.value['audience_hall'] = 1;
+        }
         activeTab.value = initialNestData.activeTab;
         console.log('使用初始巢穴数据');
       } else {
@@ -648,7 +804,12 @@ const loadBuildingData = (): void => {
       if (initialNestData) {
         breedingSlots.value = initialNestData.breedingSlots;
         resourceSlots.value = initialNestData.resourceSlots;
-        globalSlots.value = initialNestData.globalSlots || [];
+        // 全局建筑使用点建式
+        builtGlobalBuildings.value = initialNestData.builtGlobalBuildings || {};
+        // 确保谒见厅默认存在
+        if (!builtGlobalBuildings.value['audience_hall']) {
+          builtGlobalBuildings.value['audience_hall'] = 1;
+        }
         activeTab.value = initialNestData.activeTab;
         console.log('使用初始数据作为后备方案');
       }

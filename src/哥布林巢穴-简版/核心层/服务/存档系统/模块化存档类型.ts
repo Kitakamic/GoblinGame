@@ -97,12 +97,10 @@ export const INITIAL_NEST_DATA: NestModuleData = {
       unlocked: false,
     },
   ],
-  globalSlots: [
-    {
-      building: null,
-      unlocked: false,
-    },
-  ],
+  globalSlots: [], // 全局建筑改为点建式，不再使用槽位
+  builtGlobalBuildings: {
+    audience_hall: 1, // 默认建造谒见厅
+  }, // 全局建筑点建式数据
   activeTab: 'breeding',
   totalIncome: {
     gold: 30, // 贸易间收入
@@ -502,6 +500,8 @@ export interface NestModuleData {
     } | null;
     unlocked: boolean;
   }[];
+  // 全局建筑点建式数据（建筑ID -> 建造数量）
+  builtGlobalBuildings?: Record<string, number>;
   // 界面状态
   activeTab: 'breeding' | 'resource' | 'global';
   // 巢穴收入总值（每回合计算后存储）
