@@ -69,8 +69,21 @@
           <div class="setting-item">
             <label class="setting-label">
               <span class="label-text">据点人物生成概率修正</span>
-              <span class="label-desc">额外增加的据点生成人物概率（0-100%）</span>
+              <span class="label-desc"
+                >据点生成人物的真实概率（0-100%，设置为0则关闭生成，不设置则使用默认概率机制）</span
+              >
             </label>
+            <div class="checkbox-container" style="margin-bottom: 12px">
+              <label class="checkbox-label">
+                <input
+                  v-model="enableCustomHeroProbability"
+                  type="checkbox"
+                  class="checkbox-input"
+                  @change="onCustomHeroProbabilityToggle"
+                />
+                <span class="checkbox-text">启用自定义人物生成概率</span>
+              </label>
+            </div>
             <div class="slider-container">
               <input
                 v-model="heroGenerationModifier"
@@ -78,6 +91,7 @@
                 min="0"
                 max="100"
                 class="slider-input"
+                :disabled="!enableCustomHeroProbability"
                 @input="updateHeroModifier"
               />
               <span class="slider-value">{{ heroGenerationModifier }}%</span>
@@ -310,6 +324,8 @@ const enableStream = ref(true);
 
 // 据点人物生成概率修正（0-100）
 const heroGenerationModifier = ref(0);
+// 是否启用自定义人物生成概率
+const enableCustomHeroProbability = ref(false);
 
 // 人物生成格式
 const characterFormat = ref('json');
@@ -352,8 +368,10 @@ const loadSettings = () => {
 
     // 加载据点人物生成概率修正
     if (typeof globalVars['hero_generation_modifier'] === 'number') {
+      enableCustomHeroProbability.value = true;
       heroGenerationModifier.value = Math.round(globalVars['hero_generation_modifier'] * 100); // 转换为百分比显示
     } else {
+      enableCustomHeroProbability.value = false;
       heroGenerationModifier.value = 0; // 默认为 0
     }
 
@@ -438,8 +456,39 @@ const updateStreamingSetting = () => {
   }
 };
 
+// 切换自定义人物生成概率开关
+const onCustomHeroProbabilityToggle = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    if (enableCustomHeroProbability.value) {
+      // 启用时，保存当前滑块值
+      globalVars['hero_generation_modifier'] = heroGenerationModifier.value / 100; // 转换为 0-1 范围保存
+      replaceVariables(globalVars, { type: 'global' });
+      console.log('💾 已启用自定义人物生成概率:', `${heroGenerationModifier.value}%`);
+    } else {
+      // 禁用时，删除该变量（使用默认机制）
+      // 使用 lodash 的 unset 方法确保删除成功
+      _.unset(globalVars, 'hero_generation_modifier');
+      replaceVariables(globalVars, { type: 'global' });
+
+      // 验证变量是否已成功删除
+      const verifyVars = getVariables({ type: 'global' });
+      if (verifyVars['hero_generation_modifier'] === undefined) {
+        console.log('✅ 已禁用自定义人物生成概率，变量已删除，将使用默认概率机制');
+      } else {
+        console.warn('⚠️ 警告：变量删除可能未生效，变量值:', verifyVars['hero_generation_modifier']);
+      }
+    }
+  } catch (error) {
+    console.error('切换自定义人物生成概率设置失败:', error);
+  }
+};
+
 // 保存据点人物生成概率修正
 const updateHeroModifier = () => {
+  if (!enableCustomHeroProbability.value) {
+    return; // 如果未启用，不保存
+  }
   try {
     const globalVars = getVariables({ type: 'global' });
     globalVars['hero_generation_modifier'] = heroGenerationModifier.value / 100; // 转换为 0-1 范围保存
@@ -1268,6 +1317,36 @@ onMounted(() => {
     transition: 0.3s;
     border-radius: 50%;
   }
+}
+
+.checkbox-container {
+  margin-bottom: 12px;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-input {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.checkbox-text {
+  color: #f0e6d2;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .slider-container {

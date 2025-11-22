@@ -106,42 +106,108 @@ export class HeroDeterminationService {
     // 获取该类型当前的累积加成（如果不存在则初始化为0）
     const currentBonus = this.accumulatedBonusByType.get(locationType) || 0;
 
-    // 获取玩家设置的额外修正（全局变量中的比例，0-1）
-    let extraModifier = 0;
+    // 获取玩家设置的真实概率（全局变量中的比例，0-1）
+    // 如果变量存在且为有效数字（包括0），则使用该值作为真实概率（0表示关闭生成）
+    // 如果变量不存在、类型错误、或出现任何异常，则使用默认的概率机制（基础概率 + 累积加成）
+    let customProbability: number | null = null;
+    let hasCustomSetting = false;
+
     try {
       const globalVars = getVariables({ type: 'global' });
-      const savedModifier = globalVars['hero_generation_modifier'];
-      if (typeof savedModifier === 'number') {
-        extraModifier = Math.max(0, Math.min(1, savedModifier)); // 限制在 0-1 之间
+
+      // 明确检查变量是否存在
+      if (globalVars && typeof globalVars === 'object' && 'hero_generation_modifier' in globalVars) {
+        const savedModifier = globalVars['hero_generation_modifier'];
+
+        // 检查是否为有效数字（排除NaN、Infinity等）
+        if (typeof savedModifier === 'number' && !isNaN(savedModifier) && isFinite(savedModifier)) {
+          // 限制在 0-1 之间
+          customProbability = Math.max(0, Math.min(1, savedModifier));
+          hasCustomSetting = true;
+          console.log('📋 [英雄判定] 检测到自定义概率设置:', `${(customProbability * 100).toFixed(1)}%`);
+        } else {
+          console.warn('⚠️ [英雄判定] hero_generation_modifier 不是有效数字（NaN/Infinity），将使用默认机制');
+        }
+      } else {
+        console.log('📋 [英雄判定] 未检测到自定义概率设置，将使用默认概率机制');
       }
     } catch (error) {
-      console.warn('无法读取英雄生成修正值:', error);
+      // 任何异常都回退到默认模式
+      console.warn('⚠️ [英雄判定] 读取英雄生成修正值时出现异常，将使用默认机制:', error);
+      hasCustomSetting = false;
+      customProbability = null;
     }
 
-    // 计算最终概率 = 基础概率 + 该类型的累积加成 + 玩家额外修正
-    const finalProbability = Math.min(0.95, baseProbability + currentBonus + extraModifier);
+    // 最终验证：确保只有在有有效自定义设置时才使用
+    // 保底机制：如果任何条件不满足，强制使用默认模式
+    const shouldUseCustom =
+      hasCustomSetting &&
+      customProbability !== null &&
+      typeof customProbability === 'number' &&
+      !isNaN(customProbability) &&
+      isFinite(customProbability);
 
-    console.log('🎲 [英雄判定]', {
-      据点类型: locationType,
-      难度: difficulty,
-      基础概率: `${(baseProbability * 100).toFixed(1)}%`,
-      该类型累积: `${(currentBonus * 100).toFixed(0)}%`,
-      额外修正: `${(extraModifier * 100).toFixed(0)}%`,
-      最终概率: `${(finalProbability * 100).toFixed(1)}%`,
-      随机数: random.toFixed(3),
-    });
+    // 类型守卫：确保customProbability是有效数字
+    const validCustomProbability: number | null =
+      shouldUseCustom && customProbability !== null ? customProbability : null;
 
-    const hasHero = random < finalProbability;
+    let finalProbability: number;
+    let hasHero: boolean;
 
-    if (hasHero) {
-      // 出现英雄，重置该类型的累积
-      console.log(`✅ [英雄判定] ${locationType} 类型出现英雄！重置该类型累积概率`);
-      this.accumulatedBonusByType.set(locationType, 0);
+    if (shouldUseCustom && validCustomProbability !== null) {
+      // 使用用户设置的真实概率（0表示关闭生成）
+      finalProbability = validCustomProbability;
+      hasHero = random < finalProbability;
+
+      console.log('🎲 [英雄判定]', {
+        据点类型: locationType,
+        难度: difficulty,
+        模式: validCustomProbability === 0 ? '已关闭生成（自定义概率为0）' : '真实概率（自定义）',
+        真实概率: `${(validCustomProbability * 100).toFixed(1)}%`,
+        随机数: random.toFixed(3),
+        结果: hasHero ? '✅ 出现英雄' : '❌ 未出现英雄',
+      });
+
+      // 注意：使用自定义概率时，不更新累积概率机制
     } else {
-      // 未出现英雄，增加该类型的10%累积
-      const newBonus = Math.min(0.9, currentBonus + 0.1);
-      this.accumulatedBonusByType.set(locationType, newBonus);
-      console.log(`📈 [英雄判定] ${locationType} 类型未出英雄，该类型累积增加至 ${(newBonus * 100).toFixed(0)}%`);
+      // 保底机制：使用默认概率机制（基础概率 + 累积加成）
+      // 确保基础概率和累积加成都是有效值
+      const safeBaseProbability =
+        typeof baseProbability === 'number' && !isNaN(baseProbability) && isFinite(baseProbability)
+          ? baseProbability
+          : 0.15;
+      const safeCurrentBonus =
+        typeof currentBonus === 'number' && !isNaN(currentBonus) && isFinite(currentBonus) ? currentBonus : 0;
+
+      finalProbability = Math.min(0.95, Math.max(0, safeBaseProbability + safeCurrentBonus));
+      hasHero = random < finalProbability;
+
+      if (!shouldUseCustom && hasCustomSetting) {
+        console.warn('⚠️ [英雄判定] 自定义设置验证失败，已回退到默认机制');
+      }
+
+      console.log('🎲 [英雄判定]', {
+        据点类型: locationType,
+        难度: difficulty,
+        模式: '默认机制',
+        基础概率: `${(baseProbability * 100).toFixed(1)}%`,
+        该类型累积: `${(currentBonus * 100).toFixed(0)}%`,
+        最终概率: `${(finalProbability * 100).toFixed(1)}%`,
+        随机数: random.toFixed(3),
+        结果: hasHero ? '✅ 出现英雄' : '❌ 未出现英雄',
+      });
+
+      // 只有在使用默认机制时才更新累积概率
+      if (hasHero) {
+        // 出现英雄，重置该类型的累积
+        console.log(`✅ [英雄判定] ${locationType} 类型出现英雄！重置该类型累积概率`);
+        this.accumulatedBonusByType.set(locationType, 0);
+      } else {
+        // 未出现英雄，增加该类型的10%累积
+        const newBonus = Math.min(0.9, currentBonus + 0.1);
+        this.accumulatedBonusByType.set(locationType, newBonus);
+        console.log(`📈 [英雄判定] ${locationType} 类型未出英雄，该类型累积增加至 ${(newBonus * 100).toFixed(0)}%`);
+      }
     }
 
     return hasHero;
