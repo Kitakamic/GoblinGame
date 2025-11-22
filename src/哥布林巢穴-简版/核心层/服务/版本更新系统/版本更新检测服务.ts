@@ -3,7 +3,7 @@
  * 用于检测当前版本和远程最新版本，并在有新版本时提示用户更新
  */
 
-import { FRONTEND_VERSION } from '../../../version';
+import { FRONTEND_VERSION, FRONTEND_VERSION_TYPE } from '../../../version';
 import { ConfirmService } from '../通用服务/确认框服务';
 
 // 版本列表文件的 URL
@@ -14,6 +14,7 @@ interface VersionInfo {
   version: string;
   description: string;
   date: string;
+  type?: 'stable' | 'beta'; // 版本类型：稳定版或测试版
 }
 
 interface VersionList {
@@ -49,11 +50,13 @@ function compareVersions(version1: string, version2: string): number {
 
 /**
  * 获取远程最新版本信息
+ * @param stableOnly 是否只检查稳定版，默认为 true
  * @returns 最新版本信息，如果获取失败返回 null
  */
-async function getLatestVersion(): Promise<VersionInfo | null> {
+async function getLatestVersion(stableOnly: boolean = true): Promise<VersionInfo | null> {
   try {
     console.log('🔍 [版本检测] 开始检查远程版本列表:', VERSION_LIST_URL);
+    console.log('📋 [版本检测] 检查模式:', stableOnly ? '仅稳定版' : '所有版本');
 
     const response = await fetch(VERSION_LIST_URL, {
       cache: 'no-cache', // 禁用缓存，确保获取最新版本
@@ -69,8 +72,22 @@ async function getLatestVersion(): Promise<VersionInfo | null> {
       throw new Error('版本列表格式错误：versions 数组为空');
     }
 
+    // 如果只检查稳定版，过滤出稳定版版本
+    let versionsToCheck = data.versions;
+    if (stableOnly) {
+      versionsToCheck = data.versions.filter(v => {
+        // 如果没有 type 字段，默认为稳定版（向后兼容）
+        return !v.type || v.type === 'stable';
+      });
+
+      if (versionsToCheck.length === 0) {
+        console.log('⚠️ [版本检测] 没有找到稳定版版本');
+        return null;
+      }
+    }
+
     // 版本列表已经按版本号降序排列（最新版本在前）
-    const latestVersion = data.versions[0];
+    const latestVersion = versionsToCheck[0];
     console.log('✅ [版本检测] 获取到最新版本:', latestVersion);
 
     return latestVersion;
@@ -82,15 +99,17 @@ async function getLatestVersion(): Promise<VersionInfo | null> {
 
 /**
  * 检测是否有新版本可用
+ * @param stableOnly 是否只检查稳定版，默认为 true（只检查稳定版）
  * @returns 如果有新版本，返回新版本信息；否则返回 null
  */
-export async function checkForUpdates(): Promise<VersionInfo | null> {
+export async function checkForUpdates(stableOnly: boolean = true): Promise<VersionInfo | null> {
   try {
     const currentVersion = FRONTEND_VERSION;
-    console.log('📋 [版本检测] 当前版本:', currentVersion);
+    const currentVersionType = FRONTEND_VERSION_TYPE;
+    console.log('📋 [版本检测] 当前版本:', currentVersion, `(${currentVersionType})`);
 
-    // 获取最新版本
-    const latestVersion = await getLatestVersion();
+    // 获取最新版本（默认只检查稳定版）
+    const latestVersion = await getLatestVersion(stableOnly);
 
     if (!latestVersion) {
       console.log('⚠️ [版本检测] 无法获取最新版本信息');
@@ -279,7 +298,20 @@ export async function autoCheckForUpdates(): Promise<void> {
     // 延迟一小段时间，确保应用已经加载完成
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const newVersion = await checkForUpdates();
+    // 读取用户设置：是否检查测试版更新（默认只检查稳定版）
+    // 使用全局函数（这些函数在酒馆环境中全局可用）
+    const getVariables = (globalThis as any).getVariables;
+    let checkBetaVersion = false;
+    if (getVariables) {
+      const globalVars = getVariables({ type: 'global' });
+      checkBetaVersion =
+        typeof globalVars['check_beta_version'] === 'boolean' ? globalVars['check_beta_version'] : false;
+    }
+
+    console.log('📋 [版本检测] 检查测试版更新:', checkBetaVersion ? '开启' : '关闭（仅稳定版）');
+
+    // 根据用户设置决定是否检查测试版（默认只检查稳定版）
+    const newVersion = await checkForUpdates(!checkBetaVersion);
 
     if (newVersion) {
       // 延迟显示提示，避免干扰其他弹窗（如欢迎提示）

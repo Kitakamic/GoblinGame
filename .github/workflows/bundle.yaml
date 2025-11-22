@@ -60,6 +60,17 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "读取到版本号: $VERSION"
 
+      # 读取是否推送 index.html 设置
+      - name: Read push index.html setting
+        id: read_push_index
+        run: |
+          PUSH_INDEX=$(grep -oP "export const FRONTEND_PUSH_INDEX_HTML: boolean = (true|false)" src/哥布林巢穴-简版/version.ts | grep -oP "(true|false)")
+          if [ -z "$PUSH_INDEX" ]; then
+            PUSH_INDEX="false"
+          fi
+          echo "push_index=$PUSH_INDEX" >> $GITHUB_OUTPUT
+          echo "读取到推送 index.html 设置: $PUSH_INDEX"
+
       # 上传带版本号的 index.html 到 Cloudflare R2
       - name: Upload versioned index.html to Cloudflare R2
         env:
@@ -68,6 +79,7 @@ jobs:
           R2_BUCKET: gobgame-pic
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           VERSION: ${{ steps.read_version.outputs.version }}
+          PUSH_INDEX: ${{ steps.read_push_index.outputs.push_index }}
         run: |
           # 检查带版本号的文件是否存在
           VERSIONED_FILE="dist/哥布林巢穴-简版/index-v${VERSION}.html"
@@ -88,6 +100,23 @@ jobs:
 
           echo "✓ 已上传版本 ${VERSION} 到 R2 存储"
 
+          # 如果设置了推送 index.html，同时上传 index.html
+          if [ "$PUSH_INDEX" = "true" ]; then
+            INDEX_FILE="dist/哥布林巢穴-简版/index.html"
+            if [ -f "$INDEX_FILE" ]; then
+              echo "上传 index.html（覆盖最新版本）"
+              aws s3 cp "$INDEX_FILE" "s3://${R2_BUCKET}/index.html" \
+                --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+                --content-type "text/html" \
+                --cache-control "no-cache, must-revalidate"
+              echo "✓ 已上传 index.html 到 R2 存储"
+            else
+              echo "⚠️ 警告: index.html 文件不存在，跳过上传"
+            fi
+          else
+            echo "ℹ️ 未设置推送 index.html，跳过"
+          fi
+
       # 🔹 生成并上传版本列表文件
       - name: Update version list and upload to R2
         env:
@@ -97,13 +126,19 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           VERSION: ${{ steps.read_version.outputs.version }}
         run: |
-          # 读取版本号、日期和描述
+          # 读取版本号、日期、描述和类型
           VERSION_DATE=$(grep -oP "export const FRONTEND_UPDATE_DATE = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
           VERSION_DESC=$(grep -oP "export const FRONTEND_DESCRIPTION = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
+          VERSION_TYPE=$(grep -oP "export const FRONTEND_VERSION_TYPE: 'stable' | 'beta' = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
 
           # 如果描述为空，使用默认值
           if [ -z "$VERSION_DESC" ]; then
             VERSION_DESC="最新版本"
+          fi
+
+          # 如果类型为空，默认为稳定版
+          if [ -z "$VERSION_TYPE" ]; then
+            VERSION_TYPE="stable"
           fi
 
           # 如果版本列表文件已存在，读取并更新；否则创建新的
@@ -126,7 +161,8 @@ jobs:
           new_version = {
               "version": "${VERSION}",
               "description": "${VERSION_DESC}",
-              "date": "${VERSION_DATE}"
+              "date": "${VERSION_DATE}",
+              "type": "${VERSION_TYPE}"
           }
 
           # 移除已存在的相同版本
@@ -146,11 +182,12 @@ jobs:
             cat > versions.json << EOF
           {
             "versions": [
-              {
-                "version": "${VERSION}",
-                "description": "${VERSION_DESC}",
-                "date": "${VERSION_DATE}"
-              }
+            {
+              "version": "${VERSION}",
+              "description": "${VERSION_DESC}",
+              "date": "${VERSION_DATE}",
+              "type": "${VERSION_TYPE}"
+            }
             ]
           }
           EOF
@@ -171,8 +208,22 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
           VERSION: ${{ steps.read_version.outputs.version }}
+          PUSH_INDEX: ${{ steps.read_push_index.outputs.push_index }}
         run: |
+          # 准备要清理缓存的文件列表
+          FILES_TO_PURGE='["https://kitakamis.online/index-v'${VERSION}'.html"'
+
+          # 如果推送了 index.html，也需要清理它的缓存
+          if [ "$PUSH_INDEX" = "true" ]; then
+            FILES_TO_PURGE="${FILES_TO_PURGE},\"https://kitakamis.online/index.html\""
+          fi
+
+          FILES_TO_PURGE="${FILES_TO_PURGE}]"
+
+          echo "清理缓存文件: ${FILES_TO_PURGE}"
           curl -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
             -H "Authorization: Bearer ${CF_API_TOKEN}" \
             -H "Content-Type: application/json" \
-            --data '{"files":["https://kitakamis.online/index-v'${VERSION}'.html"]}'
+            --data "{\"files\":${FILES_TO_PURGE}}"
+
+          echo "✓ 已清理 Cloudflare Edge 缓存"

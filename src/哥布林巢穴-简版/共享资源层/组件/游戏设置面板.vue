@@ -25,6 +25,22 @@
             <button class="version-button" @click="openVersionManager">🔖 版本管理</button>
             <div class="setting-desc">切换版本、查看版本列表</div>
           </div>
+
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">检查测试版更新</span>
+              <span class="label-desc">开启后将同时检查测试版和稳定版更新，默认只检查稳定版</span>
+            </label>
+            <label class="switch-container">
+              <input
+                v-model="checkBetaVersion"
+                type="checkbox"
+                class="switch-input"
+                @change="updateCheckBetaVersionSetting"
+              />
+              <span class="switch-slider"></span>
+            </label>
+          </div>
         </div>
 
         <!-- 分隔线 -->
@@ -286,6 +302,9 @@ const emit = defineEmits<{
 // 版本管理弹窗状态
 const showVersionManager = ref(false);
 
+// 检查测试版更新设置
+const checkBetaVersion = ref(false);
+
 // 流式传输设置
 const enableStream = ref(true);
 
@@ -357,6 +376,13 @@ const loadSettings = () => {
       enableFullCustomMode.value = globalVars['enable_full_custom_mode'];
     } else {
       enableFullCustomMode.value = false; // 默认关闭
+    }
+
+    // 加载检查测试版更新设置，默认为 false（只检查稳定版）
+    if (typeof globalVars['check_beta_version'] === 'boolean') {
+      checkBetaVersion.value = globalVars['check_beta_version'];
+    } else {
+      checkBetaVersion.value = false; // 默认关闭（只检查稳定版）
     }
 
     // 加载玩家角色信息
@@ -453,6 +479,18 @@ const updateScoutPromptInputSetting = () => {
     console.log('💾 侦察时输入额外提示词设置已保存:', enableScoutPromptInput.value);
   } catch (error) {
     console.error('保存侦察时输入额外提示词设置失败:', error);
+  }
+};
+
+// 更新检查测试版更新设置
+const updateCheckBetaVersionSetting = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    globalVars['check_beta_version'] = checkBetaVersion.value;
+    replaceVariables(globalVars, { type: 'global' });
+    console.log('💾 已更新检查测试版更新设置:', checkBetaVersion.value);
+  } catch (error) {
+    console.error('更新检查测试版更新设置失败:', error);
   }
 };
 

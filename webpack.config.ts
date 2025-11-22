@@ -107,8 +107,9 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
   const should_obfuscate = fs.readFileSync(path.join(__dirname, entry.script), 'utf-8').includes('@obfuscate');
   const script_filepath = path.parse(entry.script);
 
-  // 读取版本号
+  // 读取版本号和推送设置
   let frontend_version: string | undefined;
+  let push_index_html: boolean = false;
   try {
     const version_file = path.join(__dirname, path.dirname(entry.script), 'version.ts');
     if (fs.existsSync(version_file)) {
@@ -117,9 +118,16 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
       if (version_match) {
         frontend_version = version_match[1];
       }
+      // 读取是否推送 index.html
+      const push_index_match = version_content.match(
+        /export\s+const\s+FRONTEND_PUSH_INDEX_HTML:\s*boolean\s*=\s*(true|false)/,
+      );
+      if (push_index_match) {
+        push_index_html = push_index_match[1] === 'true';
+      }
     }
   } catch (error) {
-    console.warn('无法读取版本号:', error);
+    console.warn('无法读取版本信息:', error);
   }
 
   return (_env, argv) => ({
@@ -342,19 +350,45 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
       ? [new MiniCssExtractPlugin()]
       : (() => {
           const htmlBaseName = path.parse(entry.html).base;
-          // 在生产模式下，如果存在版本号，直接生成带版本号的文件名
-          const htmlFilename =
-            argv.mode === 'production' && frontend_version
-              ? htmlBaseName.replace(/\.html$/, `-v${frontend_version}.html`)
-              : htmlBaseName;
+          const plugins: any[] = [];
 
-          return [
-            new HtmlWebpackPlugin({
-              template: path.join(__dirname, entry.html),
-              filename: htmlFilename,
-              scriptLoading: 'module',
-              cache: false,
-            }),
+          // 在生产模式下，如果存在版本号，生成带版本号的文件
+          if (argv.mode === 'production' && frontend_version) {
+            const versionedFilename = htmlBaseName.replace(/\.html$/, `-v${frontend_version}.html`);
+            plugins.push(
+              new HtmlWebpackPlugin({
+                template: path.join(__dirname, entry.html),
+                filename: versionedFilename,
+                scriptLoading: 'module',
+                cache: false,
+              }),
+            );
+
+            // 如果设置了推送 index.html，同时生成 index.html
+            if (push_index_html) {
+              plugins.push(
+                new HtmlWebpackPlugin({
+                  template: path.join(__dirname, entry.html),
+                  filename: htmlBaseName,
+                  scriptLoading: 'module',
+                  cache: false,
+                }),
+              );
+            }
+          } else {
+            // 开发模式或没有版本号时，生成普通的 index.html
+            plugins.push(
+              new HtmlWebpackPlugin({
+                template: path.join(__dirname, entry.html),
+                filename: htmlBaseName,
+                scriptLoading: 'module',
+                cache: false,
+              }),
+            );
+          }
+
+          // 添加其他插件
+          plugins.push(
             new HtmlInlineScriptWebpackPlugin(),
             new MiniCssExtractPlugin(),
             new HTMLInlineCSSWebpackPlugin({
@@ -362,7 +396,9 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
                 return `<style>${style}</style>`;
               },
             }),
-          ];
+          );
+
+          return plugins;
         })()
     )
       .concat(
