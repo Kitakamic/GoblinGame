@@ -235,15 +235,20 @@ export class CharacterParser {
       details = '请检查AI输出格式是否正确';
     }
 
-    // 显示错误弹窗
-    await GenerationErrorService.showError({
+    // 显示错误弹窗（不等待用户关闭，立即返回，避免阻塞解析流程）
+    // 错误弹窗会立即显示，但不会阻塞当前函数返回
+    GenerationErrorService.showError({
       title,
       message,
       summary: hasErrors ? this.errorCollector.getSummary() : undefined,
       details,
       rawText,
       onRetry,
+    }).catch(err => {
+      // 静默处理错误，避免影响解析流程
+      console.error('显示错误弹窗失败:', err);
     });
+    // 不 await，立即返回，让解析函数能够继续执行
   }
 
   // ==================== 辅助方法 ====================
@@ -379,7 +384,7 @@ export class CharacterParser {
           message: '未找到有效的JSON格式',
           category: '格式错误',
         });
-        await this.showParseErrorDialog(null, rawText || text, onRetry);
+        this.showParseErrorDialog(null, rawText || text, onRetry);
         return null;
       }
 
@@ -688,12 +693,8 @@ export class CharacterParser {
       return parsedData;
     } catch (error) {
       console.error('解析人物信息失败:', error);
-      // 显示错误弹窗
-      await this.showParseErrorDialog(
-        error instanceof Error ? error : new Error(String(error)),
-        rawText || text,
-        onRetry,
-      );
+      // 显示错误弹窗（不等待，立即返回）
+      this.showParseErrorDialog(error instanceof Error ? error : new Error(String(error)), rawText || text, onRetry);
       return null;
     }
   }
@@ -1212,7 +1213,7 @@ export class CharacterParser {
           message: '未找到有效的YAML格式内容',
           category: '格式错误',
         });
-        await this.showParseErrorDialog(null, rawText || text, onRetry);
+        this.showParseErrorDialog(null, rawText || text, onRetry);
         return null;
       }
 
@@ -1516,12 +1517,8 @@ export class CharacterParser {
       return parsedData;
     } catch (error) {
       console.error('解析人物信息失败（YAML）:', error);
-      // 显示错误弹窗
-      await this.showParseErrorDialog(
-        error instanceof Error ? error : new Error(String(error)),
-        rawText || text,
-        onRetry,
-      );
+      // 显示错误弹窗（不等待，立即返回）
+      this.showParseErrorDialog(error instanceof Error ? error : new Error(String(error)), rawText || text, onRetry);
       return null;
     }
   }

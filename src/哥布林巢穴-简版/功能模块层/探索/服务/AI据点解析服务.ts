@@ -224,7 +224,7 @@ export class LocationParser {
           message: '未找到有效的JSON格式',
           category: '格式错误',
         });
-        await this.showParseErrorDialog(null, rawText || text, onRetry);
+        this.showParseErrorDialog(null, rawText || text, onRetry);
         return null;
       }
 
@@ -241,11 +241,7 @@ export class LocationParser {
     } catch (error) {
       console.error('❌ [据点解析器] 解析据点信息失败:', error);
       console.error('❌ [据点解析器] 错误堆栈:', (error as Error).stack);
-      await this.showParseErrorDialog(
-        error instanceof Error ? error : new Error(String(error)),
-        rawText || text,
-        onRetry,
-      );
+      this.showParseErrorDialog(error instanceof Error ? error : new Error(String(error)), rawText || text, onRetry);
       return null;
     }
   }
@@ -439,7 +435,7 @@ export class LocationParser {
       console.error('❌ [JSON解析器] 错误类型:', (error as Error).constructor.name);
       console.error('❌ [JSON解析器] 错误消息:', (error as Error).message);
       console.error('❌ [JSON解析器] 错误堆栈:', (error as Error).stack);
-      await this.showParseErrorDialog(error instanceof Error ? error : new Error(String(error)), rawText, onRetry);
+      this.showParseErrorDialog(error instanceof Error ? error : new Error(String(error)), rawText, onRetry);
       return null;
     }
   }
@@ -557,7 +553,7 @@ export class LocationParser {
           message: '未找到有效的JSON数组格式（应以"["开头）',
           category: '格式错误',
         });
-        await this.showParseErrorDialog(null, rawText, onRetry);
+        this.showParseErrorDialog(null, rawText, onRetry);
         return [];
       }
 
@@ -572,7 +568,7 @@ export class LocationParser {
           message: 'JSON数据不是数组格式',
           category: '格式错误',
         });
-        await this.showParseErrorDialog(null, rawText, onRetry);
+        this.showParseErrorDialog(null, rawText, onRetry);
         return [];
       }
 
@@ -714,7 +710,7 @@ export class LocationParser {
 
       // 如果有错误，统一显示错误弹窗（包含所有据点的所有错误）
       if (this.errorCollector.hasErrors()) {
-        await this.showParseErrorDialog(null, rawText, onRetry);
+        this.showParseErrorDialog(null, rawText, onRetry);
         // 如果有错误，返回空数组，等待用户重新解析
         return [];
       }
@@ -722,7 +718,7 @@ export class LocationParser {
       return locations;
     } catch (error) {
       console.error('解析JSON多个据点失败:', error);
-      await this.showParseErrorDialog(error instanceof Error ? error : new Error(String(error)), rawText, onRetry);
+      this.showParseErrorDialog(error instanceof Error ? error : new Error(String(error)), rawText, onRetry);
       return [];
     }
   }
@@ -758,14 +754,20 @@ export class LocationParser {
       details = '请检查AI输出格式是否正确';
     }
 
-    await GenerationErrorService.showError({
+    // 显示错误弹窗（不等待用户关闭，立即返回，避免阻塞解析流程）
+    // 错误弹窗会立即显示，但不会阻塞当前函数返回
+    GenerationErrorService.showError({
       title,
       message,
       summary: hasErrors ? this.errorCollector.getSummary() : undefined,
       details,
       rawText,
       onRetry,
+    }).catch(err => {
+      // 静默处理错误，避免影响解析流程
+      console.error('显示错误弹窗失败:', err);
     });
+    // 不 await，立即返回，让解析函数能够继续执行
   }
 
   /**
