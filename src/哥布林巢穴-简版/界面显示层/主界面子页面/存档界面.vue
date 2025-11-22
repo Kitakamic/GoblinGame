@@ -39,9 +39,21 @@
           }"
         >
           <div class="slot-header">
-            <span class="slot-number">
-              {{ slot.slot === 0 ? '自动存档' : `槽位 ${slot.slot}` }}
-            </span>
+            <div class="slot-title-row">
+              <span class="slot-number">
+                {{ slot.slot === 0 ? '自动存档' : `槽位 ${slot.slot}` }}
+              </span>
+              <span v-if="slot.timestamp > 0 && slot.version && slot.version !== '1.0.0'" class="slot-version">
+                v{{ slot.version }}
+              </span>
+              <span
+                v-else-if="slot.timestamp > 0 && slot.version === '1.0.0'"
+                class="slot-version slot-version-old"
+                title="旧版本存档（版本信息不可用）"
+              >
+                旧版本
+              </span>
+            </div>
             <span class="slot-time">{{ formatTime(slot.timestamp) }}</span>
           </div>
 
@@ -668,9 +680,16 @@ const handleImportFile = async (event: Event) => {
 
         .slot-header {
           display: flex;
-          justify-content: space-between;
-          align-items: center;
+          flex-direction: column;
+          gap: 6px;
           margin-bottom: 12px;
+
+          .slot-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+          }
 
           .slot-number {
             color: #ffd7a1;
@@ -678,9 +697,26 @@ const handleImportFile = async (event: Event) => {
             font-size: 16px;
           }
 
+          .slot-version {
+            color: #8b5cf6;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            border-radius: 4px;
+          }
+
+          .slot-version-old {
+            color: #9ca3af;
+            background: rgba(156, 163, 175, 0.2);
+            border-color: rgba(156, 163, 175, 0.4);
+          }
+
           .slot-time {
             color: #9ca3af;
             font-size: 12px;
+            align-self: flex-end;
           }
         }
 

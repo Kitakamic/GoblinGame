@@ -30,30 +30,14 @@
         <div class="version-switch-section">
           <h3 class="section-title">切换版本</h3>
           <p class="section-desc">
-            切换版本将修改"自动更新CDN"正则中的URL，页面会重新加载。当前未保存的数据将丢失，建议在切换前保存重要数据。
+            切换版本将修改正则中的URL，页面会重新加载。当前未保存的数据将丢失，建议在切换前保存重要数据。
             <br />
-            <strong>注意：</strong>
-            <br />
-            • <code>index.html</code> 作为稳定入口始终可用，可在版本出问题时使用
-            <br />
-            • 切换版本会修改酒馆正则，指向对应版本文件
+            <strong>注意：</strong>切换版本会修改酒馆正则，指向对应版本文件
           </p>
 
           <div class="version-input-container">
             <label class="version-input-label">选择要使用的版本：</label>
-            <div class="version-select-options">
-              <label class="version-radio-option">
-                <input v-model="selectedVersion" type="radio" value="stable" class="version-radio" />
-                <span class="version-option-text">稳定版本</span>
-                <span class="version-option-desc">使用 index.html（默认，始终可用）</span>
-              </label>
-              <label class="version-radio-option">
-                <input v-model="selectedVersion" type="radio" value="versioned" class="version-radio" />
-                <span class="version-option-text">指定版本</span>
-                <span class="version-option-desc">从下拉菜单选择版本</span>
-              </label>
-            </div>
-            <div v-if="selectedVersion === 'versioned'" class="version-input-wrapper">
+            <div class="version-input-wrapper">
               <div v-if="isLoadingVersions" class="version-loading">
                 <span>正在加载版本列表...</span>
               </div>
@@ -68,14 +52,6 @@
                 </option>
               </select>
             </div>
-          </div>
-
-          <div class="version-tips">
-            <p class="tip-item">💡 <strong>稳定版本：</strong>使用 <code>index.html</code>，这是默认且始终可用的版本</p>
-            <p class="tip-item">
-              💡 <strong>指定版本：</strong>输入版本号后，将修改正则指向 <code>index-v{版本号}.html</code> 文件
-            </p>
-            <p class="tip-item">📌 如果某个版本出现问题，可以切换回稳定版本或选择其他版本</p>
           </div>
         </div>
 
@@ -135,7 +111,6 @@ interface VersionList {
   versions: VersionInfo[];
 }
 
-const selectedVersion = ref<'stable' | 'versioned'>('stable');
 const selectedVersionNumber = ref<string>('');
 const availableVersions = ref<VersionInfo[]>([]);
 const isLoadingVersions = ref(false);
@@ -195,27 +170,14 @@ const loadVersionList = async () => {
 watch(
   () => props.show,
   newVal => {
-    if (newVal && selectedVersion.value === 'versioned' && availableVersions.value.length === 0) {
+    if (newVal && availableVersions.value.length === 0) {
       loadVersionList();
     }
   },
 );
 
-// 监听版本选择变化，如果是 versioned 且列表为空，则加载
-watch(selectedVersion, newVal => {
-  if (newVal === 'versioned' && availableVersions.value.length === 0 && !isLoadingVersions.value) {
-    loadVersionList();
-  }
-});
-
 const canSwitch = computed(() => {
-  if (selectedVersion.value === 'stable') {
-    return true; // 稳定版本总是可以切换
-  }
-  if (selectedVersion.value === 'versioned') {
-    return selectedVersionNumber.value !== ''; // 必须选择了一个版本
-  }
-  return false;
+  return selectedVersionNumber.value !== ''; // 必须选择了一个版本
 });
 
 const handleClose = () => {
@@ -244,22 +206,15 @@ const handleSwitchVersion = async () => {
   }
 
   // 确定要使用的 URL
-  let targetUrl: string;
-  let versionName: string;
-
-  if (selectedVersion.value === 'stable') {
-    targetUrl = 'https://kitakamis.online/index.html';
-    versionName = '稳定版本';
-  } else {
-    const version = selectedVersionNumber.value;
-    if (!version) {
-      await ConfirmService.showWarning('请选择一个版本', '切换失败', '请从下拉菜单中选择一个版本。');
-      return;
-    }
-    targetUrl = `https://kitakamis.online/index-v${version}.html`;
-    const versionInfo = availableVersions.value.find(v => v.version === version);
-    versionName = versionInfo ? `${versionInfo.version} - ${versionInfo.description}` : `版本 ${version}`;
+  const version = selectedVersionNumber.value;
+  if (!version) {
+    await ConfirmService.showWarning('请选择一个版本', '切换失败', '请从下拉菜单中选择一个版本。');
+    return;
   }
+
+  const targetUrl = `https://kitakamis.online/index-v${version}.html`;
+  const versionInfo = availableVersions.value.find(v => v.version === version);
+  const versionName = versionInfo ? `${versionInfo.version} - ${versionInfo.description}` : `版本 ${version}`;
 
   try {
     // 获取所有酒馆正则
@@ -276,67 +231,53 @@ const handleSwitchVersion = async () => {
     // 查找版本切换正则（新建的，指向指定版本）
     let versionRegex = regexes.find(regex => regex.script_name === '版本切换');
 
-    // 处理版本切换
-    if (selectedVersion.value === 'stable') {
-      // 切换到稳定版本：禁用版本切换正则，启用"自动更新CDN"正则
-      console.log('📌 切换到稳定版本（index.html）');
+    // 切换到指定版本：创建或更新版本切换正则，禁用"自动更新CDN"正则
+    console.log('📌 切换到指定版本:', selectedVersionNumber.value);
 
-      if (versionRegex) {
-        versionRegex.enabled = false;
-        console.log('✅ 已禁用版本切换正则');
-      }
+    // 读取原有正则的 find_regex 和 replace_string，只替换 URL
+    const originalFindRegex = stableRegex.find_regex;
+    const originalReplaceString = stableRegex.replace_string;
 
-      stableRegex.enabled = true;
-      console.log('✅ 已启用"自动更新CDN"正则（稳定版本）');
-    } else {
-      // 切换到指定版本：创建或更新版本切换正则，禁用"自动更新CDN"正则
-      console.log('📌 切换到指定版本:', selectedVersionNumber.value);
+    // 在 replace_string 中替换 URL
+    // 匹配 https://kitakamis.online/index(-v[版本号])?.html
+    const newReplaceString = originalReplaceString.replace(
+      /https:\/\/kitakamis\.online\/index(-v[\d.]+)?\.html/g,
+      targetUrl,
+    );
 
-      // 读取原有正则的 find_regex 和 replace_string，只替换 URL
-      const originalFindRegex = stableRegex.find_regex;
-      const originalReplaceString = stableRegex.replace_string;
-
-      // 在 replace_string 中替换 URL
-      // 匹配 https://kitakamis.online/index(-v[版本号])?.html
-      const newReplaceString = originalReplaceString.replace(
-        /https:\/\/kitakamis\.online\/index(-v[\d.]+)?\.html/g,
-        targetUrl,
-      );
-
-      if (versionRegex) {
-        // 更新现有版本切换正则，使用原有的 find_regex 和替换后的 replace_string
-        versionRegex.find_regex = originalFindRegex;
-        versionRegex.replace_string = newReplaceString;
-        versionRegex.enabled = true;
-        console.log('✅ 已更新版本切换正则 URL');
-        console.log('📋 使用的 find_regex:', originalFindRegex);
-        console.log('📋 更新后的 replace_string:', newReplaceString);
-      } else {
-        // 创建新的版本切换正则，复制原有正则的所有配置，只替换 URL
-        versionRegex = {
-          id: `version_switch_${Date.now()}`,
-          script_name: '版本切换',
-          enabled: true,
-          run_on_edit: stableRegex.run_on_edit,
-          scope: stableRegex.scope,
-          find_regex: originalFindRegex,
-          replace_string: newReplaceString,
-          source: { ...stableRegex.source },
-          destination: { ...stableRegex.destination },
-          min_depth: stableRegex.min_depth,
-          max_depth: stableRegex.max_depth,
-        };
-        regexes.push(versionRegex);
-        console.log('✅ 已创建版本切换正则');
-        console.log('📋 使用的 find_regex:', originalFindRegex);
-        console.log('📋 使用的 replace_string:', newReplaceString);
-      }
-
-      // 禁用"自动更新CDN"正则，启用版本切换正则
-      stableRegex.enabled = false;
+    if (versionRegex) {
+      // 更新现有版本切换正则，使用原有的 find_regex 和替换后的 replace_string
+      versionRegex.find_regex = originalFindRegex;
+      versionRegex.replace_string = newReplaceString;
       versionRegex.enabled = true;
-      console.log('✅ 已禁用"自动更新CDN"正则，启用版本切换正则');
+      console.log('✅ 已更新版本切换正则 URL');
+      console.log('📋 使用的 find_regex:', originalFindRegex);
+      console.log('📋 更新后的 replace_string:', newReplaceString);
+    } else {
+      // 创建新的版本切换正则，复制原有正则的所有配置，只替换 URL
+      versionRegex = {
+        id: `version_switch_${Date.now()}`,
+        script_name: '版本切换',
+        enabled: true,
+        run_on_edit: stableRegex.run_on_edit,
+        scope: stableRegex.scope,
+        find_regex: originalFindRegex,
+        replace_string: newReplaceString,
+        source: { ...stableRegex.source },
+        destination: { ...stableRegex.destination },
+        min_depth: stableRegex.min_depth,
+        max_depth: stableRegex.max_depth,
+      };
+      regexes.push(versionRegex);
+      console.log('✅ 已创建版本切换正则');
+      console.log('📋 使用的 find_regex:', originalFindRegex);
+      console.log('📋 使用的 replace_string:', newReplaceString);
     }
+
+    // 禁用"自动更新CDN"正则，启用版本切换正则
+    stableRegex.enabled = false;
+    versionRegex.enabled = true;
+    console.log('✅ 已禁用"自动更新CDN"正则，启用版本切换正则');
 
     // 替换所有酒馆正则
     await replaceTavernRegexes(regexes, { scope: 'character' });

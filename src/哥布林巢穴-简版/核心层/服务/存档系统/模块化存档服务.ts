@@ -186,7 +186,8 @@ export class ModularSaveManager {
             // 如果初始化槽位不存在，创建一个，但不加载到内存
             const initGameData = createFullGameData();
             await databaseService.saveGameData(INIT_SLOT_ID, initGameData);
-            await databaseService.upsertSaveMeta(INIT_SLOT_ID, '初始化存档');
+            const { FRONTEND_VERSION: INIT_FRONTEND_VERSION } = await import('../../../version');
+            await databaseService.upsertSaveMeta(INIT_SLOT_ID, '初始化存档', INIT_FRONTEND_VERSION);
             console.log('✅ [初始化默认slot] 已创建初始化槽位（不覆盖当前进度）');
           }
         } catch (error) {
@@ -212,7 +213,8 @@ export class ModularSaveManager {
 
         // 保存到初始化槽位
         await databaseService.saveGameData(INIT_SLOT_ID, initGameData);
-        await databaseService.upsertSaveMeta(INIT_SLOT_ID, '初始化存档');
+        const { FRONTEND_VERSION: INIT_FRONTEND_VERSION } = await import('../../../version');
+        await databaseService.upsertSaveMeta(INIT_SLOT_ID, '初始化存档', INIT_FRONTEND_VERSION);
         console.log('✅ [初始化默认slot] 已创建初始化槽位');
       }
 
@@ -389,7 +391,14 @@ export class ModularSaveManager {
 
       // 保存到 IndexedDB
       await databaseService.saveGameData(saveId, gameData as any);
-      await databaseService.upsertSaveMeta(saveId, options.saveName ?? (slot === 0 ? '自动存档' : `槽位 ${slot}`));
+
+      // 保存前端版本信息到存档元数据
+      const { FRONTEND_VERSION } = await import('../../../version');
+      await databaseService.upsertSaveMeta(
+        saveId,
+        options.saveName ?? (slot === 0 ? '自动存档' : `槽位 ${slot}`),
+        FRONTEND_VERSION,
+      );
 
       // 在切换存档ID之前，先保存原来的存档ID（用于复制调教记录数据）
       const previousSaveId = databaseService.getCurrentSaveId();
@@ -754,7 +763,12 @@ export class ModularSaveManager {
       // 保存游戏数据
       const saveId = `slot_${slot}`;
       await databaseService.saveGameData(saveId, gameData as any);
-      await databaseService.upsertSaveMeta(saveId, saveName ?? (slot === 0 ? '自动存档' : `槽位 ${slot}`));
+      const { FRONTEND_VERSION: SAVE_FRONTEND_VERSION } = await import('../../../version');
+      await databaseService.upsertSaveMeta(
+        saveId,
+        saveName ?? (slot === 0 ? '自动存档' : `槽位 ${slot}`),
+        SAVE_FRONTEND_VERSION,
+      );
 
       // 如果有世界书数据，也保存
       if (worldbookData && worldbookData.length > 0) {

@@ -256,6 +256,31 @@ onMounted(async () => {
   // 初始化存档系统
   await initializeSaveSystem();
 
+  // 检测版本更新
+  try {
+    const { autoCheckForUpdates } = await import('./核心层/服务/版本更新系统/版本更新检测服务');
+    autoCheckForUpdates();
+  } catch (error) {
+    console.error('版本检测初始化失败:', error);
+  }
+
+  // 监听打开版本管理的事件
+  const handleOpenVersionManager = () => {
+    // 先打开设置面板
+    openSettings();
+    // 然后触发打开版本管理弹窗（通过设置面板）
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('open-settings-version-manager'));
+    }, 300); // 延迟一点，确保设置面板已经打开
+  };
+
+  window.addEventListener('open-version-manager', handleOpenVersionManager);
+
+  // 在组件卸载时移除事件监听
+  onUnmounted(() => {
+    window.removeEventListener('open-version-manager', handleOpenVersionManager);
+  });
+
   // 界面第一次重载时，清空人物档案世界书并更新资源世界书
   try {
     console.log('界面重载：开始清理世界书...');

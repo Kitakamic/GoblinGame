@@ -210,7 +210,7 @@ class DatabaseService {
   /**
    * 写入或更新存档元数据（saves 表）
    */
-  async upsertSaveMeta(saveId: string, name: string): Promise<void> {
+  async upsertSaveMeta(saveId: string, name: string, frontendVersion?: string): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
 
     const existing = await this.getData('saves', saveId);
@@ -219,7 +219,7 @@ class DatabaseService {
       name: name,
       createdAt: existing?.createdAt ?? new Date(),
       lastPlayed: new Date(),
-      version: '1.0.0',
+      version: frontendVersion || existing?.version || '1.0.0',
     };
 
     await this.putData('saves', meta);

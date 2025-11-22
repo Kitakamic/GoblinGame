@@ -7,6 +7,29 @@
       </div>
 
       <div class="panel-content">
+        <!-- 版本管理 -->
+        <div class="settings-section">
+          <h4 class="section-title">版本管理</h4>
+
+          <div class="setting-item">
+            <div class="version-info-display">
+              <div class="version-info-row">
+                <span class="version-info-label">当前版本：</span>
+                <span class="version-info-value">{{ FRONTEND_VERSION }}</span>
+              </div>
+              <div class="version-info-row">
+                <span class="version-info-label">更新时间：</span>
+                <span class="version-info-value">{{ FRONTEND_UPDATE_DATE }}</span>
+              </div>
+            </div>
+            <button class="version-button" @click="openVersionManager">🔖 版本管理</button>
+            <div class="setting-desc">切换版本、查看版本列表</div>
+          </div>
+        </div>
+
+        <!-- 分隔线 -->
+        <div class="divider"></div>
+
         <!-- 流式传输设置 -->
         <div class="settings-section">
           <h4 class="section-title">AI 输出设置</h4>
@@ -225,19 +248,6 @@
         <!-- 分隔线 -->
         <div class="divider"></div>
 
-        <!-- 版本管理 -->
-        <div class="settings-section">
-          <h4 class="section-title">版本管理</h4>
-
-          <div class="setting-item">
-            <button class="version-button" @click="openVersionManager">🔖 版本管理</button>
-            <div class="setting-desc">切换版本、查看当前版本信息</div>
-          </div>
-        </div>
-
-        <!-- 分隔线 -->
-        <div class="divider"></div>
-
         <!-- 帮助和教程 -->
         <div class="settings-section">
           <h4 class="section-title">帮助</h4>
@@ -245,15 +255,6 @@
           <div class="setting-item">
             <button class="tutorial-button" @click="openTutorial">📖 查看教程（强烈建议先看教程）</button>
           </div>
-
-          <!-- 暂时关闭清除缓存功能 -->
-          <!-- <div class="setting-item">
-            <label class="setting-label">
-              <span class="label-text">更新与刷新</span>
-              <span class="label-desc">如果遇到缓存问题，可以强制清除缓存并刷新页面以获取最新版本</span>
-            </label>
-            <button class="update-button" @click="forceRefresh">🔄 清除缓存并刷新</button>
-          </div> -->
         </div>
       </div>
     </div>
@@ -265,6 +266,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
+import { FRONTEND_UPDATE_DATE, FRONTEND_VERSION } from '../../version';
 import { ChainOfThoughtManager, ChainOfThoughtMode } from '../../核心层/服务/世界书管理/工具/思维链管理器';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
 import { ConfirmService } from '../../核心层/服务/通用服务/确认框服务';
@@ -979,6 +981,21 @@ watch(selectedChainMode, () => {
   loadChainFormat();
 });
 
+// 监听打开版本管理的事件（从 app.vue 触发）
+watch(
+  () => props.show,
+  newVal => {
+    if (newVal) {
+      // 设置面板打开时，检查是否有打开版本管理的请求
+      const handleOpenVersionManager = () => {
+        openVersionManager();
+        window.removeEventListener('open-settings-version-manager', handleOpenVersionManager);
+      };
+      window.addEventListener('open-settings-version-manager', handleOpenVersionManager);
+    }
+  },
+);
+
 // 初始化
 onMounted(() => {
   loadSettings();
@@ -1111,6 +1128,36 @@ onMounted(() => {
   font-size: 12px;
   line-height: 1.5;
   margin-top: 8px;
+}
+
+.version-info-display {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 6px;
+}
+
+.version-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-info-label {
+  font-size: 13px;
+  color: #d1d5db;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+.version-info-value {
+  font-size: 13px;
+  color: #fff;
+  font-weight: 600;
 }
 
 .setting-label {
