@@ -129,7 +129,7 @@ jobs:
           # 读取版本号、日期、描述和类型
           VERSION_DATE=$(grep -oP "export const FRONTEND_UPDATE_DATE = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
           VERSION_DESC=$(grep -oP "export const FRONTEND_DESCRIPTION = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
-          VERSION_TYPE=$(grep "export const FRONTEND_VERSION_TYPE" src/哥布林巢穴-简版/version.ts | grep -oP "= '([^']+)'" | tr -d "='")
+          VERSION_TYPE=$(grep "export const FRONTEND_VERSION_TYPE" src/哥布林巢穴-简版/version.ts | grep -oP "= '([^']+)'" | tr -d "=' " | xargs)
 
           # 如果描述为空，使用默认值
           if [ -z "$VERSION_DESC" ]; then

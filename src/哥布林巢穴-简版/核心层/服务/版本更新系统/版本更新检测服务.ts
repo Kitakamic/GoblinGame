@@ -72,13 +72,31 @@ async function getLatestVersion(stableOnly: boolean = true): Promise<VersionInfo
       throw new Error('版本列表格式错误：versions 数组为空');
     }
 
+    console.log('📋 [版本检测] 版本列表总数:', data.versions.length);
+    console.log(
+      '📋 [版本检测] 所有版本信息:',
+      data.versions.map(v => ({
+        version: v.version,
+        type: v.type || '(未设置)',
+        description: v.description,
+      })),
+    );
+
     // 如果只检查稳定版，过滤出稳定版版本
     let versionsToCheck = data.versions;
     if (stableOnly) {
       versionsToCheck = data.versions.filter(v => {
         // 如果没有 type 字段，默认为稳定版（向后兼容）
-        return !v.type || v.type === 'stable';
+        // 去除空格，兼容可能的空格问题（如 " stable" -> "stable"）
+        const type = v.type ? String(v.type).trim().toLowerCase() : '';
+        const isStable = !type || type === 'stable';
+        console.log(
+          `📋 [版本检测] 版本 ${v.version}: type="${v.type || '(未设置)'}" (trimmed: "${type}"), isStable=${isStable}`,
+        );
+        return isStable;
       });
+
+      console.log('📋 [版本检测] 过滤后的稳定版数量:', versionsToCheck.length);
 
       if (versionsToCheck.length === 0) {
         console.log('⚠️ [版本检测] 没有找到稳定版版本');
