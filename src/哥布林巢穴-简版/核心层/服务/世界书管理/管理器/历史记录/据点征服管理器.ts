@@ -1,7 +1,7 @@
-import type { Location } from '../../../../功能模块层/探索/类型/探索类型';
-import { INITIAL_LOCATIONS } from '../../存档系统/模块化存档类型';
-import { WorldbookHelper } from '../工具/世界书助手';
-import type { WorldbookEntry } from '../类型/世界书类型定义';
+import type { Location } from '../../../../../功能模块层/探索/类型/探索类型';
+import { INITIAL_LOCATIONS } from '../../../存档系统/模块化存档类型';
+import { WorldbookHelper } from '../../工具/世界书助手';
+import type { WorldbookEntry } from '../../类型/世界书类型定义';
 
 /**
  * 据点征服记录管理器 - 负责据点征服记录的管理

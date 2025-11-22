@@ -1,7 +1,7 @@
-import type { Continent } from '../../../../功能模块层/探索/类型/大陆探索类型';
-import { TimeParseService } from '../../通用服务/时间解析服务';
-import { WorldbookHelper } from '../工具/世界书助手';
-import type { WorldbookEntry } from '../类型/世界书类型定义';
+import type { Continent } from '../../../../../功能模块层/探索/类型/大陆探索类型';
+import { TimeParseService } from '../../../通用服务/时间解析服务';
+import { WorldbookHelper } from '../../工具/世界书助手';
+import type { WorldbookEntry } from '../../类型/世界书类型定义';
 
 /**
  * 资源世界书管理器 - 负责管理资源相关的世界书条目

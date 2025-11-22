@@ -1,6 +1,6 @@
-import { WorldbookHelper } from '../工具/世界书助手';
-import { RecordBuilder } from '../工具/记录构建器';
-import type { HistoryRecord } from '../类型/世界书类型定义';
+import { WorldbookHelper } from '../../工具/世界书助手';
+import { RecordBuilder } from '../../工具/记录构建器';
+import type { HistoryRecord } from '../../类型/世界书类型定义';
 
 /**
  * 战前对话管理器 - 专门负责战前对话记录的管理

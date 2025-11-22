@@ -8,7 +8,7 @@ import { computed, ref } from 'vue';
 import type { Location } from '../../../功能模块层/探索/类型/探索类型';
 import { WorldbookService } from '../世界书管理/服务/世界书服务';
 import { GameEventLorebookManager } from '../世界书管理/管理器/冒头事件管理器';
-import { ConquestRecordManager } from '../世界书管理/管理器/据点征服管理器';
+import { ConquestRecordManager } from '../世界书管理/管理器/历史记录/据点征服管理器';
 import { databaseService } from './数据库服务';
 import type {
   BaseResources,

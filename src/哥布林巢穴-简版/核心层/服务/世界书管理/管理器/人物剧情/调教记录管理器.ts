@@ -1,7 +1,7 @@
-import { databaseService } from '../../存档系统/数据库服务';
-import { WorldbookHelper } from '../工具/世界书助手';
-import { RecordBuilder } from '../工具/记录构建器';
-import type { HistoryRecord } from '../类型/世界书类型定义';
+import { databaseService } from '../../../存档系统/数据库服务';
+import { WorldbookHelper } from '../../工具/世界书助手';
+import { RecordBuilder } from '../../工具/记录构建器';
+import type { HistoryRecord } from '../../类型/世界书类型定义';
 
 /**
  * 调教记录管理器 - 专门负责调教记录的管理
