@@ -5,3 +5,4 @@
 
 export const FRONTEND_VERSION = '1.5.4.2';
 export const FRONTEND_UPDATE_DATE = '2025-11-15';
+export const FRONTEND_DESCRIPTION = '最新版本';

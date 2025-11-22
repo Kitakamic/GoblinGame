@@ -51,37 +51,127 @@ jobs:
       - if: ${{ steps.autotag.outputs.tag != '0.0.0' }}
         run: git push --delete origin ${{ steps.autotag.outputs.tag }}
 
-      # 上传 index.html 到 Cloudflare R2
-      - name: Upload index.html to Cloudflare R2
+      # 读取版本号
+      - name: Read version
+        id: read_version
+        run: |
+          VERSION=$(grep -oP "export const FRONTEND_VERSION = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "读取到版本号: $VERSION"
+
+      # 上传带版本号的 index.html 到 Cloudflare R2
+      - name: Upload versioned index.html to Cloudflare R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET: gobgame-pic
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          VERSION: ${{ steps.read_version.outputs.version }}
         run: |
-          # 检查文件是否存在
-          if [ ! -f "dist/哥布林巢穴-简版/index.html" ]; then
-            echo "错误: dist/哥布林巢穴-简版/index.html 不存在"
+          # 检查带版本号的文件是否存在
+          VERSIONED_FILE="dist/哥布林巢穴-简版/index-v${VERSION}.html"
+          if [ ! -f "$VERSIONED_FILE" ]; then
+            echo "错误: 版本化文件不存在: $VERSIONED_FILE"
             echo "构建输出目录内容:"
             ls -la dist/ || echo "dist 目录不存在"
             ls -la dist/哥布林巢穴-简版/ || echo "dist/哥布林巢穴-简版/ 目录不存在"
             exit 1
           fi
 
-          # 使用环境变量直接上传，不需要 aws configure
-          # 添加必要的元数据以确保 HTML 正确显示
-          aws s3 cp dist/哥布林巢穴-简版/index.html "s3://${R2_BUCKET}/index.html" \
+          # 上传带版本号的文件
+          echo "上传版本化文件: index-v${VERSION}.html"
+          aws s3 cp "$VERSIONED_FILE" "s3://${R2_BUCKET}/index-v${VERSION}.html" \
             --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
             --content-type "text/html" \
             --cache-control "no-cache, must-revalidate"
 
-      # 🔹 新增：清理 Cloudflare Edge 缓存
+          echo "✓ 已上传版本 ${VERSION} 到 R2 存储"
+
+      # 🔹 生成并上传版本列表文件
+      - name: Update version list and upload to R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: gobgame-pic
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          VERSION: ${{ steps.read_version.outputs.version }}
+        run: |
+          # 读取版本号、日期和描述
+          VERSION_DATE=$(grep -oP "export const FRONTEND_UPDATE_DATE = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
+          VERSION_DESC=$(grep -oP "export const FRONTEND_DESCRIPTION = '([^']+)'" src/哥布林巢穴-简版/version.ts | grep -oP "'([^']+)'" | tr -d "'")
+
+          # 如果描述为空，使用默认值
+          if [ -z "$VERSION_DESC" ]; then
+            VERSION_DESC="最新版本"
+          fi
+
+          # 如果版本列表文件已存在，读取并更新；否则创建新的
+          if aws s3 ls "s3://${R2_BUCKET}/versions.json" --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" > /dev/null 2>&1; then
+            echo "版本列表文件已存在，读取并更新..."
+            aws s3 cp "s3://${R2_BUCKET}/versions.json" versions.json \
+              --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+            
+            # 检查版本是否已存在
+            if grep -q "\"version\": \"${VERSION}\"" versions.json; then
+              echo "版本 ${VERSION} 已存在于版本列表中，跳过添加"
+            else
+              # 使用 Python 更新 JSON（更可靠）
+              python3 << EOF
+          import json
+
+          with open('versions.json', 'r', encoding='utf-8') as f:
+              data = json.load(f)
+
+          new_version = {
+              "version": "${VERSION}",
+              "description": "${VERSION_DESC}",
+              "date": "${VERSION_DATE}"
+          }
+
+          # 移除已存在的相同版本
+          data["versions"] = [v for v in data["versions"] if v["version"] != "${VERSION}"]
+
+          # 添加到列表开头（最新版本在前）
+          data["versions"].insert(0, new_version)
+
+          # 保存文件
+          with open('versions.json', 'w', encoding='utf-8') as f:
+              json.dump(data, f, indent=2, ensure_ascii=False)
+          EOF
+              echo "✓ 已添加版本 ${VERSION} 到版本列表"
+            fi
+          else
+            echo "版本列表文件不存在，创建新文件..."
+            cat > versions.json << EOF
+          {
+            "versions": [
+              {
+                "version": "${VERSION}",
+                "description": "${VERSION_DESC}",
+                "date": "${VERSION_DATE}"
+              }
+            ]
+          }
+          EOF
+          fi
+
+          # 上传版本列表文件
+          echo "上传版本列表文件..."
+          aws s3 cp versions.json "s3://${R2_BUCKET}/versions.json" \
+            --endpoint-url "https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+            --content-type "application/json" \
+            --cache-control "public, max-age=300"
+
+          echo "✓ 版本列表已更新并上传到 R2 存储"
+
+      # 🔹 清理 Cloudflare Edge 缓存
       - name: Purge Cloudflare Cache
         env:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          VERSION: ${{ steps.read_version.outputs.version }}
         run: |
           curl -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
             -H "Authorization: Bearer ${CF_API_TOKEN}" \
             -H "Content-Type: application/json" \
-            --data '{"files":["https://kitakamis.online/index.html"]}'
+            --data '{"files":["https://kitakamis.online/index-v'${VERSION}'.html"]}'

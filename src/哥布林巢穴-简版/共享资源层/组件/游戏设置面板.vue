@@ -225,6 +225,19 @@
         <!-- 分隔线 -->
         <div class="divider"></div>
 
+        <!-- 版本管理 -->
+        <div class="settings-section">
+          <h4 class="section-title">版本管理</h4>
+
+          <div class="setting-item">
+            <button class="version-button" @click="openVersionManager">🔖 版本管理</button>
+            <div class="setting-desc">切换版本、查看当前版本信息</div>
+          </div>
+        </div>
+
+        <!-- 分隔线 -->
+        <div class="divider"></div>
+
         <!-- 帮助和教程 -->
         <div class="settings-section">
           <h4 class="section-title">帮助</h4>
@@ -245,6 +258,9 @@
       </div>
     </div>
   </div>
+
+  <!-- 版本管理弹窗 -->
+  <component :is="VersionManagerModal" :show="showVersionManager" @close="closeVersionManager" />
 </template>
 
 <script setup lang="ts">
@@ -252,6 +268,7 @@ import { onMounted, ref, watch } from 'vue';
 import { ChainOfThoughtManager, ChainOfThoughtMode } from '../../核心层/服务/世界书管理/工具/思维链管理器';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
 import { ConfirmService } from '../../核心层/服务/通用服务/确认框服务';
+import VersionManagerModal from './版本管理弹窗.vue';
 
 interface Props {
   show: boolean;
@@ -263,6 +280,9 @@ const emit = defineEmits<{
   (e: 'open-text-style'): void;
   (e: 'open-tutorial'): void;
 }>();
+
+// 版本管理弹窗状态
+const showVersionManager = ref(false);
 
 // 流式传输设置
 const enableStream = ref(true);
@@ -928,6 +948,17 @@ const openTextStyleSettings = () => {
 const openTutorial = () => {
   emit('open-tutorial');
 };
+
+// 打开版本管理
+const openVersionManager = () => {
+  showVersionManager.value = true;
+};
+
+// 关闭版本管理
+const closeVersionManager = () => {
+  showVersionManager.value = false;
+};
+
 // 关闭面板
 const close = () => {
   emit('close');
@@ -1073,6 +1104,13 @@ onMounted(() => {
   &:last-child {
     margin-bottom: 0;
   }
+}
+
+.setting-desc {
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 8px;
 }
 
 .setting-label {
@@ -1231,7 +1269,8 @@ onMounted(() => {
 }
 
 .style-button,
-.tutorial-button {
+.tutorial-button,
+.version-button {
   width: 100%;
   padding: 12px 20px;
   background: linear-gradient(135deg, #8a3c2c, #65261c);
@@ -1256,6 +1295,15 @@ onMounted(() => {
 
   &:hover {
     background: linear-gradient(135deg, #4b8ef6, #3575eb);
+  }
+}
+
+.version-button {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  border-color: rgba(167, 139, 250, 0.5);
+
+  &:hover {
+    background: linear-gradient(135deg, #9b6cf6, #8c4aed);
   }
 }
 

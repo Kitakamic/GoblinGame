@@ -107,6 +107,21 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
   const should_obfuscate = fs.readFileSync(path.join(__dirname, entry.script), 'utf-8').includes('@obfuscate');
   const script_filepath = path.parse(entry.script);
 
+  // 读取版本号
+  let frontend_version: string | undefined;
+  try {
+    const version_file = path.join(__dirname, path.dirname(entry.script), 'version.ts');
+    if (fs.existsSync(version_file)) {
+      const version_content = fs.readFileSync(version_file, 'utf-8');
+      const version_match = version_content.match(/export\s+const\s+FRONTEND_VERSION\s*=\s*['"]([^'"]+)['"]/);
+      if (version_match) {
+        frontend_version = version_match[1];
+      }
+    }
+  } catch (error) {
+    console.warn('无法读取版本号:', error);
+  }
+
   return (_env, argv) => ({
     experiments: {
       outputModule: true,
@@ -325,21 +340,30 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
     },
     plugins: (entry.html === undefined
       ? [new MiniCssExtractPlugin()]
-      : [
-          new HtmlWebpackPlugin({
-            template: path.join(__dirname, entry.html),
-            filename: path.parse(entry.html).base,
-            scriptLoading: 'module',
-            cache: false,
-          }),
-          new HtmlInlineScriptWebpackPlugin(),
-          new MiniCssExtractPlugin(),
-          new HTMLInlineCSSWebpackPlugin({
-            styleTagFactory({ style }: { style: string }) {
-              return `<style>${style}</style>`;
-            },
-          }),
-        ]
+      : (() => {
+          const htmlBaseName = path.parse(entry.html).base;
+          // 在生产模式下，如果存在版本号，直接生成带版本号的文件名
+          const htmlFilename =
+            argv.mode === 'production' && frontend_version
+              ? htmlBaseName.replace(/\.html$/, `-v${frontend_version}.html`)
+              : htmlBaseName;
+
+          return [
+            new HtmlWebpackPlugin({
+              template: path.join(__dirname, entry.html),
+              filename: htmlFilename,
+              scriptLoading: 'module',
+              cache: false,
+            }),
+            new HtmlInlineScriptWebpackPlugin(),
+            new MiniCssExtractPlugin(),
+            new HTMLInlineCSSWebpackPlugin({
+              styleTagFactory({ style }: { style: string }) {
+                return `<style>${style}</style>`;
+              },
+            }),
+          ];
+        })()
     )
       .concat(
         { apply: watch_it },
