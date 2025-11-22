@@ -3,7 +3,7 @@
     <div class="custom-confirm-modal" @click.stop>
       <div class="modal-header">
         <h3>{{ title }}</h3>
-        <button v-if="showClose" class="close-button" @click="handleCancel">×</button>
+        <button v-if="showClose" class="close-button" @click="handleClose">×</button>
       </div>
 
       <div class="modal-content">
@@ -29,7 +29,7 @@ import { computed } from 'vue';
 interface Props {
   show: boolean;
   title?: string;
-  message: string;
+  message?: string;
   details?: string;
   confirmText?: string;
   cancelText?: string;
@@ -40,6 +40,8 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   title: '提示',
+  message: '',
+  details: undefined,
   confirmText: '确定',
   cancelText: '取消',
   showCancel: true,
@@ -59,6 +61,10 @@ const handleConfirm = () => {
 
 const handleCancel = () => {
   emit('cancel');
+};
+
+const handleClose = () => {
+  emit('close');
 };
 
 const handleOverlayClick = () => {

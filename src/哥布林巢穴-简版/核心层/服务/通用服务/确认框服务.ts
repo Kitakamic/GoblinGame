@@ -11,6 +11,8 @@ interface ConfirmOptions {
   type?: 'info' | 'warning' | 'danger' | 'success';
 }
 
+type ConfirmResult = 'confirm' | 'cancel' | 'close';
+
 interface ConfirmState {
   show: boolean;
   title: string;
@@ -21,7 +23,7 @@ interface ConfirmState {
   showCancel: boolean;
   showClose: boolean;
   type: 'info' | 'warning' | 'danger' | 'success';
-  resolve?: (value: boolean) => void;
+  resolve?: (value: boolean | ConfirmResult) => void;
 }
 
 // 全局确认框状态
@@ -90,7 +92,7 @@ export class ConfirmService {
   /**
    * 显示警告确认框
    */
-  static showWarning(message: string, title: string = '警告', details?: string): Promise<boolean> {
+  static showWarning(message: string, title: string = '警告', details?: string): Promise<boolean | ConfirmResult> {
     return new Promise(resolve => {
       confirmState.value = {
         show: true,
@@ -102,9 +104,9 @@ export class ConfirmService {
         showCancel: true,
         showClose: true,
         type: 'warning',
-        resolve: (confirmed: boolean) => {
+        resolve: (value: boolean | ConfirmResult) => {
           confirmState.value.show = false;
-          resolve(confirmed);
+          resolve(value);
         },
       };
     });
@@ -113,7 +115,7 @@ export class ConfirmService {
   /**
    * 显示危险操作确认框
    */
-  static showDanger(message: string, title: string = '危险操作', details?: string): Promise<boolean> {
+  static showDanger(message: string, title: string = '危险操作', details?: string): Promise<boolean | ConfirmResult> {
     return new Promise(resolve => {
       confirmState.value = {
         show: true,
@@ -125,9 +127,9 @@ export class ConfirmService {
         showCancel: true,
         showClose: true,
         type: 'danger',
-        resolve: (confirmed: boolean) => {
+        resolve: (value: boolean | ConfirmResult) => {
           confirmState.value.show = false;
-          resolve(confirmed);
+          resolve(value);
         },
       };
     });
@@ -136,7 +138,7 @@ export class ConfirmService {
   /**
    * 显示通用确认框
    */
-  static showConfirm(options: ConfirmOptions): Promise<boolean> {
+  static showConfirm(options: ConfirmOptions): Promise<boolean | ConfirmResult> {
     return new Promise(resolve => {
       confirmState.value = {
         show: true,
@@ -148,9 +150,9 @@ export class ConfirmService {
         showCancel: options.showCancel !== false,
         showClose: options.showClose !== false,
         type: options.type || 'info',
-        resolve: (confirmed: boolean) => {
+        resolve: (value: boolean | ConfirmResult) => {
           confirmState.value.show = false;
-          resolve(confirmed);
+          resolve(value);
         },
       };
     });
@@ -179,7 +181,8 @@ export class ConfirmService {
    */
   static handleClose(): void {
     if (confirmState.value.resolve) {
-      confirmState.value.resolve(false);
+      // 关闭按钮或失焦返回 'close'，以便调用方区分
+      confirmState.value.resolve('close' as any);
     }
   }
 

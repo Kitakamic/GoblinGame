@@ -119,6 +119,98 @@ export async function checkForUpdates(): Promise<VersionInfo | null> {
 }
 
 /**
+ * 直接切换到指定版本
+ * @param version 要切换到的版本号
+ */
+async function switchToVersion(version: string): Promise<void> {
+  // 使用全局函数（这些函数在酒馆环境中全局可用）
+  const getTavernRegexes = (globalThis as any).getTavernRegexes;
+  const replaceTavernRegexes = (globalThis as any).replaceTavernRegexes;
+
+  if (!getTavernRegexes || !replaceTavernRegexes) {
+    throw new Error('无法访问酒馆正则函数，请确保在酒馆环境中运行。');
+  }
+
+  try {
+    const targetUrl = `https://kitakamis.online/index-v${version}.html`;
+
+    // 获取所有酒馆正则
+    const regexes = getTavernRegexes({ scope: 'character' });
+    console.log('📋 [版本更新] 当前角色卡酒馆正则数量:', regexes.length);
+
+    // 查找稳定的"自动更新CDN"正则（玩家必定有此正则才能看到界面）
+    const stableRegex = regexes.find((regex: any) => regex.script_name === '自动更新CDN');
+
+    if (!stableRegex) {
+      throw new Error('未找到"自动更新CDN"正则，无法切换版本。');
+    }
+
+    // 查找版本切换正则（新建的，指向指定版本）
+    let versionRegex = regexes.find((regex: any) => regex.script_name === '版本切换');
+
+    // 读取原有正则的 find_regex 和 replace_string，只替换 URL
+    const originalFindRegex = stableRegex.find_regex;
+    const originalReplaceString = stableRegex.replace_string;
+
+    // 在 replace_string 中替换 URL
+    // 匹配 https://kitakamis.online/index(-v[版本号])?.html
+    const newReplaceString = originalReplaceString.replace(
+      /https:\/\/kitakamis\.online\/index(-v[\d.]+)?\.html/g,
+      targetUrl,
+    );
+
+    if (versionRegex) {
+      // 更新现有版本切换正则，使用原有的 find_regex 和替换后的 replace_string
+      versionRegex.find_regex = originalFindRegex;
+      versionRegex.replace_string = newReplaceString;
+      versionRegex.enabled = true;
+      console.log('✅ [版本更新] 已更新版本切换正则 URL');
+    } else {
+      // 创建新的版本切换正则，复制原有正则的所有配置，只替换 URL
+      versionRegex = {
+        id: `version_switch_${Date.now()}`,
+        script_name: '版本切换',
+        enabled: true,
+        run_on_edit: stableRegex.run_on_edit,
+        scope: stableRegex.scope,
+        find_regex: originalFindRegex,
+        replace_string: newReplaceString,
+        source: { ...stableRegex.source },
+        destination: { ...stableRegex.destination },
+        min_depth: stableRegex.min_depth,
+        max_depth: stableRegex.max_depth,
+      };
+      regexes.push(versionRegex);
+      console.log('✅ [版本更新] 已创建版本切换正则');
+    }
+
+    // 禁用"自动更新CDN"正则，启用版本切换正则
+    stableRegex.enabled = false;
+    versionRegex.enabled = true;
+    console.log('✅ [版本更新] 已禁用"自动更新CDN"正则，启用版本切换正则');
+
+    // 替换所有酒馆正则
+    await replaceTavernRegexes(regexes, { scope: 'character' });
+    console.log('✅ [版本更新] 酒馆正则已更新');
+
+    // 提示用户需要重新加载
+    await ConfirmService.showSuccess(`已切换到版本 ${version}，页面将重新加载以应用更改。`, '版本切换成功');
+
+    // 延迟一下再重新加载，让用户看到提示
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
+  } catch (error) {
+    console.error('❌ [版本更新] 切换版本失败:', error);
+    await ConfirmService.showWarning(
+      `切换版本失败：${error instanceof Error ? error.message : String(error)}`,
+      '切换失败',
+    );
+    throw error;
+  }
+}
+
+/**
  * 显示更新提示弹窗
  * @param newVersion 新版本信息
  */
@@ -127,26 +219,52 @@ export async function showUpdateNotification(newVersion: VersionInfo): Promise<v
     `发现新版本 ${newVersion.version}！\n\n` +
     `更新时间：${newVersion.date}\n` +
     `更新说明：${newVersion.description}\n\n` +
-    `是否前往版本管理页面切换版本？`;
+    `是否直接更新到最新版本？\n（也可以前往版本管理页面选择其他版本）`;
 
-  const confirmed = await ConfirmService.showConfirm({
+  const result = await ConfirmService.showConfirm({
     title: '🆕 发现新版本',
     message: message,
-    confirmText: '前往版本管理',
-    cancelText: '稍后提醒',
+    confirmText: '直接更新',
+    cancelText: '前往版本管理',
     details: `当前版本：${FRONTEND_VERSION}\n最新版本：${newVersion.version}`,
   });
 
-  if (confirmed) {
-    // 触发打开设置面板和版本管理的事件
+  // 处理不同的用户操作
+  if (result === true) {
+    // 用户点击了"直接更新"按钮
+    console.log('✅ [版本检测] 用户选择直接更新到最新版本');
+    try {
+      await switchToVersion(newVersion.version);
+    } catch (error) {
+      // 如果直接更新失败，提示用户前往版本管理
+      console.error('❌ [版本检测] 直接更新失败，提示用户前往版本管理');
+      const goToManager = await ConfirmService.showConfirm({
+        title: '更新失败',
+        message: '直接更新失败，是否前往版本管理页面手动切换版本？',
+        confirmText: '前往版本管理',
+        cancelText: '取消',
+      });
+
+      if (goToManager) {
+        window.dispatchEvent(
+          new CustomEvent('open-version-manager', {
+            detail: { version: newVersion.version },
+          }),
+        );
+      }
+    }
+  } else if (result === false) {
+    // 用户点击了"前往版本管理"按钮
     console.log('✅ [版本检测] 用户选择前往版本管理');
     window.dispatchEvent(
       new CustomEvent('open-version-manager', {
         detail: { version: newVersion.version },
       }),
     );
-  } else {
-    console.log('ℹ️ [版本检测] 用户选择稍后提醒');
+  } else if (result === 'close') {
+    // 用户点击了关闭按钮或失焦（点击外部），直接关闭，不打开版本管理
+    console.log('ℹ️ [版本检测] 用户关闭了更新提示弹窗');
+    // 不做任何操作，直接关闭
   }
 }
 
