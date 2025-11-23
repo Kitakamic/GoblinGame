@@ -124,6 +124,7 @@ export class BattleSummaryManager {
 
   /**
    * 更新战斗总结世界书条目
+   * 注意：战斗总结阶段人物无法设置，因此使用默认设置（不读取角色设置）
    */
   private static async updateBattleSummaryEntry(
     characterId: string,
@@ -138,13 +139,20 @@ export class BattleSummaryManager {
       entry => entry.extra?.entry_type === 'character_story_history' && entry.extra?.character_id === characterId,
     );
 
-    const historyEntry = WorldbookHelper.createCharacterStoryHistoryEntry(characterId, characterName, content);
-
+    // 如果条目已存在，只更新 content，保留现有的 strategy 设置
     if (historyEntryIndex !== -1) {
-      // 更新现有条目（UID 已经是固定的，直接替换）
-      worldbook[historyEntryIndex] = historyEntry;
+      const existingEntry = worldbook[historyEntryIndex];
+      worldbook[historyEntryIndex] = {
+        ...existingEntry,
+        content: content,
+        extra: {
+          ...existingEntry.extra,
+          updated_at: new Date().toISOString(),
+        },
+      };
     } else {
-      // 创建新条目
+      // 如果条目不存在，创建新条目（使用默认设置）
+      const historyEntry = WorldbookHelper.createCharacterStoryHistoryEntry(characterId, characterName, content);
       worldbook.push(historyEntry);
     }
 

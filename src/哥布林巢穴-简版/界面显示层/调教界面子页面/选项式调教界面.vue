@@ -225,7 +225,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { MessageService } from '../../共享资源层/消息/消息服务';
 import { useMessageChat } from '../../共享资源层/消息/消息聊天';
 import ToastContainer from '../../共享资源层/组件/弹窗提示.vue';
@@ -566,8 +566,6 @@ onMounted(async () => {
 
   console.log('🚀 ========== 调教界面初始化完成 ==========');
 });
-
-onUnmounted(async () => {});
 
 // 构建AI提示词
 

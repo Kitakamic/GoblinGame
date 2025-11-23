@@ -184,18 +184,36 @@ export class WorldbookHelper {
   /**
    * 创建人物剧情记录世界书条目
    * 统一的方法，供所有管理器使用，避免代码重复
+   * @param characterId 角色ID
+   * @param characterName 角色名称
+   * @param content 条目内容
+   * @param secondaryKeys 额外关键词（加入 keys_secondary）
+   * @param isGlobalStoryHistory 是否为全局剧情记录（constant 模式）
+   * @param characterTitle 角色身份/称号（用于主关键词）
    */
-  static createCharacterStoryHistoryEntry(characterId: string, characterName: string, content: string): WorldbookEntry {
+  static createCharacterStoryHistoryEntry(
+    characterId: string,
+    characterName: string,
+    content: string,
+    secondaryKeys?: string[],
+    isGlobalStoryHistory?: boolean,
+    characterTitle?: string,
+  ): WorldbookEntry {
+    const strategyType = isGlobalStoryHistory ? 'constant' : 'selective';
+    // 主关键词始终包含人物名称和身份，不受 isGlobalStoryHistory 影响
+    const primaryKeys = [characterName, characterTitle || '角色'];
+    const secondaryKeysArray = secondaryKeys || [];
+
     return {
       uid: this.generateStoryHistoryUID(characterId),
       name: `${characterName}-剧情记录`,
       enabled: true,
       strategy: {
-        type: 'selective',
-        keys: [characterName, '战斗总结', '调教记录', '战前对话', '剧情记录'],
+        type: strategyType,
+        keys: primaryKeys,
         keys_secondary: {
           logic: 'and_any',
-          keys: [],
+          keys: secondaryKeysArray,
         },
         scan_depth: 'same_as_global',
       },

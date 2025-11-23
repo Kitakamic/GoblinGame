@@ -265,6 +265,13 @@ const initializeSaveSystem = async () => {
   }
 };
 
+// 监听打开版本管理的事件处理函数（必须在 setup 顶层定义）
+const handleOpenVersionManager = () => {
+  // 先打开设置面板
+  openSettings();
+  // 版本管理内容已直接显示在设置面板的版本管理选项卡中
+};
+
 // 监听楼层增加事件
 onMounted(async () => {
   // 初始化存档系统
@@ -278,19 +285,8 @@ onMounted(async () => {
     console.error('版本检测初始化失败:', error);
   }
 
-  // 监听打开版本管理的事件
-  const handleOpenVersionManager = () => {
-    // 先打开设置面板
-    openSettings();
-    // 版本管理内容已直接显示在设置面板的版本管理选项卡中
-  };
-
+  // 添加事件监听
   window.addEventListener('open-version-manager', handleOpenVersionManager);
-
-  // 在组件卸载时移除事件监听
-  onUnmounted(() => {
-    window.removeEventListener('open-version-manager', handleOpenVersionManager);
-  });
 
   // 界面第一次重载时，清空人物档案世界书并更新资源世界书
   try {
@@ -345,6 +341,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   disableAutoSave();
+  // 移除事件监听
+  window.removeEventListener('open-version-manager', handleOpenVersionManager);
 });
 </script>
 

@@ -48,7 +48,7 @@ export class CharacterWorldbookManager {
         strategy: {
           ...worldbook[entryIndex].strategy,
           type: strategyType,
-          keys: character.isGlobalCharacter ? [] : [character.name, character.title || '角色'],
+          keys: [character.name, character.title || ''],
           keys_secondary: {
             ...worldbook[entryIndex].strategy.keys_secondary,
             keys: secondaryKeys,
@@ -175,7 +175,7 @@ export class CharacterWorldbookManager {
       enabled: true,
       strategy: {
         type: strategyType,
-        keys: character.isGlobalCharacter ? [] : [character.name, character.title || '角色'],
+        keys: [character.name, character.title || ''],
         keys_secondary: {
           logic: 'and_any',
           keys: secondaryKeys,

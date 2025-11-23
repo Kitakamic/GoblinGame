@@ -242,6 +242,8 @@ export interface Character {
   worldbookSecondaryKeys?: string[];
   /** 是否为全局人物（将人物的条目 selective 改为 constant，总是触发） */
   isGlobalCharacter?: boolean;
+  /** 人物剧情记录是否开启常量（将剧情记录条目的 selective 改为 constant，总是触发） */
+  isGlobalStoryHistory?: boolean;
 
   // ========== 生育记录 ==========
   /** 生育记录 */

@@ -1,3 +1,4 @@
+import type { Character } from '../../../../../功能模块层/人物管理/类型/人物类型';
 import { databaseService } from '../../../存档系统/数据库服务';
 import { WorldbookHelper } from '../../工具/世界书助手';
 import { RecordBuilder } from '../../工具/记录构建器';
@@ -525,6 +526,30 @@ export class TrainingRecordManager {
   }
 
   /**
+   * 获取角色数据（使用动态导入避免循环依赖）
+   * @param characterId 角色ID或名称
+   * @param characterName 角色名称
+   * @returns 角色数据，如果未找到则返回null
+   */
+  private static async getCharacterData(characterId: string, characterName: string): Promise<Character | null> {
+    try {
+      // 动态导入 modularSaveManager 避免循环依赖
+      // eslint-disable-next-line import-x/no-cycle
+      const { modularSaveManager } = await import('../../../存档系统/模块化存档服务');
+      const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
+      if (trainingData?.characters && Array.isArray(trainingData.characters)) {
+        const character = trainingData.characters.find(
+          (char: Character) => char.id === characterId || char.name === characterName,
+        );
+        return character || null;
+      }
+    } catch (error) {
+      console.warn('获取角色数据失败:', error);
+    }
+    return null;
+  }
+
+  /**
    * 更新调教记录世界书条目
    */
   private static async updateTrainingEntry(
@@ -540,6 +565,12 @@ export class TrainingRecordManager {
       entry => entry.extra?.entry_type === 'character_story_history' && entry.extra?.character_id === characterId,
     );
 
+    // 获取角色数据，用于应用额外关键词和全局常量设置
+    const character = await this.getCharacterData(characterId, characterName);
+    const secondaryKeys = character?.worldbookSecondaryKeys || [];
+    const isGlobalStoryHistory = character?.isGlobalStoryHistory || false;
+    const characterTitle = character?.title;
+
     // 如果现有条目有summary（仅支持新格式<summary_N>），保留它
     let finalContent = content;
     if (historyEntryIndex !== -1) {
@@ -553,11 +584,28 @@ export class TrainingRecordManager {
       }
     }
 
-    const historyEntry = WorldbookHelper.createCharacterStoryHistoryEntry(characterId, characterName, finalContent);
+    const historyEntry = WorldbookHelper.createCharacterStoryHistoryEntry(
+      characterId,
+      characterName,
+      finalContent,
+      secondaryKeys,
+      isGlobalStoryHistory,
+      characterTitle,
+    );
 
     if (historyEntryIndex !== -1) {
-      // 更新现有条目（UID 已经是固定的，直接替换）
-      worldbook[historyEntryIndex] = historyEntry;
+      // 更新现有条目（UID 已经是固定的，直接替换，保留其他字段）
+      const existingEntry = worldbook[historyEntryIndex];
+      worldbook[historyEntryIndex] = {
+        ...existingEntry,
+        ...historyEntry,
+        // 保留现有的 extra 数据，只更新 updated_at
+        extra: {
+          ...existingEntry.extra,
+          ...historyEntry.extra,
+          updated_at: new Date().toISOString(),
+        },
+      };
     } else {
       // 创建新条目
       worldbook.push(historyEntry);

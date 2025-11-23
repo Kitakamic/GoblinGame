@@ -78,6 +78,22 @@
               </label>
             </div>
           </div>
+
+          <!-- 4. 人物剧情记录是否开启常量 -->
+          <div class="setting-item">
+            <div class="setting-label">
+              <span class="label-icon">📚</span>
+              <span class="label-text">剧情记录常量：</span>
+              <span class="label-desc">（设置人物剧情记录世界书为总是触发，不依赖关键词）</span>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch">
+                <input v-model="isGlobalStoryHistory" type="checkbox" @change="handleGlobalStoryHistoryChange" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">{{ isGlobalStoryHistory ? '是' : '否' }}</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
       <div v-if="internalCharacter" class="modal-body">
@@ -539,6 +555,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { AvatarSwitchService } from '../../功能模块层/人物管理/服务/头像切换服务';
 import type { Character } from '../../功能模块层/人物管理/类型/人物类型';
+import { WorldbookHelper } from '../../核心层/服务/世界书管理/工具/世界书助手';
 import type { GuidelineThemeLibrary } from '../../核心层/服务/世界书管理/工具/人物指导风格生成器';
 import { WorldbookService } from '../../核心层/服务/世界书管理/服务/世界书服务';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
@@ -600,6 +617,7 @@ const selectedGuidelineThemeId = ref<string>('');
 // 人物设置相关
 const secondaryKeysInput = ref<string>('');
 const isGlobalCharacter = ref<boolean>(false);
+const isGlobalStoryHistory = ref<boolean>(false);
 
 // 加载主题库
 const loadGuidelineThemes = () => {
@@ -644,9 +662,12 @@ const loadCharacterSettings = () => {
     secondaryKeysInput.value = internalCharacter.value.worldbookSecondaryKeys?.join(', ') || '';
     // 加载全局人物设置
     isGlobalCharacter.value = internalCharacter.value.isGlobalCharacter || false;
+    // 加载剧情记录常量设置
+    isGlobalStoryHistory.value = internalCharacter.value.isGlobalStoryHistory || false;
   } else {
     secondaryKeysInput.value = '';
     isGlobalCharacter.value = false;
+    isGlobalStoryHistory.value = false;
   }
 };
 
@@ -708,6 +729,8 @@ const handleSecondaryKeysChange = async () => {
     internalCharacter.value.worldbookSecondaryKeys = keys.length > 0 ? keys : undefined;
 
     await saveCharacterSettings('额外关键词');
+    // 更新剧情记录条目的 strategy
+    await updateStoryHistoryEntryStrategy();
   } catch (error) {
     console.error('保存额外关键词失败:', error);
     toast.error('保存额外关键词失败', { title: '错误' });
@@ -730,6 +753,102 @@ const handleGlobalCharacterChange = async () => {
     toast.error('保存全局人物设置失败', { title: '错误' });
     // 恢复原值
     loadCharacterSettings();
+  }
+};
+
+// 处理剧情记录常量设置变更
+const handleGlobalStoryHistoryChange = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 更新角色的剧情记录常量设置
+    internalCharacter.value.isGlobalStoryHistory = isGlobalStoryHistory.value || undefined;
+
+    await saveCharacterSettings('剧情记录常量设置');
+    // 更新剧情记录条目的 strategy
+    await updateStoryHistoryEntryStrategy();
+  } catch (error) {
+    console.error('保存剧情记录常量设置失败:', error);
+    toast.error('保存剧情记录常量设置失败', { title: '错误' });
+    // 恢复原值
+    loadCharacterSettings();
+  }
+};
+
+// 更新剧情记录条目的 strategy（当额外关键词或全局常量设置改变时）
+const updateStoryHistoryEntryStrategy = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 使用 modularSaveManager 获取当前世界书名称
+    const worldbookName = modularSaveManager.getCurrentWorldbookName();
+    await WorldbookHelper.ensureExists(worldbookName);
+    const worldbook = await WorldbookHelper.get(worldbookName);
+
+    console.log(
+      `🔍 查找剧情记录条目: characterId=${internalCharacter.value.id}, characterName=${internalCharacter.value.name}`,
+    );
+    console.log(`📚 世界书名称: ${worldbookName}, 条目数量: ${worldbook.length}`);
+
+    // 尝试通过 character_id 或 character_name 匹配
+    const historyEntryIndex = WorldbookHelper.findEntryIndex(
+      worldbook,
+      entry =>
+        entry.extra?.entry_type === 'character_story_history' &&
+        (entry.extra?.character_id === internalCharacter.value!.id ||
+          entry.extra?.character_id === internalCharacter.value!.name ||
+          entry.extra?.character_name === internalCharacter.value!.name),
+    );
+
+    if (historyEntryIndex !== -1) {
+      const existingEntry = worldbook[historyEntryIndex];
+      const secondaryKeys = internalCharacter.value.worldbookSecondaryKeys || [];
+      const isGlobal = internalCharacter.value.isGlobalStoryHistory || false;
+
+      console.log(`📝 找到条目，当前 strategy.type=${existingEntry.strategy.type}`);
+      console.log(`🔧 将更新为: type=${isGlobal ? 'constant' : 'selective'}, secondaryKeys=${secondaryKeys.join(',')}`);
+
+      const strategyType = isGlobal ? 'constant' : 'selective';
+      // 主关键词始终包含人物名称和身份，不受 isGlobalStoryHistory 影响
+      const primaryKeys = [internalCharacter.value.name, internalCharacter.value.title || '角色'];
+
+      worldbook[historyEntryIndex] = {
+        ...existingEntry,
+        strategy: {
+          ...existingEntry.strategy,
+          type: strategyType,
+          keys: primaryKeys,
+          keys_secondary: {
+            ...existingEntry.strategy.keys_secondary,
+            keys: secondaryKeys,
+          },
+        },
+        extra: {
+          ...existingEntry.extra,
+          updated_at: new Date().toISOString(),
+        },
+      };
+
+      await WorldbookHelper.replace(worldbookName, worldbook);
+      console.log(`✅ 已更新剧情记录条目的 strategy (${internalCharacter.value.name}): type=${strategyType}`);
+    } else {
+      console.log(
+        `ℹ️ 角色 ${internalCharacter.value.name} (ID: ${internalCharacter.value.id}) 还没有剧情记录条目，将在创建时应用设置`,
+      );
+      // 列出所有剧情记录条目以便调试
+      const allHistoryEntries = worldbook.filter(entry => entry.extra?.entry_type === 'character_story_history');
+      console.log(
+        `📋 当前世界书中的剧情记录条目:`,
+        allHistoryEntries.map(e => ({
+          name: e.name,
+          character_id: e.extra?.character_id,
+          character_name: e.extra?.character_name,
+        })),
+      );
+    }
+  } catch (error) {
+    console.error('更新剧情记录条目 strategy 失败:', error);
+    // 不抛出错误，避免影响主流程
   }
 };
 
