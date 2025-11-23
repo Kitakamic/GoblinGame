@@ -221,6 +221,7 @@ interface Props {
 
 interface Emits {
   (e: 'close'): void;
+  (e: 'endDialogue'): void;
 }
 
 const props = defineProps<Props>();
@@ -792,6 +793,11 @@ const closeDialogue = async () => {
   if (props.dialogueConfig.onDialogueClose) {
     props.dialogueConfig.onDialogueClose();
   }
+
+  // 触发对话结束事件
+  emit('endDialogue');
+
+  // 触发关闭事件
   emit('close');
 };
 

@@ -79,6 +79,7 @@ export interface RandomEvent {
     onCustomInput?: (text: string) => void;
     onAIGenerate?: (userInput: string) => Promise<string>;
     onDialogueClose?: () => void;
+    secretaryPrompt?: string; // 秘书官提示词（可选），支持占位符：{{secretaryName}}, {{secretaryTitle}}，会附加到 onAIGenerate 的 prompt 上
   };
 }
 

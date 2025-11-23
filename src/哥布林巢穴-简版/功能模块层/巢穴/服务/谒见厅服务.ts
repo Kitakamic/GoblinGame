@@ -1,12 +1,9 @@
 /**
  * 谒见厅服务
- * 负责管理谒见厅的业务逻辑，包括秘书官管理、政策管理和对话生成
+ * 负责管理谒见厅的业务逻辑，包括秘书官管理、事件检查和事件报告生成
  */
 
-import { generateWithChainOfThought } from '../../../核心层/服务/世界书管理/工具/AI生成助手';
-import { ChainOfThoughtMode } from '../../../核心层/服务/世界书管理/工具/思维链管理器';
 import { modularSaveManager } from '../../../核心层/服务/存档系统/模块化存档服务';
-import { TimeParseService } from '../../../核心层/服务/通用服务/时间解析服务';
 import type { Character } from '../../人物管理/类型/人物类型';
 import { RandomEventService } from '../../随机事件/服务/随机事件服务';
 import type { RandomEvent } from '../../随机事件/类型/事件类型';
@@ -14,19 +11,16 @@ import type { RandomEvent } from '../../随机事件/类型/事件类型';
 // ==================== 类型定义 ====================
 
 /**
- * 对话配置接口
+ * 事件报告接口
  */
-export interface DialogueConfig {
-  title: string;
-  subtitle: string;
-  welcomeText: string;
-  welcomeHint: string;
-  initialOptions: Array<{
-    text: string;
-    label: string;
-  }>;
-  showCustomInput: boolean;
-  onAIGenerate?: (userInput: string) => Promise<string>;
+export interface EventReport {
+  eventId: string;
+  eventName: string;
+  eventDescription: string;
+  triggerRound: number;
+  reportContent?: string; // AI生成的事件报告内容
+  createdAt: number; // 创建时间戳
+  viewed: boolean; // 是否已查看
 }
 
 /**
@@ -39,6 +33,8 @@ export interface AudienceHallState {
   selectedSecretary: Character | null;
   /** 待处理事件 */
   pendingEvent: RandomEvent | null;
+  /** 事件报告列表 */
+  eventReports: EventReport[];
 }
 
 /**
@@ -124,53 +120,17 @@ export class AudienceHallService {
   }
 
   /**
-   * 生成秘书官回复
-   */
-  public async generateSecretaryReply(
-    secretary: Character,
-    userInput: string,
-    pendingEvent: RandomEvent | null,
-  ): Promise<string> {
-    try {
-      // 获取当前游戏时间
-      const rounds = modularSaveManager.resources.value.rounds || 0;
-      const timeInfo = TimeParseService.getTimeInfo(rounds, false);
-      const gameTime = timeInfo.formattedDate;
-
-      // 构建提示词
-      const prompt = `你是 ${secretary.name}，${secretary.title}，作为哥布林巢穴的秘书官。
-
-当前游戏时间：${gameTime}
-
-${pendingEvent ? `当前有事件需要汇报：${pendingEvent.name} - ${pendingEvent.description}` : ''}
-
-请以秘书官的身份回复玩家：${userInput}
-
-要求：
-1. 符合 ${secretary.name} 的性格和身份
-2. 可以提及当前的事件
-3. 回复要专业、有条理
-4. 使用自然的中文对话`;
-
-      const reply = await generateWithChainOfThought(ChainOfThoughtMode.CHARACTER_TRAINING, {
-        user_input: prompt,
-        temperature: 0.8,
-      });
-
-      return reply;
-    } catch (error) {
-      console.error('生成秘书官回复失败:', error);
-      return '抱歉，我暂时无法回复。';
-    }
-  }
-
-  /**
    * 检查随机事件
+   * @param gameState 游戏状态（可选），用于更准确的事件条件检查
    */
-  public checkRandomEvents(): RandomEvent | null {
+  public checkRandomEvents(gameState?: any): RandomEvent | null {
     try {
       const rounds = modularSaveManager.resources.value.rounds || 0;
-      const result = this.eventService.checkRoundStartEvents(rounds, {});
+
+      // 如果没有传入游戏状态，尝试从存档中获取
+      const state = gameState || this.buildGameState();
+
+      const result = this.eventService.checkRoundStartEvents(rounds, state);
       if (result.triggered && result.event) {
         console.log('检测到随机事件:', result.event.name);
         return result.event;
@@ -183,36 +143,180 @@ ${pendingEvent ? `当前有事件需要汇报：${pendingEvent.name} - ${pending
   }
 
   /**
-   * 构建对话配置
+   * 构建游戏状态对象（用于事件条件检查）
    */
-  public buildDialogueConfig(
-    secretary: Character | null,
-    onAIGenerate: (userInput: string) => Promise<string>,
-  ): DialogueConfig {
-    if (!secretary) {
-      return {
-        title: '谒见厅',
-        subtitle: '请先选择秘书官',
-        welcomeText: '请先选择一位秘书官',
-        welcomeHint: '在左侧选择秘书官后即可开始对话',
-        initialOptions: [],
-        showCustomInput: false,
-      };
-    }
+  private buildGameState(): any {
+    try {
+      const resources = modularSaveManager.resources.value;
+      const exploreData = modularSaveManager.getModuleData({ moduleName: 'exploration' }) as any;
 
-    return {
-      title: '谒见厅',
-      subtitle: `与 ${secretary.name} 对话`,
-      welcomeText: `${secretary.name} 正在等待您的指示`,
-      welcomeHint: '您可以与秘书官讨论政务、政策，或听取事件汇报',
-      initialOptions: [
-        { text: '汇报当前情况', label: '汇报' },
-        { text: '讨论发展方针', label: '发展' },
-        { text: '讨论对外政策', label: '外交' },
-        { text: '讨论调教方针', label: '调教' },
-      ],
-      showCustomInput: true,
-      onAIGenerate,
-    };
+      return {
+        resources: {
+          gold: resources.gold || 0,
+          food: resources.food || 0,
+          threat: resources.threat || 0,
+          slaves: resources.slaves || 0,
+        },
+        threat: resources.threat || 0,
+        continents: exploreData?.continents || {},
+      };
+    } catch (error) {
+      console.error('构建游戏状态失败:', error);
+      return {};
+    }
+  }
+
+  /**
+   * 保存待处理事件列表
+   */
+  public savePendingEvents(events: RandomEvent[]): void {
+    try {
+      const nestData = modularSaveManager.getModuleData({ moduleName: 'nest' }) as any;
+      modularSaveManager.updateModuleData({
+        moduleName: 'nest',
+        data: {
+          ...nestData,
+          pendingEvents: events,
+        },
+      });
+      console.log('待处理事件列表已保存，共', events.length, '个事件');
+    } catch (error) {
+      console.error('保存待处理事件列表失败:', error);
+    }
+  }
+
+  /**
+   * 加载待处理事件列表
+   */
+  public loadPendingEvents(): RandomEvent[] {
+    try {
+      const nestData = modularSaveManager.getModuleData({ moduleName: 'nest' }) as any;
+      if (nestData && nestData.pendingEvents && Array.isArray(nestData.pendingEvents)) {
+        console.log('已加载待处理事件列表，共', nestData.pendingEvents.length, '个事件');
+        return nestData.pendingEvents as RandomEvent[];
+      }
+      // 兼容旧数据：如果存在单个 pendingEvent，转换为数组
+      if (nestData && nestData.pendingEvent) {
+        const events = [nestData.pendingEvent as RandomEvent];
+        this.savePendingEvents(events);
+        return events;
+      }
+      return [];
+    } catch (error) {
+      console.error('加载待处理事件列表失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 添加待处理事件（如果不存在）
+   */
+  public addPendingEvent(event: RandomEvent): void {
+    try {
+      const events = this.loadPendingEvents();
+      // 检查是否已存在
+      const exists = events.some(e => e.id === event.id);
+      if (!exists) {
+        events.push(event);
+        this.savePendingEvents(events);
+        console.log('待处理事件已添加:', event.name);
+      }
+    } catch (error) {
+      console.error('添加待处理事件失败:', error);
+    }
+  }
+
+  /**
+   * 移除待处理事件
+   */
+  public removePendingEvent(eventId: string): void {
+    try {
+      const events = this.loadPendingEvents();
+      const filtered = events.filter(e => e.id !== eventId);
+      this.savePendingEvents(filtered);
+      console.log('待处理事件已移除:', eventId);
+    } catch (error) {
+      console.error('移除待处理事件失败:', error);
+    }
+  }
+
+  /**
+   * 清除所有待处理事件
+   */
+  public clearPendingEvents(): void {
+    try {
+      const nestData = modularSaveManager.getModuleData({ moduleName: 'nest' }) as any;
+      modularSaveManager.updateModuleData({
+        moduleName: 'nest',
+        data: {
+          ...nestData,
+          pendingEvents: [],
+          pendingEvent: null, // 清除旧数据
+        },
+      });
+      console.log('待处理事件列表已清除');
+    } catch (error) {
+      console.error('清除待处理事件列表失败:', error);
+    }
+  }
+
+  /**
+   * @deprecated 使用 loadPendingEvents 代替
+   */
+  public loadPendingEvent(): RandomEvent | null {
+    const events = this.loadPendingEvents();
+    return events.length > 0 ? events[0] : null;
+  }
+
+  /**
+   * @deprecated 使用 addPendingEvent 代替
+   */
+  public savePendingEvent(event: RandomEvent): void {
+    this.addPendingEvent(event);
+  }
+
+  /**
+   * @deprecated 使用 clearPendingEvents 代替
+   */
+  public clearPendingEvent(): void {
+    this.clearPendingEvents();
+  }
+
+  /**
+   * 获取所有事件报告
+   */
+  public getEventReports(): EventReport[] {
+    try {
+      const nestData = modularSaveManager.getModuleData({ moduleName: 'nest' }) as any;
+      return nestData?.eventReports || [];
+    } catch (error) {
+      console.error('获取事件报告失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 标记事件报告为已查看
+   */
+  public markEventReportAsViewed(reportId: string): void {
+    try {
+      const nestData = modularSaveManager.getModuleData({ moduleName: 'nest' }) as any;
+      const reports = nestData?.eventReports || [];
+      const report = reports.find(
+        (r: EventReport) => r.eventId === reportId && r.triggerRound === modularSaveManager.resources.value.rounds,
+      );
+      if (report) {
+        report.viewed = true;
+        modularSaveManager.updateModuleData({
+          moduleName: 'nest',
+          data: {
+            ...nestData,
+            eventReports: reports,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('标记事件报告失败:', error);
+    }
   }
 }

@@ -64,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, ref, watch } from 'vue';
+import { computed, onActivated, onMounted, onUnmounted, ref, watch } from 'vue';
 import { SacrificeService, type SacrificeAmounts } from '../功能模块层/巢穴/服务/献祭服务';
 import { modularSaveManager } from '../核心层/服务/存档系统/模块化存档服务';
 import type { NestModuleData } from '../核心层/服务/存档系统/模块化存档类型';
@@ -951,6 +951,29 @@ onActivated(() => {
   loadCharacters();
   // 同步繁殖间信息，确保显示最新状态
   syncBreedingRoomInfo();
+
+  // 检查是否需要自动打开谒见厅
+  const eventToOpen = (window as any).openAudienceHallWithEvent;
+  if (eventToOpen) {
+    showAudienceHall.value = true;
+    // 清除标记
+    delete (window as any).openAudienceHallWithEvent;
+  }
+});
+
+// 监听打开谒见厅的自定义事件
+const handleOpenAudienceHall = (event: CustomEvent) => {
+  if (event.detail?.event) {
+    showAudienceHall.value = true;
+  }
+};
+
+onMounted(() => {
+  window.addEventListener('open-audience-hall', handleOpenAudienceHall as EventListener);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('open-audience-hall', handleOpenAudienceHall as EventListener);
 });
 
 // ==================== 献祭相关方法 ====================

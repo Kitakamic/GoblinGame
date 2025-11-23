@@ -178,13 +178,23 @@
     <!-- 剧情总结界面 -->
     <StorySummaryModal :show="showStorySummaryModal" @close="closeStorySummaryModal" />
 
-    <!-- 随机事件管理器 -->
-    <RandomEventManager
-      ref="randomEventManagerRef"
-      :current-round="roundCount"
-      :game-state="gameStateForEvents"
-      @event-triggered="handleRandomEventTriggered"
-      @event-completed="handleRandomEventCompleted"
+    <!-- 事件提示弹窗 -->
+    <EventNotificationDialog
+      :show="showEventNotification"
+      :event="pendingEvent"
+      @close="closeEventNotification"
+      @listen-report="handleListenReport"
+      @write-report="handleWriteReport"
+      @ignore="handleIgnore"
+    />
+
+    <!-- 事件对话界面（直接在主界面显示，跳过谒见厅） -->
+    <EventDialogueInterface
+      v-if="showEventDialog && currentViewingEvent"
+      :event="currentViewingEvent"
+      :show="showEventDialog"
+      @close="closeEventDialog"
+      @event-completed="handleEventCompleted"
     />
   </div>
 </template>
@@ -198,8 +208,9 @@
 import { computed, ref } from 'vue';
 
 // 功能模块层服务
+import { AudienceHallService } from '../功能模块层/巢穴/服务/谒见厅服务';
 import { continentExploreService } from '../功能模块层/探索/服务/大陆探索服务';
-import RandomEventManager from '../功能模块层/随机事件/视图/随机事件管理器.vue';
+import type { RandomEvent } from '../功能模块层/随机事件/类型/事件类型';
 
 // 核心层服务
 import { WorldbookService } from '../核心层/服务/世界书管理/服务/世界书服务';
@@ -212,6 +223,8 @@ import { ConfirmService } from '../核心层/服务/通用服务/确认框服务
 import { ResourceFormatService } from '../核心层/服务/通用服务/资源格式化服务';
 
 // 主界面子页面组件
+import EventNotificationDialog from '../共享资源层/组件/事件提示弹窗.vue';
+import EventDialogueInterface from '../功能模块层/随机事件/视图/事件对话界面.vue';
 import StorySummaryModal from './主界面子页面/剧情总结界面.vue';
 import HistoryModal from './主界面子页面/历史记录界面.vue';
 import SaveLoadModal from './主界面子页面/存档界面.vue';
@@ -231,9 +244,17 @@ const showStorySummaryModal = ref(false);
 const needsSummary = ref(false);
 const latestRoundInfo = ref<any>(null);
 
+// 事件相关状态
+const showEventNotification = ref(false);
+const pendingEvent = ref<RandomEvent | null>(null);
+const audienceHallService = AudienceHallService.getInstance();
+
+// 事件对话界面相关（主界面直接显示，跳过谒见厅）
+const showEventDialog = ref(false);
+const currentViewingEvent = ref<RandomEvent | null>(null);
+
 // 组件引用
 const historyModalRef = ref<any>(null);
-const randomEventManagerRef = ref();
 
 // ============================================================================
 // 计算属性 - 资源显示
@@ -280,11 +301,7 @@ const currentSeason = computed(() => {
 // 计算属性 - 游戏状态
 // ============================================================================
 
-const gameStateForEvents = computed(() => ({
-  resources: resources.value,
-  threat: resources.value.threat,
-  rounds: resources.value.rounds,
-}));
+// 随机事件已转移到谒见厅处理
 
 // ============================================================================
 // UI 工具函数
@@ -502,17 +519,65 @@ const closeStorySummaryModal = () => {
 // ============================================================================
 
 /**
- * 处理随机事件触发
+ * 关闭事件提示弹窗
  */
-const handleRandomEventTriggered = (event: any) => {
-  console.log('随机事件触发:', event.name);
+const closeEventNotification = () => {
+  showEventNotification.value = false;
+  pendingEvent.value = null;
 };
 
 /**
- * 处理随机事件完成
+ * 处理"听取汇报"按钮（直接在主界面打开事件对话框，跳过谒见厅）
  */
-const handleRandomEventCompleted = (event: any, result: any) => {
-  console.log('随机事件完成:', event.name, result);
+const handleListenReport = (event: RandomEvent) => {
+  // 直接在主界面打开事件对话框
+  currentViewingEvent.value = event;
+  showEventDialog.value = true;
+  // 关闭事件提示弹窗
+  closeEventNotification();
+};
+
+/**
+ * 处理"撰写报告"按钮（改为保存待处理事件）
+ */
+const handleWriteReport = (event: RandomEvent) => {
+  try {
+    // 添加待处理事件，不跳转，后续在谒见厅中查看
+    audienceHallService.addPendingEvent(event);
+    console.log('待处理事件已添加:', event.name);
+  } catch (error) {
+    console.error('添加待处理事件失败:', error);
+  }
+};
+
+/**
+ * 处理"忽略事件"按钮
+ */
+const handleIgnore = (event: RandomEvent) => {
+  // 忽略事件，不做任何处理，只是关闭弹窗
+  console.log('事件已忽略:', event.name);
+};
+
+/**
+ * 关闭事件对话框
+ */
+const closeEventDialog = () => {
+  showEventDialog.value = false;
+  currentViewingEvent.value = null;
+};
+
+/**
+ * 处理事件完成
+ */
+const handleEventCompleted = (event: RandomEvent, _result: any) => {
+  // 从待处理列表中移除该事件（如果存在）
+  try {
+    audienceHallService.removePendingEvent(event.id);
+    console.log('事件已处理完成并从待处理列表中移除');
+  } catch (error) {
+    console.error('移除待处理事件失败:', error);
+  }
+  closeEventDialog();
 };
 
 // ============================================================================
@@ -875,10 +940,13 @@ const endRound = async () => {
       console.error('更新人物世界书状态失败:', error);
     }
 
-    // 检查随机事件
+    // 检查随机事件（在主界面显示提示弹窗）
     console.log('检查回合开始随机事件...');
-    if (randomEventManagerRef.value) {
-      randomEventManagerRef.value.checkRoundStartEvents();
+    const event = audienceHallService.checkRandomEvents();
+    if (event) {
+      pendingEvent.value = event;
+      showEventNotification.value = true;
+      console.log('触发随机事件提示:', event.name);
     }
 
     // 检查是否需要总结

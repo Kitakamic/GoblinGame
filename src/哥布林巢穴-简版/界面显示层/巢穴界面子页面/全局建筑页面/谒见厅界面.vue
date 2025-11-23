@@ -52,16 +52,46 @@
         <!-- 事件汇报区域 -->
         <div class="settings-section">
           <h4 class="section-title">事件汇报</h4>
-          <div v-if="pendingEvent" class="event-display">
-            <div class="event-header">
-              <span class="event-icon">⚠️</span>
-              <span class="event-name">{{ pendingEvent.name }}</span>
+          <div v-if="pendingEvents.length > 0" class="pending-events-list">
+            <div v-for="(event, index) in pendingEvents" :key="`${event.id}-${index}`" class="pending-event-item">
+              <div class="event-header">
+                <span class="event-icon">⚠️</span>
+                <div class="event-info">
+                  <div class="event-name">{{ event.name }}</div>
+                  <div class="event-description">{{ event.description }}</div>
+                </div>
+              </div>
+              <button class="action-button small-btn" @click="showEventReport(event)">查看详情</button>
             </div>
-            <div class="event-description">{{ pendingEvent.description }}</div>
-            <button class="action-button event-button" @click="showEventReport">查看事件详情</button>
           </div>
           <div v-else class="no-event">
             <p>当前没有待处理事件</p>
+          </div>
+        </div>
+
+        <!-- 事件报告列表 -->
+        <div v-if="eventReports.length > 0" class="settings-section">
+          <h4 class="section-title">历史事件报告</h4>
+          <div class="event-reports-list">
+            <div
+              v-for="report in eventReports"
+              :key="report.eventId + '-' + report.triggerRound"
+              class="event-report-item"
+            >
+              <div class="report-header">
+                <span class="report-icon">📋</span>
+                <div class="report-info">
+                  <div class="report-name">{{ report.eventName }}</div>
+                  <div class="report-meta">第{{ report.triggerRound }}回合</div>
+                </div>
+                <span v-if="!report.viewed" class="new-badge">新</span>
+              </div>
+              <div class="report-content">
+                <div v-if="report.reportContent" class="report-text">{{ report.reportContent }}</div>
+                <div v-else class="report-text">{{ report.eventDescription }}</div>
+              </div>
+              <button class="action-button small-btn" @click="viewEventReport(report)">查看详情</button>
+            </div>
           </div>
         </div>
       </div>
@@ -108,8 +138,8 @@
 
     <!-- 事件汇报弹窗 -->
     <EventDialogueInterface
-      v-if="showEventDialog && pendingEvent"
-      :event="pendingEvent"
+      v-if="showEventDialog && currentViewingEvent"
+      :event="currentViewingEvent"
       :show="showEventDialog"
       @close="closeEventDialog"
       @event-completed="handleEventCompleted"
@@ -121,7 +151,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { AvatarSwitchService } from '../../../功能模块层/人物管理/服务/头像切换服务';
 import type { Character } from '../../../功能模块层/人物管理/类型/人物类型';
-import { AudienceHallService } from '../../../功能模块层/巢穴/服务/谒见厅服务';
+import { AudienceHallService, type EventReport } from '../../../功能模块层/巢穴/服务/谒见厅服务';
 import type { RandomEvent } from '../../../功能模块层/随机事件/类型/事件类型';
 import EventDialogueInterface from '../../../功能模块层/随机事件/视图/事件对话界面.vue';
 
@@ -148,9 +178,14 @@ const selectedSecretary = ref<Character | null>(null);
 // 秘书官选择器显示状态
 const showSecretarySelector = ref(false);
 
-// 待处理事件
-const pendingEvent = ref<RandomEvent | null>(null);
+// 待处理事件列表
+const pendingEvents = ref<RandomEvent[]>([]);
+// 当前查看的事件
+const currentViewingEvent = ref<RandomEvent | null>(null);
 const showEventDialog = ref(false);
+
+// 事件报告列表
+const eventReports = ref<EventReport[]>([]);
 
 // ==================== 方法 ====================
 
@@ -181,19 +216,40 @@ const selectSecretary = (character: Character) => {
   console.log('已选择秘书官:', character.name);
 };
 
-// 检查随机事件
-const checkRandomEvents = () => {
-  const event = audienceHallService.checkRandomEvents();
-  if (event) {
-    pendingEvent.value = event;
-  }
+// 加载事件报告列表
+const loadEventReports = () => {
+  eventReports.value = audienceHallService.getEventReports();
+  // 按触发回合倒序排列（最新的在前）
+  eventReports.value.sort((a, b) => b.triggerRound - a.triggerRound);
+};
+
+// 加载待处理事件列表
+const loadPendingEvents = () => {
+  const savedEvents = audienceHallService.loadPendingEvents();
+  pendingEvents.value = savedEvents;
+};
+
+// 加载事件数据（不检查新事件，新事件由主界面在回合结束时检查）
+const loadEventData = () => {
+  // 只加载已保存的待处理事件列表和事件报告列表
+  loadPendingEvents();
+  loadEventReports();
+};
+
+// 查看事件报告
+const viewEventReport = (report: EventReport) => {
+  // 标记为已查看
+  audienceHallService.markEventReportAsViewed(report.eventId);
+  // 重新加载报告列表
+  loadEventReports();
+  // 可以在这里显示报告详情，或者直接打开事件对话
+  // 暂时只标记为已查看
 };
 
 // 显示事件汇报
-const showEventReport = () => {
-  if (pendingEvent.value) {
-    showEventDialog.value = true;
-  }
+const showEventReport = (event: RandomEvent) => {
+  currentViewingEvent.value = event;
+  showEventDialog.value = true;
 };
 
 // 关闭事件对话框
@@ -202,8 +258,15 @@ const closeEventDialog = () => {
 };
 
 // 处理事件完成
-const handleEventCompleted = (_event: RandomEvent, _result: any) => {
-  pendingEvent.value = null;
+const handleEventCompleted = (event: RandomEvent, _result: any) => {
+  // 从待处理列表中移除该事件
+  const index = pendingEvents.value.findIndex(e => e.id === event.id);
+  if (index > -1) {
+    pendingEvents.value.splice(index, 1);
+    // 更新存档
+    audienceHallService.removePendingEvent(event.id);
+  }
+  currentViewingEvent.value = null;
   closeEventDialog();
   console.log('事件已处理完成');
 };
@@ -216,17 +279,23 @@ const close = () => {
 // ==================== 生命周期 ====================
 
 onMounted(() => {
+  // 只在组件挂载时加载基础数据
   loadAvailableCharacters();
   loadSavedSecretary();
-  checkRandomEvents();
+  // 如果谒见厅是显示的，才加载事件相关数据
+  if (props.show) {
+    loadEventData();
+  }
 });
 
-// 监听显示状态，每次打开时检查事件
+// 监听显示状态，每次打开时加载事件数据（不检查新事件）
 watch(
   () => props.show,
   newVal => {
     if (newVal) {
-      checkRandomEvents();
+      // 只有在谒见厅界面实际显示时才加载事件数据
+      // 新事件由主界面在回合结束时检查，这里只显示已保存的待处理事件
+      loadEventData();
     }
   },
 );
@@ -473,38 +542,61 @@ watch(
   }
 }
 
-/* 事件显示 */
-.event-display {
+/* 待处理事件列表 */
+.pending-events-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
-.event-header {
+.pending-event-item {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
-
-  .event-icon {
-    font-size: 20px;
-    flex-shrink: 0;
-  }
-
-  .event-name {
-    font-size: 16px;
-    font-weight: 700;
-    color: #ffd7a1;
-  }
-}
-
-.event-description {
-  font-size: 14px;
-  color: #9ca3af;
-  line-height: 1.6;
-  padding: 12px;
+  padding: 16px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(205, 133, 63, 0.3);
-  border-radius: 8px;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: rgba(205, 133, 63, 0.5);
+    transform: translateY(-2px);
+  }
+
+  .event-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+
+    .event-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .event-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .event-name {
+        font-size: 16px;
+        font-weight: 700;
+        color: #ffd7a1;
+      }
+
+      .event-description {
+        font-size: 14px;
+        color: #9ca3af;
+        line-height: 1.6;
+      }
+    }
+  }
 }
 
 .no-event {
@@ -512,6 +604,87 @@ watch(
   padding: 20px;
   color: #9ca3af;
   font-size: 14px;
+}
+
+/* 事件报告列表 */
+.event-reports-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.event-report-item {
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(205, 133, 63, 0.3);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: rgba(205, 133, 63, 0.5);
+  }
+
+  .report-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+
+    .report-icon {
+      font-size: 20px;
+    }
+
+    .report-info {
+      flex: 1;
+
+      .report-name {
+        color: #ffd7a1;
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+
+      .report-meta {
+        color: #9ca3af;
+        font-size: 12px;
+      }
+    }
+
+    .new-badge {
+      padding: 4px 8px;
+      background: rgba(59, 130, 246, 0.3);
+      border: 1px solid rgba(59, 130, 246, 0.5);
+      border-radius: 6px;
+      color: #60a5fa;
+      font-size: 11px;
+      font-weight: 600;
+    }
+  }
+
+  .report-content {
+    margin-bottom: 12px;
+
+    .report-text {
+      color: #9ca3af;
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      line-clamp: 4;
+      -webkit-box-orient: vertical;
+    }
+  }
+
+  .small-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
 }
 
 /* 操作按钮 */
