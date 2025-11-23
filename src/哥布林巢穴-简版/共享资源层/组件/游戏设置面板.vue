@@ -185,7 +185,7 @@
               <button class="chain-action-button" @click="saveChainFormat">💾 保存当前格式</button>
               <button class="chain-action-button secondary" @click="loadDefaultChainFormat">👁️ 查看默认格式</button>
             </div>
-            <div class="button-group">
+            <div class="button-group" style="margin-top: 12px">
               <button class="chain-action-button secondary" @click="exportChainFormats">📤 导出为文件</button>
               <button class="chain-action-button secondary" @click="triggerChainFileImport">📥 从文件导入</button>
               <input

@@ -50,14 +50,14 @@
             <div class="setting-label">
               <span class="label-icon">🔑</span>
               <span class="label-text">触发额外关键词：</span>
-              <span class="label-desc">（加入世界书的第二提示词 keys_secondary，多个关键词用逗号分隔）</span>
+              <span class="label-desc">（额外的世界书触发关键词，多个关键词用逗号分隔）</span>
             </div>
             <div class="setting-control">
               <input
                 v-model="secondaryKeysInput"
                 type="text"
                 class="secondary-keys-input"
-                placeholder="例如：女王,公主,贵族"
+                placeholder="例如：女王,公主,角色昵称等"
                 @blur="handleSecondaryKeysChange"
               />
             </div>
@@ -68,7 +68,7 @@
             <div class="setting-label">
               <span class="label-icon">🌐</span>
               <span class="label-text">全局人物：</span>
-              <span class="label-desc">（设置为 constant，总是触发，不依赖关键词）</span>
+              <span class="label-desc">（设置角色设定世界书为总是触发，不依赖关键词）</span>
             </div>
             <div class="setting-control">
               <label class="toggle-switch">
@@ -1998,6 +1998,11 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
       transition: all 0.3s ease;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
       margin-right: 4px;
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      min-height: 32px;
+      box-sizing: border-box;
 
       &:hover {
         background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(139, 69, 19, 0.4));
@@ -2007,8 +2012,12 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
       }
 
       .btn-icon {
-        font-size: 12px;
+        font-size: 14px;
         opacity: 0.9;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
     }
 
