@@ -236,6 +236,8 @@ export interface Character {
   // ========== 调教信息 ==========
   /** 最后调教时间 */
   lastTraining?: Date;
+  /** 指导风格主题ID（关联到主题库中的主题） */
+  guidelineThemeId?: string;
 
   // ========== 生育记录 ==========
   /** 生育记录 */

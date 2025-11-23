@@ -180,22 +180,13 @@
             ></textarea>
           </div>
 
-          <div class="setting-item" style="display: flex; gap: 8px">
-            <button class="chain-action-button" @click="saveChainFormat">💾 保存当前格式</button>
-            <button class="chain-action-button secondary" @click="loadDefaultChainFormat">👁️ 查看默认格式</button>
-          </div>
-
-          <!-- 分隔线 -->
-          <div class="divider" style="margin: 16px 0"></div>
-
-          <!-- 导入导出功能 -->
           <div class="setting-item">
-            <label class="setting-label">
-              <span class="label-text">导入/导出思维链格式</span>
-              <span class="label-desc">可以将您的自定义思维链格式导出为文件分享，或从文件导入他人的格式</span>
-            </label>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap">
-              <button class="chain-action-button" @click="exportChainFormats">📤 导出为文件</button>
+            <div class="button-group">
+              <button class="chain-action-button" @click="saveChainFormat">💾 保存当前格式</button>
+              <button class="chain-action-button secondary" @click="loadDefaultChainFormat">👁️ 查看默认格式</button>
+            </div>
+            <div class="button-group">
+              <button class="chain-action-button secondary" @click="exportChainFormats">📤 导出为文件</button>
               <button class="chain-action-button secondary" @click="triggerChainFileImport">📥 从文件导入</button>
               <input
                 ref="chainFileInput"
@@ -204,6 +195,237 @@
                 style="display: none"
                 @change="handleChainFileImport"
               />
+            </div>
+          </div>
+        </div>
+
+        <!-- 人物指导风格自定义 -->
+        <div v-show="activeTab === 'guideline'" class="settings-section">
+          <h4 class="section-title">人物指导风格自定义</h4>
+
+          <!-- 指导风格主题管理 -->
+          <div class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">指导风格主题</span>
+              <span class="label-desc">管理可复用的指导风格主题模板。主题可以在人物信息中关联使用。</span>
+            </label>
+
+            <!-- 显示当前默认主题 -->
+            <div v-if="defaultThemeId && guidelineThemes[defaultThemeId]" class="default-theme-indicator">
+              <div style="display: flex; align-items: center; justify-content: space-between">
+                <span class="label-desc" style="color: #fbbf24; font-weight: 600; line-height: 1.4; font-size: 13px">
+                  ⭐ 当前全局默认主题：{{ guidelineThemes[defaultThemeId].name }}
+                </span>
+                <button class="preview-toggle-button" @click="showDefaultThemePreview = !showDefaultThemePreview">
+                  {{ showDefaultThemePreview ? '🔽' : '▶️' }}
+                </button>
+              </div>
+              <!-- 显示默认主题的指导词内容 -->
+              <div v-if="showDefaultThemePreview" class="default-theme-preview">
+                <div
+                  v-for="(item, index) in getDefaultThemeGuidelines().filter(
+                    (i): i is LoyaltyGuidelineItem & { loyalty: number } => i.loyalty !== undefined,
+                  )"
+                  :key="index"
+                  class="preview-guideline-item"
+                >
+                  <div class="preview-label">
+                    <strong>忠诚度 ≥ {{ item.loyalty }}</strong>
+                    <span style="margin-left: 8px; font-size: 12px; color: #9ca3af">
+                      {{ getLoyaltyThresholdName(item.loyalty) }}
+                    </span>
+                  </div>
+                  <div class="preview-content">{{ item.content }}</div>
+                </div>
+              </div>
+            </div>
+            <div v-else class="default-theme-indicator">
+              <div style="display: flex; align-items: center; justify-content: space-between">
+                <span class="label-desc" style="color: #9ca3af; line-height: 1.4; font-size: 13px">
+                  💡 未设置全局默认主题，将使用系统默认配置
+                </span>
+                <button class="preview-toggle-button" @click="showDefaultThemePreview = !showDefaultThemePreview">
+                  {{ showDefaultThemePreview ? '🔽' : '▶️' }}
+                </button>
+              </div>
+              <!-- 显示系统默认配置的指导词内容 -->
+              <div v-if="showDefaultThemePreview" class="default-theme-preview">
+                <div
+                  v-for="(item, index) in CharacterGuidelineGenerator.getDefaultGuidelines().filter(
+                    (i): i is LoyaltyGuidelineItem & { loyalty: number } => i.loyalty !== undefined,
+                  )"
+                  :key="index"
+                  class="preview-guideline-item"
+                >
+                  <div class="preview-label">
+                    <strong>忠诚度 ≥ {{ item.loyalty }}</strong>
+                    <span style="margin-left: 8px; font-size: 12px; color: #9ca3af">
+                      {{ getLoyaltyThresholdName(item.loyalty) }}
+                    </span>
+                  </div>
+                  <div class="preview-content">{{ item.content }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-bottom: 12px; margin-top: 8px">
+              <select
+                v-model="selectedThemeId"
+                class="format-select"
+                style="width: 100%; margin-bottom: 8px"
+                @change="loadTheme"
+              >
+                <option value="">请选择主题（或创建新主题）</option>
+                <option v-for="(theme, themeId) in guidelineThemes" :key="themeId" :value="themeId">
+                  {{ theme.name }}{{ themeId === defaultThemeId ? ' ⭐（全局默认）' : '' }}
+                </option>
+              </select>
+              <div class="button-group">
+                <button class="chain-action-button secondary" @click="openCreateThemeDialog">➕ 新建主题</button>
+                <button v-if="selectedThemeId" class="chain-action-button secondary" @click="setAsDefaultTheme">
+                  ⭐ 设为全局默认
+                </button>
+                <button
+                  v-if="selectedThemeId"
+                  class="chain-action-button secondary"
+                  style="color: #ef4444; border-color: #ef4444"
+                  @click="deleteTheme"
+                >
+                  🗑️ 删除主题
+                </button>
+              </div>
+              <div class="button-group" style="margin-top: 8px">
+                <button class="chain-action-button secondary" @click="exportGuidelineSettings">📤 导出主题库</button>
+                <button class="chain-action-button secondary" @click="triggerGuidelineFileImport">📥 导入主题库</button>
+                <input
+                  ref="guidelineFileInput"
+                  type="file"
+                  accept=".json"
+                  style="display: none"
+                  @change="handleGuidelineFileImport"
+                />
+              </div>
+            </div>
+            <!-- 创建主题对话框 -->
+            <div v-if="showCreateThemeDialog" class="dialog-overlay" @click.self="showCreateThemeDialog = false">
+              <div class="dialog-content" @click.stop>
+                <h5>创建新主题</h5>
+                <input v-model="newThemeName" type="text" class="text-input" placeholder="输入主题名称" />
+                <div style="display: flex; gap: 8px; margin-top: 12px">
+                  <button class="chain-action-button" @click="createNewTheme">创建</button>
+                  <button class="chain-action-button secondary" @click="showCreateThemeDialog = false">取消</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 主题编辑 -->
+          <div v-if="selectedThemeId" class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">主题名称</span>
+              <span class="label-desc">主题的描述性名称</span>
+            </label>
+            <input v-model="currentTheme.name" type="text" class="text-input" placeholder="输入主题名称" />
+          </div>
+          <div v-if="selectedThemeId" class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">主题描述（可选）</span>
+              <span class="label-desc">主题的简要描述</span>
+            </label>
+            <input
+              v-model="currentTheme.description"
+              type="text"
+              class="text-input"
+              placeholder="输入主题描述（可选）"
+            />
+          </div>
+          <div v-if="selectedThemeId" class="setting-item">
+            <button class="chain-action-button" @click="saveTheme">💾 保存当前主题</button>
+          </div>
+
+          <!-- 未捕获/敌人状态（-100） -->
+          <div v-if="selectedThemeId" class="divider" style="margin: 16px 0"></div>
+          <h5 v-if="selectedThemeId" class="subsection-title">未捕获/敌人状态（忠诚度：-100）</h5>
+          <div v-if="selectedThemeId" class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">提示词内容</span>
+              <span class="label-desc">第一行作为状态描述，空行后每行一个指导原则</span>
+            </label>
+            <textarea
+              v-model="getUncapturedConfig().contentText"
+              class="chain-textarea"
+              rows="8"
+              placeholder="输入指导原则..."
+            ></textarea>
+          </div>
+
+          <!-- 忠诚度区间配置 -->
+          <div v-if="selectedThemeId" class="divider" style="margin: 16px 0"></div>
+          <h5 v-if="selectedThemeId" class="subsection-title">忠诚度区间配置</h5>
+          <div v-if="selectedThemeId" class="setting-item">
+            <label class="setting-label">
+              <span class="label-text">忠诚度区间提示词</span>
+              <span class="label-desc"
+                >配置不同忠诚度区间的提示词。-100:未捕获, 0:正常状态起始,
+                100:完全堕落。当忠诚度≥阈值时应用对应配置。</span
+              >
+            </label>
+            <div class="button-group" style="margin-top: 8px">
+              <button class="chain-action-button secondary" @click="addLoyaltyGuideline">➕ 添加忠诚度区间</button>
+              <button class="chain-action-button secondary" @click="ensureBasicLoyaltyIntervals">
+                📋 添加基础区间（0和100）
+              </button>
+            </div>
+          </div>
+          <template v-if="selectedThemeId">
+            <div v-for="(item, index) in getLoyaltyIntervals()" :key="index" class="loyalty-guideline-item">
+              <div style="margin-bottom: 8px">
+                <label class="setting-label" style="margin: 0">
+                  <span class="label-text">忠诚度阈值 ≥</span>
+                  <span class="label-desc" style="margin-left: 8px; font-size: 12px; color: #9ca3af">
+                    {{ getLoyaltyThresholdName(item.loyalty) }}
+                  </span>
+                </label>
+                <div style="margin-top: 4px; margin-bottom: 8px">
+                  <input
+                    v-model.number="item.loyalty"
+                    type="number"
+                    min="-100"
+                    max="100"
+                    class="text-input"
+                    placeholder="-100, 0-99, 或 100"
+                    style="width: 100%; margin-bottom: 8px"
+                  />
+                  <button
+                    v-if="item.loyalty !== -100"
+                    class="chain-action-button secondary"
+                    style="width: 100%; padding: 8px 12px; font-size: 12px"
+                    @click="removeLoyaltyGuideline(getLoyaltyIndex(item.loyalty))"
+                  >
+                    ❌ 删除此条目
+                  </button>
+                </div>
+              </div>
+              <textarea
+                v-model="item.contentText"
+                class="chain-textarea"
+                rows="4"
+                placeholder="输入指导原则..."
+              ></textarea>
+            </div>
+          </template>
+          <div v-if="selectedThemeId" class="setting-item">
+            <div class="button-group">
+              <button class="chain-action-button" @click="saveAllGuidelineSettings">💾 保存当前主题</button>
+              <button class="chain-action-button secondary" @click="restoreDefaultGuidelineSettings">
+                🔄 恢复到默认配置
+              </button>
+            </div>
+          </div>
+
+          <div v-if="!selectedThemeId" class="setting-item">
+            <div class="label-desc" style="color: #9ca3af; font-size: 13px; line-height: 1.6">
+              💡 提示：请先选择一个主题进行编辑，或创建一个新主题。
             </div>
           </div>
         </div>
@@ -281,6 +503,12 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue';
+import {
+  CharacterGuidelineGenerator,
+  type GuidelineTheme,
+  type GuidelineThemeLibrary,
+  type LoyaltyGuidelineItem,
+} from '../../核心层/服务/世界书管理/工具/人物指导风格生成器';
 import { ChainOfThoughtManager, ChainOfThoughtMode } from '../../核心层/服务/世界书管理/工具/思维链管理器';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
 import { ConfirmService } from '../../核心层/服务/通用服务/确认框服务';
@@ -323,6 +551,32 @@ const currentChainFormat = ref('');
 
 // 文件导入相关
 const chainFileInput = ref<HTMLInputElement | null>(null);
+
+// 人物指导风格自定义 - 主题库管理
+const selectedThemeId = ref<string>('');
+const guidelineThemes = ref<GuidelineThemeLibrary>({});
+const currentTheme = ref<
+  GuidelineTheme & { loyaltyGuidelinesWithText: Array<LoyaltyGuidelineItem & { contentText: string }> }
+>({
+  name: '',
+  description: '',
+  loyaltyGuidelines: [],
+  loyaltyGuidelinesWithText: [],
+});
+const showCreateThemeDialog = ref(false);
+const newThemeName = ref('');
+
+// 全局默认主题ID
+const defaultThemeId = ref<string>('');
+
+// 显示默认主题预览
+const showDefaultThemePreview = ref(false);
+
+// 当前编辑的主题的忠诚度指导风格
+const loyaltyGuidelines = ref<Array<LoyaltyGuidelineItem & { contentText: string }>>([]);
+
+// 文件导入相关
+const guidelineFileInput = ref<HTMLInputElement | null>(null);
 
 // 玩家角色信息
 const playerName = ref('哥布林之王');
@@ -392,6 +646,9 @@ const loadSettings = () => {
 
     // 加载思维链格式
     loadChainFormat();
+
+    // 加载人物指导风格
+    loadGuidelineSettings();
 
     console.log('📋 已加载游戏设置:', {
       enableStream: enableStream.value,
@@ -606,6 +863,560 @@ const loadDefaultChainFormat = () => {
   console.log(
     `👁️ 已加载默认思维链格式用于查看: ${getCurrentChainModeName()}（只是临时显示，需要点击"保存当前格式"才会应用）`,
   );
+};
+
+// 加载人物指导风格设置（主题库）
+const loadGuidelineSettings = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const themeLibraryKey = 'guideline_theme_library';
+    const defaultThemeKey = 'guideline_default_theme_id';
+
+    // 加载主题库
+    if (globalVars[themeLibraryKey] && typeof globalVars[themeLibraryKey] === 'object') {
+      guidelineThemes.value = globalVars[themeLibraryKey] as GuidelineThemeLibrary;
+    } else {
+      guidelineThemes.value = {};
+    }
+
+    // 加载全局默认主题ID
+    if (typeof globalVars[defaultThemeKey] === 'string') {
+      defaultThemeId.value = globalVars[defaultThemeKey];
+    } else {
+      defaultThemeId.value = '';
+    }
+
+    // 如果有默认主题，自动选中
+    if (defaultThemeId.value && guidelineThemes.value[defaultThemeId.value]) {
+      selectedThemeId.value = defaultThemeId.value;
+      loadTheme();
+    } else if (Object.keys(guidelineThemes.value).length > 0) {
+      // 如果没有默认主题但有主题，选中第一个
+      const firstThemeId = Object.keys(guidelineThemes.value)[0];
+      selectedThemeId.value = firstThemeId;
+      loadTheme();
+    } else {
+      // 如果没有主题，加载默认配置作为临时编辑
+      loadDefaultGuidelineSettings();
+    }
+  } catch (error) {
+    console.error('加载人物指导风格设置失败:', error);
+    loadDefaultGuidelineSettings();
+  }
+};
+
+// 加载默认设置（用于编辑新主题时的临时显示）
+const loadDefaultGuidelineSettings = () => {
+  // 使用 CharacterGuidelineGenerator.getDefaultGuidelines() 获取完整的默认配置
+  // 包含所有忠诚度区间：-100, 0, 20, 40, 60, 80, 100
+  const defaultGuidelines = CharacterGuidelineGenerator.getDefaultGuidelines();
+
+  if (defaultGuidelines && defaultGuidelines.length > 0) {
+    // 过滤掉没有 loyalty 的项并添加 contentText 字段
+    loyaltyGuidelines.value = defaultGuidelines
+      .filter((item): item is LoyaltyGuidelineItem & { loyalty: number } => item.loyalty !== undefined)
+      .map((item: LoyaltyGuidelineItem) => ({
+        ...item,
+        contentText: item.content || '',
+      }));
+  } else {
+    // 如果获取失败，至少初始化基础配置
+    loyaltyGuidelines.value = [
+      {
+        loyalty: -100,
+        content: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(-100),
+        contentText: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(-100),
+      },
+      {
+        loyalty: 0,
+        content: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(0),
+        contentText: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(0),
+      },
+      {
+        loyalty: 100,
+        content: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(100),
+        contentText: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(100),
+      },
+    ];
+  }
+};
+
+// 获取未捕获配置（-100）
+const getUncapturedConfig = () => {
+  let config = loyaltyGuidelines.value.find(item => item.loyalty !== undefined && item.loyalty === -100);
+  if (!config) {
+    // 如果没有找到，创建一个默认的
+    config = {
+      loyalty: -100,
+      content: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(-100),
+      contentText: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(-100),
+    };
+    loyaltyGuidelines.value.push(config);
+  }
+  return config;
+};
+
+// 获取忠诚度区间（排除-100，只返回有 loyalty 字段的项）
+const getLoyaltyIntervals = () => {
+  return loyaltyGuidelines.value.filter(
+    (item): item is LoyaltyGuidelineItem & { loyalty: number; contentText: string } =>
+      item.loyalty !== undefined && item.loyalty !== -100,
+  );
+};
+
+// 获取忠诚度项的索引（在排除-100后的数组中）
+const getLoyaltyIndex = (loyalty: number | undefined) => {
+  if (loyalty === undefined) return -1;
+  const intervals = getLoyaltyIntervals();
+  return intervals.findIndex(item => item.loyalty === loyalty);
+};
+
+// 获取忠诚度阈值名称
+const getLoyaltyThresholdName = (loyalty: number) => {
+  if (loyalty === -100) return '（未捕获/敌人）';
+  if (loyalty === 0) return '（正常状态起始）';
+  if (loyalty === 100) return '（完全堕落）';
+  return `（忠诚度 ${loyalty}）`;
+};
+
+// 获取默认主题的指导词内容
+const getDefaultThemeGuidelines = (): LoyaltyGuidelineItem[] => {
+  if (defaultThemeId.value && guidelineThemes.value[defaultThemeId.value]) {
+    return guidelineThemes.value[defaultThemeId.value].loyaltyGuidelines;
+  }
+  return [];
+};
+
+// 确保基础区间存在（0和100）
+const ensureBasicLoyaltyIntervals = () => {
+  // 检查并添加0（正常状态起始）
+  if (!loyaltyGuidelines.value.find(item => item.loyalty !== undefined && item.loyalty === 0)) {
+    loyaltyGuidelines.value.push({
+      loyalty: 0,
+      content: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(0),
+      contentText: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(0),
+    });
+  }
+
+  // 检查并添加100（完全堕落）
+  if (!loyaltyGuidelines.value.find(item => item.loyalty !== undefined && item.loyalty === 100)) {
+    loyaltyGuidelines.value.push({
+      loyalty: 100,
+      content: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(100),
+      contentText: CharacterGuidelineGenerator.getDefaultContentByLoyaltyValue(100),
+    });
+  }
+
+  // 按忠诚度降序排序（只排序有 loyalty 字段的项）
+  loyaltyGuidelines.value.sort((a, b) => {
+    const aLoyalty = a.loyalty ?? -Infinity;
+    const bLoyalty = b.loyalty ?? -Infinity;
+    return bLoyalty - aLoyalty;
+  });
+
+  toastr.success('已添加基础区间', '操作成功');
+};
+
+// 加载主题
+const loadTheme = () => {
+  if (!selectedThemeId.value || !guidelineThemes.value[selectedThemeId.value]) {
+    currentTheme.value = {
+      name: '',
+      description: '',
+      loyaltyGuidelines: [],
+      loyaltyGuidelinesWithText: [],
+    };
+    loyaltyGuidelines.value = [];
+    return;
+  }
+
+  const theme = guidelineThemes.value[selectedThemeId.value];
+  currentTheme.value = {
+    ...theme,
+    loyaltyGuidelinesWithText: theme.loyaltyGuidelines.map(item => ({
+      ...item,
+      contentText: item.content || '',
+    })),
+  };
+  loyaltyGuidelines.value = [...currentTheme.value.loyaltyGuidelinesWithText];
+};
+
+// 保存当前主题
+const saveTheme = () => {
+  if (!selectedThemeId.value) return;
+
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const themeLibraryKey = 'guideline_theme_library';
+
+    // 确保所有内容已更新
+    loyaltyGuidelines.value.forEach(item => {
+      item.content = item.contentText.trim();
+    });
+
+    // 转换为保存格式（过滤掉没有 loyalty 的项）
+    const loyaltyItems: LoyaltyGuidelineItem[] = loyaltyGuidelines.value
+      .filter(
+        (item): item is LoyaltyGuidelineItem & { loyalty: number; contentText: string } => item.loyalty !== undefined,
+      )
+      .map(item => ({
+        loyalty: item.loyalty,
+        content: item.contentText.trim(),
+      }));
+
+    // 按忠诚度降序排序
+    loyaltyItems.sort((a, b) => {
+      const aLoyalty = a.loyalty ?? -Infinity;
+      const bLoyalty = b.loyalty ?? -Infinity;
+      return bLoyalty - aLoyalty;
+    });
+
+    const theme: GuidelineTheme = {
+      name: currentTheme.value.name,
+      description: currentTheme.value.description || '',
+      loyaltyGuidelines: loyaltyItems,
+    };
+
+    // 更新主题库
+    if (!guidelineThemes.value) {
+      guidelineThemes.value = {};
+    }
+    guidelineThemes.value[selectedThemeId.value] = theme;
+    currentTheme.value = {
+      ...theme,
+      loyaltyGuidelinesWithText: theme.loyaltyGuidelines.map(item => ({
+        ...item,
+        contentText: item.content || '',
+      })),
+    };
+
+    // 保存到全局变量
+    globalVars[themeLibraryKey] = guidelineThemes.value;
+    replaceVariables(globalVars, { type: 'global' });
+
+    toastr.success(`已保存主题: ${theme.name}`, '保存成功');
+    console.log(`💾 已保存主题: ${theme.name}`);
+  } catch (error) {
+    console.error('保存主题失败:', error);
+    toastr.error('保存主题失败', '错误');
+  }
+};
+
+// 添加忠诚度区间
+const addLoyaltyGuideline = () => {
+  loyaltyGuidelines.value.push({
+    loyalty: 50,
+    content: '',
+    contentText: '',
+  });
+  // 按忠诚度降序排序（只排序有 loyalty 字段的项）
+  loyaltyGuidelines.value.sort((a, b) => {
+    const aLoyalty = a.loyalty ?? -Infinity;
+    const bLoyalty = b.loyalty ?? -Infinity;
+    return bLoyalty - aLoyalty;
+  });
+};
+
+// 删除忠诚度区间
+const removeLoyaltyGuideline = (index: number) => {
+  const intervals = getLoyaltyIntervals();
+  const item = intervals[index];
+  if (item && item.loyalty !== undefined) {
+    const actualIndex = loyaltyGuidelines.value.findIndex(i => i.loyalty === item.loyalty);
+    if (actualIndex !== -1) {
+      loyaltyGuidelines.value.splice(actualIndex, 1);
+    }
+  }
+};
+
+// 保存所有配置（保存当前主题）
+const saveAllGuidelineSettings = () => {
+  // 如果有选中的主题，保存主题；否则创建新主题
+  if (selectedThemeId.value) {
+    saveTheme();
+  } else {
+    toastr.warning('请先选择或创建一个主题', '提示');
+  }
+};
+
+// 恢复到默认配置（恢复当前主题到默认值）
+const restoreDefaultGuidelineSettings = () => {
+  try {
+    const defaultGuidelines = CharacterGuidelineGenerator.getDefaultGuidelines();
+
+    if (defaultGuidelines && defaultGuidelines.length > 0) {
+      // 更新界面上的配置（过滤掉没有 loyalty 的项）
+      loyaltyGuidelines.value = defaultGuidelines
+        .filter((item): item is LoyaltyGuidelineItem & { loyalty: number } => item.loyalty !== undefined)
+        .map(item => ({
+          ...item,
+          contentText: item.content || '',
+        }));
+
+      // 如果当前主题存在，也更新主题中的配置
+      if (selectedThemeId.value && currentTheme.value) {
+        currentTheme.value.loyaltyGuidelinesWithText = [...loyaltyGuidelines.value];
+      }
+
+      toastr.success('已恢复到默认配置', '操作成功');
+      console.log('🔄 已恢复到默认配置');
+    }
+  } catch (error) {
+    console.error('恢复默认配置失败:', error);
+    toastr.error('恢复默认配置失败', '错误');
+  }
+};
+
+// 导出指导风格配置（主题库）
+const exportGuidelineSettings = async () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const themeLibraryKey = 'guideline_theme_library';
+    const defaultThemeKey = 'guideline_default_theme_id';
+
+    const themeLibrary = (globalVars[themeLibraryKey] || {}) as GuidelineThemeLibrary;
+    const defaultThemeId = globalVars[defaultThemeKey] as string | undefined;
+
+    const exportData = {
+      version: '2.0',
+      description: '哥布林巢穴人物指导风格主题库',
+      themeLibrary,
+      defaultThemeId,
+      exportedAt: new Date().toISOString(),
+    };
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `人物指导风格主题库_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
+    await ConfirmService.showSuccess('已导出人物指导风格主题库', '导出成功', '文件已保存到您的下载文件夹。');
+    console.log('✅ 人物指导风格主题库已导出:', exportData);
+  } catch (error) {
+    console.error('导出人物指导风格主题库失败:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await ConfirmService.showDanger(`导出失败：${errorMessage}`, '导出失败', '请重试或检查文件权限。');
+  }
+};
+
+// 触发文件选择
+const triggerGuidelineFileImport = () => {
+  guidelineFileInput.value?.click();
+};
+
+// 处理文件导入
+const handleGuidelineFileImport = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    let importData: any;
+
+    try {
+      importData = JSON.parse(text);
+    } catch (parseError) {
+      await ConfirmService.showWarning('JSON格式错误', '导入失败', '文件不是有效的JSON格式，请检查文件是否正确。');
+      target.value = '';
+      return;
+    }
+
+    // 检查导入数据格式
+    if (!importData.themeLibrary || typeof importData.themeLibrary !== 'object') {
+      await ConfirmService.showWarning('数据格式错误', '导入失败', '文件中没有找到有效的主题库数据。');
+      target.value = '';
+      return;
+    }
+
+    const themeLibrary = importData.themeLibrary as GuidelineThemeLibrary;
+    const defaultThemeId = importData.defaultThemeId as string | undefined;
+
+    if (Object.keys(themeLibrary).length === 0) {
+      await ConfirmService.showWarning('数据格式错误', '导入失败', '主题库为空。');
+      target.value = '';
+      return;
+    }
+
+    const globalVars = getVariables({ type: 'global' });
+    const themeLibraryKey = 'guideline_theme_library';
+    const defaultThemeKey = 'guideline_default_theme_id';
+
+    // 合并主题库（保留现有主题，添加新主题）
+    const existingLibrary = (globalVars[themeLibraryKey] || {}) as GuidelineThemeLibrary;
+    globalVars[themeLibraryKey] = { ...existingLibrary, ...themeLibrary };
+
+    if (defaultThemeId) {
+      globalVars[defaultThemeKey] = defaultThemeId;
+    }
+
+    replaceVariables(globalVars, { type: 'global' });
+
+    // 重新加载设置
+    loadGuidelineSettings();
+
+    const themeCount = Object.keys(themeLibrary).length;
+    await ConfirmService.showSuccess(
+      `已成功导入 ${themeCount} 个主题`,
+      '导入成功',
+      '主题库已更新，您可以在主题列表中选择使用。',
+    );
+    console.log('✅ 人物指导风格主题库已导入:', { themeCount, defaultThemeId });
+  } catch (error) {
+    console.error('导入人物指导风格主题库失败:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await ConfirmService.showDanger(`导入失败：${errorMessage}`, '导入失败', '请检查文件是否正确或重试。');
+  } finally {
+    target.value = '';
+  }
+};
+
+// 打开创建主题对话框
+const openCreateThemeDialog = () => {
+  newThemeName.value = '';
+  showCreateThemeDialog.value = true;
+};
+
+// 设置全局默认主题
+const setAsDefaultTheme = () => {
+  if (!selectedThemeId.value) {
+    toastr.warning('请先选择一个主题', '提示');
+    return;
+  }
+
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const defaultThemeKey = 'guideline_default_theme_id';
+    globalVars[defaultThemeKey] = selectedThemeId.value;
+    replaceVariables(globalVars, { type: 'global' });
+    defaultThemeId.value = selectedThemeId.value;
+    toastr.success(`已将"${currentTheme.value.name}"设为全局默认主题`, '设置成功');
+    console.log(`💾 已设置全局默认主题: ${selectedThemeId.value}`);
+  } catch (error) {
+    console.error('设置全局默认主题失败:', error);
+    toastr.error('设置全局默认主题失败', '错误');
+  }
+};
+
+// 删除主题
+const deleteTheme = async () => {
+  if (!selectedThemeId.value) {
+    toastr.warning('请先选择一个主题', '提示');
+    return;
+  }
+
+  const theme = guidelineThemes.value[selectedThemeId.value];
+  if (!theme) {
+    toastr.warning('主题不存在', '提示');
+    return;
+  }
+
+  // 确认删除
+  const isDefaultTheme = selectedThemeId.value === defaultThemeId.value;
+  const confirmMessage = isDefaultTheme
+    ? `确定要删除主题"${theme.name}"吗？\n\n⚠️ 这是当前全局默认主题，删除后需要重新设置默认主题。\n\n此操作不可恢复。`
+    : `确定要删除主题"${theme.name}"吗？\n\n此操作不可恢复。`;
+
+  const result = await ConfirmService.showConfirm({
+    message: confirmMessage,
+    title: '删除主题',
+    type: 'danger',
+    confirmText: '删除',
+    cancelText: '取消',
+  });
+
+  if (result !== true) {
+    return;
+  }
+
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const themeLibraryKey = 'guideline_theme_library';
+    const defaultThemeKey = 'guideline_default_theme_id';
+
+    // 从主题库中删除主题
+    if (guidelineThemes.value[selectedThemeId.value]) {
+      delete guidelineThemes.value[selectedThemeId.value];
+    }
+
+    // 如果删除的是默认主题，清除默认主题ID
+    if (isDefaultTheme) {
+      delete globalVars[defaultThemeKey];
+      defaultThemeId.value = '';
+    }
+
+    // 保存到全局变量
+    globalVars[themeLibraryKey] = guidelineThemes.value;
+    replaceVariables(globalVars, { type: 'global' });
+
+    // 清空当前选中和主题内容
+    selectedThemeId.value = '';
+    currentTheme.value = {
+      name: '',
+      description: '',
+      loyaltyGuidelines: [],
+      loyaltyGuidelinesWithText: [],
+    };
+    loyaltyGuidelines.value = [];
+
+    // 重新加载设置
+    loadGuidelineSettings();
+
+    toastr.success(`已删除主题: ${theme.name}`, '删除成功');
+    console.log(`🗑️ 已删除主题: ${theme.name} (${selectedThemeId.value})`);
+  } catch (error) {
+    console.error('删除主题失败:', error);
+    toastr.error('删除主题失败', '错误');
+  }
+};
+
+// 创建新主题
+const createNewTheme = () => {
+  if (!newThemeName.value.trim()) {
+    toastr.warning('主题名称不能为空', '提示');
+    return;
+  }
+
+  const themeId = `theme_${Date.now()}`;
+  const defaultGuidelines = CharacterGuidelineGenerator.getDefaultGuidelines();
+
+  const newTheme: GuidelineTheme = {
+    name: newThemeName.value.trim(),
+    description: '',
+    loyaltyGuidelines: defaultGuidelines,
+  };
+
+  guidelineThemes.value[themeId] = newTheme;
+  selectedThemeId.value = themeId;
+  currentTheme.value = {
+    ...newTheme,
+    loyaltyGuidelinesWithText: newTheme.loyaltyGuidelines.map(item => ({
+      ...item,
+      contentText: item.content || '',
+    })),
+  };
+  loyaltyGuidelines.value = [...currentTheme.value.loyaltyGuidelinesWithText];
+
+  // 保存到全局变量
+  const globalVars = getVariables({ type: 'global' });
+  const themeLibraryKey = 'guideline_theme_library';
+  globalVars[themeLibraryKey] = guidelineThemes.value;
+  replaceVariables(globalVars, { type: 'global' });
+
+  showCreateThemeDialog.value = false;
+  newThemeName.value = '';
+
+  toastr.success(`已创建新主题: ${newTheme.name}`, '创建成功');
+  console.log(`✅ 已创建新主题: ${newTheme.name}`);
 };
 
 // 导出思维链格式为文件（导出所有格式，包括默认格式）
@@ -1028,7 +1839,7 @@ const close = () => {
 };
 
 // 选项卡类型定义
-type TabId = 'version' | 'ai' | 'game' | 'chain' | 'player' | 'other';
+type TabId = 'version' | 'ai' | 'game' | 'chain' | 'guideline' | 'player' | 'other';
 
 // 选项卡定义
 const tabs: Array<{ id: TabId; icon: string; label: string }> = [
@@ -1036,6 +1847,7 @@ const tabs: Array<{ id: TabId; icon: string; label: string }> = [
   { id: 'ai', icon: '🤖', label: 'AI 输出' },
   { id: 'game', icon: '⚙️', label: '游戏机制' },
   { id: 'chain', icon: '🔗', label: '思维链' },
+  { id: 'guideline', icon: '📝', label: '人物指导风格' },
   { id: 'player', icon: '👤', label: '玩家角色' },
   { id: 'other', icon: '⚙️', label: '其他设置' },
 ];
@@ -1154,6 +1966,37 @@ onMounted(() => {
     width: 95%;
     max-height: 90vh;
   }
+
+  /* 自定义滚动条样式 - Webkit浏览器 (Chrome, Edge, Safari) */
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    margin: 8px 0;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(205, 133, 63, 0.6), rgba(205, 133, 63, 0.4));
+    border-radius: 10px;
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+
+    &:hover {
+      background: linear-gradient(180deg, rgba(205, 133, 63, 0.8), rgba(205, 133, 63, 0.6));
+      border-color: rgba(205, 133, 63, 0.3);
+    }
+
+    &:active {
+      background: linear-gradient(180deg, rgba(205, 133, 63, 0.9), rgba(205, 133, 63, 0.7));
+    }
+  }
+
+  /* Firefox滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(205, 133, 63, 0.6) rgba(0, 0, 0, 0.2);
 }
 
 @keyframes fadeIn {
@@ -1750,10 +2593,207 @@ onMounted(() => {
     border-color: rgba(255, 120, 60, 0.6);
     box-shadow: 0 0 0 3px rgba(255, 120, 60, 0.1);
   }
+
+  /* 自定义滚动条样式 - Webkit浏览器 */
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, rgba(205, 133, 63, 0.5), rgba(205, 133, 63, 0.3));
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: linear-gradient(180deg, rgba(205, 133, 63, 0.7), rgba(205, 133, 63, 0.5));
+    }
+
+    &:active {
+      background: linear-gradient(180deg, rgba(205, 133, 63, 0.8), rgba(205, 133, 63, 0.6));
+    }
+  }
+
+  /* Firefox滚动条样式 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(205, 133, 63, 0.5) rgba(0, 0, 0, 0.2);
+}
+
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+}
+
+.dialog-content {
+  background: linear-gradient(135deg, rgba(40, 26, 20, 0.98), rgba(26, 19, 19, 0.98));
+  border: 2px solid rgba(205, 133, 63, 0.6);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 300px;
+  max-width: 500px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+
+  h5 {
+    margin: 0 0 16px 0;
+    color: #ffd7a1;
+    font-size: 18px;
+    font-weight: 700;
+  }
+}
+
+.subsection-title {
+  color: #ffd7a1;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 24px 0 16px 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(205, 133, 63, 0.3);
+}
+
+.loyalty-guideline-item {
+  border: 1px solid rgba(205, 133, 63, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: rgba(205, 133, 63, 0.5);
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+
+  @media (min-width: 481px) {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .chain-action-button {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+.default-theme-indicator {
+  padding: 6px 12px;
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.preview-toggle-button {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #9ca3af;
+  font-size: 14px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(156, 163, 175, 0.1);
+    color: #d1d5db;
+  }
+
+  &:active {
+    background: rgba(156, 163, 175, 0.2);
+  }
+}
+
+.default-theme-preview {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+  border: 1px solid rgba(251, 191, 36, 0.2);
+  max-height: 400px;
+  overflow-y: auto;
+
+  /* 自定义滚动条样式 */
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(251, 191, 36, 0.4);
+    border-radius: 6px;
+
+    &:hover {
+      background: rgba(251, 191, 36, 0.6);
+    }
+  }
+
+  scrollbar-width: thin;
+  scrollbar-color: rgba(251, 191, 36, 0.4) rgba(0, 0, 0, 0.2);
+}
+
+.preview-guideline-item {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(251, 191, 36, 0.2);
+
+  &:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+  }
+}
+
+.preview-label {
+  color: #fbbf24;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.preview-content {
+  color: #f0e6d2;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  border-left: 3px solid rgba(251, 191, 36, 0.4);
 }
 
 .chain-action-button {
-  flex: 1;
   padding: 10px 16px;
   background: linear-gradient(135deg, #6366f1, #4f46e5);
   border: 2px solid rgba(99, 102, 241, 0.5);
@@ -1764,24 +2804,39 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  width: 100%;
 
-  &:hover {
+  @media (min-width: 481px) {
+    width: auto;
+    flex: 1;
+    min-width: 100px;
+  }
+
+  &:hover:not(:disabled) {
     background: linear-gradient(135deg, #7578f6, #5f56e5);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    border-color: rgba(99, 102, 241, 0.7);
   }
 
-  &:active {
+  &:active:not(:disabled) {
     transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    border-color: rgba(107, 114, 128, 0.5);
   }
 
   &.secondary {
     background: linear-gradient(135deg, #6b7280, #4b5563);
     border-color: rgba(107, 114, 128, 0.5);
 
-    &:hover {
-      background: linear-gradient(135deg, #7c8289, #5b616b);
-      box-shadow: 0 4px 12px rgba(107, 114, 128, 0.3);
+    &:hover:not(:disabled) {
+      background: linear-gradient(135deg, #7578f6, #5f56e5);
+      border-color: rgba(107, 114, 128, 0.7);
     }
   }
 }
