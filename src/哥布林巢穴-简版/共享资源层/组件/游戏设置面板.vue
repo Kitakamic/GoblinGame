@@ -63,6 +63,11 @@
           </div>
         </div>
 
+        <!-- 自定义API设置 -->
+        <div v-show="activeTab === 'api'" class="settings-section">
+          <CustomApiSettings ref="customApiSettingsRef" />
+        </div>
+
         <!-- 游戏机制设置 -->
         <div v-show="activeTab === 'game'" class="settings-section">
           <h4 class="section-title">游戏机制设置</h4>
@@ -502,6 +507,7 @@ import { modularSaveManager } from '../../核心层/服务/存档系统/模块�
 import { toast } from '../../核心层/服务/通用服务/弹窗提示服务';
 import { ConfirmService } from '../../核心层/服务/通用服务/确认框服务';
 import VersionManagerContent from './版本管理内容.vue';
+import CustomApiSettings from './设置界面子页面/自定义API设置.vue';
 
 interface Props {
   show: boolean;
@@ -576,6 +582,9 @@ const fileInput = ref<HTMLInputElement | null>(null);
 
 // 版本管理组件引用
 const versionManagerRef = ref<InstanceType<typeof VersionManagerContent> | null>(null);
+
+// 自定义API设置组件引用
+const customApiSettingsRef = ref<InstanceType<typeof CustomApiSettings> | null>(null);
 
 // 保存状态，防止重复点击
 const isSaving = ref(false);
@@ -1823,12 +1832,13 @@ const close = () => {
 };
 
 // 选项卡类型定义
-type TabId = 'version' | 'ai' | 'game' | 'chain' | 'guideline' | 'player' | 'other';
+type TabId = 'version' | 'ai' | 'api' | 'game' | 'chain' | 'guideline' | 'player' | 'other';
 
 // 选项卡定义
 const tabs: Array<{ id: TabId; icon: string; label: string }> = [
   { id: 'version', icon: '🔖', label: '版本管理' },
   { id: 'ai', icon: '🤖', label: 'AI 输出' },
+  { id: 'api', icon: '🔌', label: '自定义API' },
   { id: 'game', icon: '⚙️', label: '游戏机制' },
   { id: 'chain', icon: '🔗', label: '思维链' },
   { id: 'guideline', icon: '📝', label: '人物指导风格' },
@@ -1880,6 +1890,16 @@ watch(
                 }
               }
             }, 500);
+          }
+        }, 300);
+      });
+    } else if (newTab === 'api') {
+      // 切换到自定义API设置时，确保加载设置
+      nextTick(() => {
+        setTimeout(() => {
+          if (customApiSettingsRef.value && typeof customApiSettingsRef.value.loadSettings === 'function') {
+            customApiSettingsRef.value.loadSettings();
+            console.log('📥 切换到自定义API设置选项卡，已加载设置');
           }
         }, 300);
       });
