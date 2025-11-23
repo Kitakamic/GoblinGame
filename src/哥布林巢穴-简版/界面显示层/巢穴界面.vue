@@ -57,6 +57,9 @@
 
     <!-- 献祭对话框 -->
     <SacrificeDialog :show="showSacrificeDialog" @close="closeSacrificeDialog" @confirm="handleSacrificeConfirm" />
+
+    <!-- 谒见厅界面 -->
+    <AudienceHallInterface :show="showAudienceHall" @close="showAudienceHall = false" />
   </div>
 </template>
 
@@ -72,6 +75,7 @@ import { breedingBuildings, globalBuildings, resourceBuildings } from '../功能
 import type { Building, BuildingSlot, SlotCost, SlotType } from '../功能模块层/巢穴/类型/建筑类型';
 // 巢穴界面子页面
 import GlobalBuildingsGrid from './巢穴界面子页面/全局建筑网格.vue';
+import AudienceHallInterface from './巢穴界面子页面/全局建筑页面/谒见厅界面.vue';
 import NestHeader from './巢穴界面子页面/巢穴头部.vue';
 import BuildingTabs from './巢穴界面子页面/建筑标签页.vue';
 import BuildingSlotGrid from './巢穴界面子页面/建筑槽位网格.vue';
@@ -147,6 +151,9 @@ const characters = ref<any[]>([]);
 // 献祭对话框状态
 const showSacrificeDialog = ref(false);
 const currentSacrificeSlotIndex = ref(-1);
+
+// 谒见厅界面状态
+const showAudienceHall = ref(false);
 
 // ==================== 建筑数据 ====================
 // 建筑数据已从 '../功能模块层/巢穴/数据/建筑数据' 导入
@@ -685,13 +692,17 @@ const handleRemoveGlobalBuilding = async (building: Building) => {
 
 /**
  * 处理全局建筑互动
- * 未来会打开该建筑的独立互动弹窗
+ * 根据建筑ID打开对应的互动界面
  */
 const handleGlobalBuildingInteract = (building: Building) => {
-  // TODO: 未来实现各建筑的独立互动弹窗
   console.log(`进入 ${building.name} 进行互动`);
-  // 这里将来会根据 building.id 打开不同的互动弹窗
-  // 例如：if (building.id === 'brothel') { openBrothelDialog(); }
+
+  // 根据建筑ID打开对应的界面
+  if (building.id === 'audience_hall') {
+    showAudienceHall.value = true;
+  }
+  // 未来可以在这里添加其他建筑的互动界面
+  // 例如：if (building.id === 'brothel') { showBrothel.value = true; }
 };
 
 // ==================== 数据持久化 ====================
