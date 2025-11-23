@@ -18,6 +18,24 @@
           <button class="close-btn" @click="close">×</button>
         </div>
       </div>
+      <!-- 指导风格设置栏 -->
+      <div v-if="internalCharacter" class="guideline-theme-section">
+        <div class="guideline-theme-container">
+          <div class="guideline-theme-label">
+            <span class="label-icon">📝</span>
+            <span class="label-text">指导风格主题：</span>
+          </div>
+          <select v-model="selectedGuidelineThemeId" class="guideline-theme-select" @change="handleThemeChange">
+            <option value="">使用全局默认</option>
+            <option v-for="(theme, themeId) in guidelineThemes" :key="themeId" :value="themeId">
+              {{ theme.name }}{{ themeId === defaultThemeId ? ' ⭐（全局默认）' : '' }}
+            </option>
+          </select>
+          <button class="refresh-theme-btn" title="刷新主题库" @click="refreshThemeLibrary">
+            <span class="btn-icon">🔄</span>
+          </button>
+        </div>
+      </div>
       <div v-if="internalCharacter" class="modal-body">
         <div class="character-detail-content">
           <!-- 人物基础信息展示 -->
@@ -474,10 +492,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { AvatarSwitchService } from '../../功能模块层/人物管理/服务/头像切换服务';
 import type { Character } from '../../功能模块层/人物管理/类型/人物类型';
+import type { GuidelineThemeLibrary } from '../../核心层/服务/世界书管理/工具/人物指导风格生成器';
+import { WorldbookService } from '../../核心层/服务/世界书管理/服务/世界书服务';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
+import { toast } from '../../核心层/服务/通用服务/弹窗提示服务';
 import { TimeParseService } from '../../核心层/服务/通用服务/时间解析服务';
 import { BreedingService } from '../../核心层/服务/通用服务/生育服务';
 // 导入本地组件
@@ -523,6 +544,132 @@ const isClothingExpanded = ref(false);
 
 // JSON编辑器状态
 const showJsonEditor = ref(false);
+
+// 指导风格主题相关
+const guidelineThemes = ref<GuidelineThemeLibrary>({});
+const defaultThemeId = ref<string>('');
+const selectedGuidelineThemeId = ref<string>('');
+
+// 加载主题库
+const loadGuidelineThemes = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const themeLibraryKey = 'guideline_theme_library';
+    const defaultThemeKey = 'guideline_default_theme_id';
+
+    // 加载主题库
+    if (globalVars[themeLibraryKey] && typeof globalVars[themeLibraryKey] === 'object') {
+      guidelineThemes.value = globalVars[themeLibraryKey] as GuidelineThemeLibrary;
+    } else {
+      guidelineThemes.value = {};
+    }
+
+    // 加载全局默认主题ID
+    if (typeof globalVars[defaultThemeKey] === 'string') {
+      defaultThemeId.value = globalVars[defaultThemeKey];
+    } else {
+      defaultThemeId.value = '';
+    }
+  } catch (error) {
+    console.error('加载指导风格主题库失败:', error);
+    guidelineThemes.value = {};
+    defaultThemeId.value = '';
+  }
+};
+
+// 加载角色的主题ID
+const loadCharacterThemeId = () => {
+  if (internalCharacter.value) {
+    selectedGuidelineThemeId.value = internalCharacter.value.guidelineThemeId || '';
+  } else {
+    selectedGuidelineThemeId.value = '';
+  }
+};
+
+// 刷新主题库
+const refreshThemeLibrary = () => {
+  loadGuidelineThemes();
+  // 确保当前选中的主题ID仍然有效
+  if (selectedGuidelineThemeId.value && !guidelineThemes.value[selectedGuidelineThemeId.value]) {
+    // 如果选中的主题不存在了，清空选择
+    selectedGuidelineThemeId.value = '';
+    if (internalCharacter.value) {
+      internalCharacter.value.guidelineThemeId = undefined;
+    }
+  }
+  toast.success('已刷新主题库', { title: '刷新成功' });
+  console.log('✅ 已刷新指导风格主题库');
+};
+
+// 处理主题变更
+const handleThemeChange = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 更新角色的主题ID
+    internalCharacter.value.guidelineThemeId = selectedGuidelineThemeId.value || undefined;
+
+    // 保存到存档
+    const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
+    const characters = (trainingData?.characters || []) as Character[];
+
+    const updatedCharacters = characters.map(char => {
+      if (char.id === internalCharacter.value!.id) {
+        return { ...internalCharacter.value! };
+      }
+      return char;
+    });
+
+    modularSaveManager.updateModuleData({
+      moduleName: 'training',
+      data: {
+        ...trainingData,
+        characters: updatedCharacters,
+      },
+    });
+
+    // 保存到数据库
+    await modularSaveManager.saveCurrentGameData(0);
+
+    // 更新世界书中的角色指导提示词
+    console.log('📚 更新世界书中的角色指导提示词...');
+    await WorldbookService.updateCharacterEntry(internalCharacter.value);
+    console.log('✅ 世界书中的角色指导提示词已更新');
+
+    // 通知父组件更新
+    emit('character-updated', internalCharacter.value);
+
+    toast.success(
+      selectedGuidelineThemeId.value
+        ? `已为 ${internalCharacter.value.name} 设置指导风格主题：${guidelineThemes.value[selectedGuidelineThemeId.value]?.name || ''}`
+        : `已清除 ${internalCharacter.value.name} 的指导风格主题，将使用全局默认`,
+      { title: '设置成功' },
+    );
+    console.log(
+      `✅ 已更新角色 ${internalCharacter.value.name} 的指导风格主题: ${selectedGuidelineThemeId.value || '全局默认'}`,
+    );
+  } catch (error) {
+    console.error('保存指导风格主题失败:', error);
+    toast.error('保存指导风格主题失败', { title: '错误' });
+    // 恢复原值
+    loadCharacterThemeId();
+  }
+};
+
+// 组件挂载时加载主题库
+onMounted(() => {
+  loadGuidelineThemes();
+  // 加载角色的主题ID（确保主题库已加载后再加载角色主题）
+  loadCharacterThemeId();
+});
+
+// 监听角色变化，更新主题ID
+watch(
+  () => internalCharacter.value,
+  () => {
+    loadCharacterThemeId();
+  },
+);
 
 // 打开JSON编辑器
 const openJsonEditor = () => {
@@ -2346,6 +2493,113 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
             }
           }
         }
+      }
+    }
+  }
+}
+
+// 指导风格主题设置栏样式
+.guideline-theme-section {
+  padding: 12px 16px;
+  background: rgba(40, 26, 20, 0.4);
+  border-bottom: 1px solid rgba(205, 133, 63, 0.3);
+  border-top: 1px solid rgba(205, 133, 63, 0.3);
+  margin-bottom: 0;
+
+  .guideline-theme-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+
+    .guideline-theme-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #ffd7a1;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+
+      .label-icon {
+        font-size: 13px;
+        opacity: 0.9;
+      }
+
+      .label-text {
+        color: #ffd7a1;
+      }
+    }
+
+    .guideline-theme-select {
+      flex: 1;
+      min-width: 200px;
+      padding: 6px 10px;
+      background: rgba(25, 17, 14, 0.6);
+      border: 1px solid rgba(205, 133, 63, 0.4);
+      border-radius: 6px;
+      color: #f0e6d2;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+
+      &:hover {
+        border-color: rgba(205, 133, 63, 0.6);
+        background: rgba(25, 17, 14, 0.8);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      &:focus {
+        outline: none;
+        border-color: rgba(205, 133, 63, 0.6);
+        box-shadow:
+          0 0 4px rgba(205, 133, 63, 0.3),
+          0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      option {
+        background: rgba(40, 26, 20, 0.95);
+        color: #f0e6d2;
+        padding: 8px;
+      }
+    }
+
+    .refresh-theme-btn {
+      background: linear-gradient(135deg, rgba(205, 133, 63, 0.2), rgba(139, 69, 19, 0.3));
+      border: 1px solid rgba(205, 133, 63, 0.4);
+      color: #ffd7a1;
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      flex-shrink: 0;
+
+      &:hover {
+        background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(139, 69, 19, 0.4));
+        border-color: rgba(205, 133, 63, 0.6);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      &:active {
+        transform: translateY(0);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+      }
+
+      .btn-icon {
+        font-size: 13px;
+        opacity: 0.9;
+        transition: transform 0.2s ease;
+      }
+
+      &:hover .btn-icon {
+        transform: rotate(180deg);
       }
     }
   }

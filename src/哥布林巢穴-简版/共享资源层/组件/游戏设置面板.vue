@@ -511,6 +511,7 @@ import {
 } from '../../核心层/服务/世界书管理/工具/人物指导风格生成器';
 import { ChainOfThoughtManager, ChainOfThoughtMode } from '../../核心层/服务/世界书管理/工具/思维链管理器';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
+import { toast } from '../../核心层/服务/通用服务/弹窗提示服务';
 import { ConfirmService } from '../../核心层/服务/通用服务/确认框服务';
 import VersionManagerContent from './版本管理内容.vue';
 
@@ -1014,7 +1015,7 @@ const ensureBasicLoyaltyIntervals = () => {
     return bLoyalty - aLoyalty;
   });
 
-  toastr.success('已添加基础区间', '操作成功');
+  toast.success('已添加基础区间', { title: '操作成功' });
 };
 
 // 加载主题
@@ -1094,11 +1095,11 @@ const saveTheme = () => {
     globalVars[themeLibraryKey] = guidelineThemes.value;
     replaceVariables(globalVars, { type: 'global' });
 
-    toastr.success(`已保存主题: ${theme.name}`, '保存成功');
+    toast.success(`已保存主题: ${theme.name}`, { title: '保存成功' });
     console.log(`💾 已保存主题: ${theme.name}`);
   } catch (error) {
     console.error('保存主题失败:', error);
-    toastr.error('保存主题失败', '错误');
+    toast.error('保存主题失败', { title: '错误' });
   }
 };
 
@@ -1135,7 +1136,7 @@ const saveAllGuidelineSettings = () => {
   if (selectedThemeId.value) {
     saveTheme();
   } else {
-    toastr.warning('请先选择或创建一个主题', '提示');
+    toast.warning('请先选择或创建一个主题', { title: '提示' });
   }
 };
 
@@ -1158,12 +1159,12 @@ const restoreDefaultGuidelineSettings = () => {
         currentTheme.value.loyaltyGuidelinesWithText = [...loyaltyGuidelines.value];
       }
 
-      toastr.success('已恢复到默认配置', '操作成功');
+      toast.success('已恢复到默认配置', { title: '操作成功' });
       console.log('🔄 已恢复到默认配置');
     }
   } catch (error) {
     console.error('恢复默认配置失败:', error);
-    toastr.error('恢复默认配置失败', '错误');
+    toast.error('恢复默认配置失败', { title: '错误' });
   }
 };
 
@@ -1289,7 +1290,7 @@ const openCreateThemeDialog = () => {
 // 设置全局默认主题
 const setAsDefaultTheme = () => {
   if (!selectedThemeId.value) {
-    toastr.warning('请先选择一个主题', '提示');
+    toast.warning('请先选择一个主题', { title: '提示' });
     return;
   }
 
@@ -1299,24 +1300,24 @@ const setAsDefaultTheme = () => {
     globalVars[defaultThemeKey] = selectedThemeId.value;
     replaceVariables(globalVars, { type: 'global' });
     defaultThemeId.value = selectedThemeId.value;
-    toastr.success(`已将"${currentTheme.value.name}"设为全局默认主题`, '设置成功');
+    toast.success(`已将"${currentTheme.value.name}"设为全局默认主题`, { title: '设置成功' });
     console.log(`💾 已设置全局默认主题: ${selectedThemeId.value}`);
   } catch (error) {
     console.error('设置全局默认主题失败:', error);
-    toastr.error('设置全局默认主题失败', '错误');
+    toast.error('设置全局默认主题失败', { title: '错误' });
   }
 };
 
 // 删除主题
 const deleteTheme = async () => {
   if (!selectedThemeId.value) {
-    toastr.warning('请先选择一个主题', '提示');
+    toast.warning('请先选择一个主题', { title: '提示' });
     return;
   }
 
   const theme = guidelineThemes.value[selectedThemeId.value];
   if (!theme) {
-    toastr.warning('主题不存在', '提示');
+    toast.warning('主题不存在', { title: '提示' });
     return;
   }
 
@@ -1371,18 +1372,18 @@ const deleteTheme = async () => {
     // 重新加载设置
     loadGuidelineSettings();
 
-    toastr.success(`已删除主题: ${theme.name}`, '删除成功');
+    toast.success(`已删除主题: ${theme.name}`, { title: '删除成功' });
     console.log(`🗑️ 已删除主题: ${theme.name} (${selectedThemeId.value})`);
   } catch (error) {
     console.error('删除主题失败:', error);
-    toastr.error('删除主题失败', '错误');
+    toast.error('删除主题失败', { title: '错误' });
   }
 };
 
 // 创建新主题
 const createNewTheme = () => {
   if (!newThemeName.value.trim()) {
-    toastr.warning('主题名称不能为空', '提示');
+    toast.warning('主题名称不能为空', { title: '提示' });
     return;
   }
 
@@ -1415,7 +1416,7 @@ const createNewTheme = () => {
   showCreateThemeDialog.value = false;
   newThemeName.value = '';
 
-  toastr.success(`已创建新主题: ${newTheme.name}`, '创建成功');
+  toast.success(`已创建新主题: ${newTheme.name}`, { title: '创建成功' });
   console.log(`✅ 已创建新主题: ${newTheme.name}`);
 };
 
