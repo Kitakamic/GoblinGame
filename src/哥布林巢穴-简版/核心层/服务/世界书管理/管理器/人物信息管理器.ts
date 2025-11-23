@@ -37,9 +37,23 @@ export class CharacterWorldbookManager {
       // 条目已存在，更新
       console.log(`人物 ${character.name} 的世界书条目已存在，执行更新`);
       const updatedContent = this.buildCharacterContent(character);
+
+      // 根据角色设置更新 strategy
+      const strategyType = character.isGlobalCharacter ? 'constant' : 'selective';
+      const secondaryKeys = character.worldbookSecondaryKeys || [];
+
       worldbook[entryIndex] = {
         ...worldbook[entryIndex],
         content: updatedContent,
+        strategy: {
+          ...worldbook[entryIndex].strategy,
+          type: strategyType,
+          keys: character.isGlobalCharacter ? [] : [character.name, character.title || '角色'],
+          keys_secondary: {
+            ...worldbook[entryIndex].strategy.keys_secondary,
+            keys: secondaryKeys,
+          },
+        },
         extra: {
           ...worldbook[entryIndex].extra,
           updated_at: new Date().toISOString(),
@@ -149,16 +163,22 @@ export class CharacterWorldbookManager {
     const content = this.buildCharacterContent(character);
     const entryName = `${character.title || '角色'}-${character.name}`;
 
+    // 根据角色设置决定 strategy type
+    const strategyType = character.isGlobalCharacter ? 'constant' : 'selective';
+
+    // 获取额外关键词（用于 keys_secondary）
+    const secondaryKeys = character.worldbookSecondaryKeys || [];
+
     return {
       uid: parseInt(character.id.replace(/\D/g, '')) || Date.now(),
       name: entryName,
       enabled: true,
       strategy: {
-        type: 'selective',
-        keys: [character.name, character.title || '角色'],
+        type: strategyType,
+        keys: character.isGlobalCharacter ? [] : [character.name, character.title || '角色'],
         keys_secondary: {
           logic: 'and_any',
-          keys: [],
+          keys: secondaryKeys,
         },
         scan_depth: 'same_as_global',
       },
@@ -202,7 +222,7 @@ export class CharacterWorldbookManager {
         age: character.age || '未知',
         country: character.country || '未知',
         background: character.background || '未知',
-        rating: character.rating || 'D',
+        rating: character.rating || '未知',
       },
       background: {
         sexExperience: character.sexExperience,

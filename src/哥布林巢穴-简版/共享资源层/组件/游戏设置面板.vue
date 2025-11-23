@@ -328,18 +328,6 @@
             <input v-model="currentTheme.name" type="text" class="text-input" placeholder="输入主题名称" />
           </div>
           <div v-if="selectedThemeId" class="setting-item">
-            <label class="setting-label">
-              <span class="label-text">主题描述（可选）</span>
-              <span class="label-desc">主题的简要描述</span>
-            </label>
-            <input
-              v-model="currentTheme.description"
-              type="text"
-              class="text-input"
-              placeholder="输入主题描述（可选）"
-            />
-          </div>
-          <div v-if="selectedThemeId" class="setting-item">
             <button class="chain-action-button" @click="saveTheme">💾 保存当前主题</button>
           </div>
 
@@ -560,7 +548,6 @@ const currentTheme = ref<
   GuidelineTheme & { loyaltyGuidelinesWithText: Array<LoyaltyGuidelineItem & { contentText: string }> }
 >({
   name: '',
-  description: '',
   loyaltyGuidelines: [],
   loyaltyGuidelinesWithText: [],
 });
@@ -1023,7 +1010,6 @@ const loadTheme = () => {
   if (!selectedThemeId.value || !guidelineThemes.value[selectedThemeId.value]) {
     currentTheme.value = {
       name: '',
-      description: '',
       loyaltyGuidelines: [],
       loyaltyGuidelinesWithText: [],
     };
@@ -1074,7 +1060,6 @@ const saveTheme = () => {
 
     const theme: GuidelineTheme = {
       name: currentTheme.value.name,
-      description: currentTheme.value.description || '',
       loyaltyGuidelines: loyaltyItems,
     };
 
@@ -1363,7 +1348,6 @@ const deleteTheme = async () => {
     selectedThemeId.value = '';
     currentTheme.value = {
       name: '',
-      description: '',
       loyaltyGuidelines: [],
       loyaltyGuidelinesWithText: [],
     };
@@ -1392,7 +1376,6 @@ const createNewTheme = () => {
 
   const newTheme: GuidelineTheme = {
     name: newThemeName.value.trim(),
-    description: '',
     loyaltyGuidelines: defaultGuidelines,
   };
 

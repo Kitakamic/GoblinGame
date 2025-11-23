@@ -238,6 +238,10 @@ export interface Character {
   lastTraining?: Date;
   /** 指导风格主题ID（关联到主题库中的主题） */
   guidelineThemeId?: string;
+  /** 人物触发额外关键词（加入到世界书的第二提示词 keys_secondary 里面触发） */
+  worldbookSecondaryKeys?: string[];
+  /** 是否为全局人物（将人物的条目 selective 改为 constant，总是触发） */
+  isGlobalCharacter?: boolean;
 
   // ========== 生育记录 ==========
   /** 生育记录 */

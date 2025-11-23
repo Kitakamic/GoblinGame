@@ -18,8 +18,6 @@ export interface LoyaltyGuidelineItem {
 export interface GuidelineTheme {
   /** 主题名称 */
   name: string;
-  /** 主题描述 */
-  description?: string;
   /** 基于忠诚度的指导风格配置 */
   loyaltyGuidelines: LoyaltyGuidelineItem[];
 }

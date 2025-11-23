@@ -18,22 +18,66 @@
           <button class="close-btn" @click="close">×</button>
         </div>
       </div>
-      <!-- 指导风格设置栏 -->
-      <div v-if="internalCharacter" class="guideline-theme-section">
-        <div class="guideline-theme-container">
-          <div class="guideline-theme-label">
-            <span class="label-icon">📝</span>
-            <span class="label-text">指导风格主题：</span>
+      <!-- 人物设置栏 -->
+      <div v-if="internalCharacter" class="character-settings-section">
+        <div class="character-settings-header" @click="isSettingsExpanded = !isSettingsExpanded">
+          <span class="settings-header-icon">⚙️</span>
+          <span class="settings-header-text">人物设置</span>
+          <span class="settings-expand-icon" :class="{ expanded: isSettingsExpanded }">▼</span>
+        </div>
+        <div v-show="isSettingsExpanded" class="character-settings-content">
+          <!-- 1. 指导风格主题 -->
+          <div class="setting-item">
+            <div class="setting-label">
+              <span class="label-icon">📝</span>
+              <span class="label-text">指导风格主题：</span>
+            </div>
+            <div class="setting-control">
+              <select v-model="selectedGuidelineThemeId" class="guideline-theme-select" @change="handleThemeChange">
+                <option value="">使用全局默认</option>
+                <option v-for="(theme, themeId) in guidelineThemes" :key="themeId" :value="themeId">
+                  {{ theme.name }}{{ themeId === defaultThemeId ? ' ⭐（全局默认）' : '' }}
+                </option>
+              </select>
+              <button class="refresh-theme-btn" title="刷新主题库" @click="refreshThemeLibrary">
+                <span class="btn-icon">🔄</span>
+              </button>
+            </div>
           </div>
-          <select v-model="selectedGuidelineThemeId" class="guideline-theme-select" @change="handleThemeChange">
-            <option value="">使用全局默认</option>
-            <option v-for="(theme, themeId) in guidelineThemes" :key="themeId" :value="themeId">
-              {{ theme.name }}{{ themeId === defaultThemeId ? ' ⭐（全局默认）' : '' }}
-            </option>
-          </select>
-          <button class="refresh-theme-btn" title="刷新主题库" @click="refreshThemeLibrary">
-            <span class="btn-icon">🔄</span>
-          </button>
+
+          <!-- 2. 人物触发额外关键词 -->
+          <div class="setting-item">
+            <div class="setting-label">
+              <span class="label-icon">🔑</span>
+              <span class="label-text">触发额外关键词：</span>
+              <span class="label-desc">（加入世界书的第二提示词 keys_secondary，多个关键词用逗号分隔）</span>
+            </div>
+            <div class="setting-control">
+              <input
+                v-model="secondaryKeysInput"
+                type="text"
+                class="secondary-keys-input"
+                placeholder="例如：女王,公主,贵族"
+                @blur="handleSecondaryKeysChange"
+              />
+            </div>
+          </div>
+
+          <!-- 3. 设置为全局人物 -->
+          <div class="setting-item">
+            <div class="setting-label">
+              <span class="label-icon">🌐</span>
+              <span class="label-text">全局人物：</span>
+              <span class="label-desc">（设置为 constant，总是触发，不依赖关键词）</span>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch">
+                <input v-model="isGlobalCharacter" type="checkbox" @change="handleGlobalCharacterChange" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">{{ isGlobalCharacter ? '是' : '否' }}</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
       <div v-if="internalCharacter" class="modal-body">
@@ -545,10 +589,17 @@ const isClothingExpanded = ref(false);
 // JSON编辑器状态
 const showJsonEditor = ref(false);
 
+// 人物设置栏展开状态
+const isSettingsExpanded = ref(false);
+
 // 指导风格主题相关
 const guidelineThemes = ref<GuidelineThemeLibrary>({});
 const defaultThemeId = ref<string>('');
 const selectedGuidelineThemeId = ref<string>('');
+
+// 人物设置相关
+const secondaryKeysInput = ref<string>('');
+const isGlobalCharacter = ref<boolean>(false);
 
 // 加载主题库
 const loadGuidelineThemes = () => {
@@ -586,6 +637,19 @@ const loadCharacterThemeId = () => {
   }
 };
 
+// 加载角色的其他设置
+const loadCharacterSettings = () => {
+  if (internalCharacter.value) {
+    // 加载额外关键词
+    secondaryKeysInput.value = internalCharacter.value.worldbookSecondaryKeys?.join(', ') || '';
+    // 加载全局人物设置
+    isGlobalCharacter.value = internalCharacter.value.isGlobalCharacter || false;
+  } else {
+    secondaryKeysInput.value = '';
+    isGlobalCharacter.value = false;
+  }
+};
+
 // 刷新主题库
 const refreshThemeLibrary = () => {
   loadGuidelineThemes();
@@ -609,6 +673,71 @@ const handleThemeChange = async () => {
     // 更新角色的主题ID
     internalCharacter.value.guidelineThemeId = selectedGuidelineThemeId.value || undefined;
 
+    const themeName = selectedGuidelineThemeId.value
+      ? guidelineThemes.value[selectedGuidelineThemeId.value]?.name || ''
+      : '全局默认';
+
+    await saveCharacterSettings('指导风格主题');
+
+    toast.success(
+      selectedGuidelineThemeId.value
+        ? `已为 ${internalCharacter.value.name} 设置指导风格主题：${themeName}`
+        : `已清除 ${internalCharacter.value.name} 的指导风格主题，将使用全局默认`,
+      { title: '设置成功' },
+    );
+  } catch (error) {
+    console.error('保存指导风格主题失败:', error);
+    toast.error('保存指导风格主题失败', { title: '错误' });
+    // 恢复原值
+    loadCharacterThemeId();
+  }
+};
+
+// 处理额外关键词变更
+const handleSecondaryKeysChange = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 解析输入的关键词（用逗号分隔，去除空格）
+    const keys = secondaryKeysInput.value
+      .split(',')
+      .map(key => key.trim())
+      .filter(key => key.length > 0);
+
+    // 更新角色的额外关键词
+    internalCharacter.value.worldbookSecondaryKeys = keys.length > 0 ? keys : undefined;
+
+    await saveCharacterSettings('额外关键词');
+  } catch (error) {
+    console.error('保存额外关键词失败:', error);
+    toast.error('保存额外关键词失败', { title: '错误' });
+    // 恢复原值
+    loadCharacterSettings();
+  }
+};
+
+// 处理全局人物设置变更
+const handleGlobalCharacterChange = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 更新角色的全局人物设置
+    internalCharacter.value.isGlobalCharacter = isGlobalCharacter.value || undefined;
+
+    await saveCharacterSettings('全局人物设置');
+  } catch (error) {
+    console.error('保存全局人物设置失败:', error);
+    toast.error('保存全局人物设置失败', { title: '错误' });
+    // 恢复原值
+    loadCharacterSettings();
+  }
+};
+
+// 保存人物设置（通用方法）
+const saveCharacterSettings = async (settingName: string) => {
+  if (!internalCharacter.value) return;
+
+  try {
     // 保存到存档
     const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
     const characters = (trainingData?.characters || []) as Character[];
@@ -631,43 +760,36 @@ const handleThemeChange = async () => {
     // 保存到数据库
     await modularSaveManager.saveCurrentGameData(0);
 
-    // 更新世界书中的角色指导提示词
-    console.log('📚 更新世界书中的角色指导提示词...');
+    // 更新世界书中的角色条目（包含 strategy 设置）
+    console.log('📚 更新世界书中的角色条目（包含 strategy 设置）...');
     await WorldbookService.updateCharacterEntry(internalCharacter.value);
-    console.log('✅ 世界书中的角色指导提示词已更新');
+    console.log('✅ 世界书中的角色条目已更新');
 
     // 通知父组件更新
     emit('character-updated', internalCharacter.value);
 
-    toast.success(
-      selectedGuidelineThemeId.value
-        ? `已为 ${internalCharacter.value.name} 设置指导风格主题：${guidelineThemes.value[selectedGuidelineThemeId.value]?.name || ''}`
-        : `已清除 ${internalCharacter.value.name} 的指导风格主题，将使用全局默认`,
-      { title: '设置成功' },
-    );
-    console.log(
-      `✅ 已更新角色 ${internalCharacter.value.name} 的指导风格主题: ${selectedGuidelineThemeId.value || '全局默认'}`,
-    );
+    toast.success(`已保存${settingName}`, { title: '设置成功' });
+    console.log(`✅ 已更新角色 ${internalCharacter.value.name} 的${settingName}`);
   } catch (error) {
-    console.error('保存指导风格主题失败:', error);
-    toast.error('保存指导风格主题失败', { title: '错误' });
-    // 恢复原值
-    loadCharacterThemeId();
+    console.error(`保存${settingName}失败:`, error);
+    throw error;
   }
 };
 
-// 组件挂载时加载主题库
+// 组件挂载时加载主题库和设置
 onMounted(() => {
   loadGuidelineThemes();
-  // 加载角色的主题ID（确保主题库已加载后再加载角色主题）
+  // 加载角色的所有设置（确保主题库已加载后再加载角色设置）
   loadCharacterThemeId();
+  loadCharacterSettings();
 });
 
-// 监听角色变化，更新主题ID
+// 监听角色变化，更新所有设置
 watch(
   () => internalCharacter.value,
   () => {
     loadCharacterThemeId();
+    loadCharacterSettings();
   },
 );
 
@@ -2498,108 +2620,251 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
   }
 }
 
-// 指导风格主题设置栏样式
-.guideline-theme-section {
-  padding: 12px 16px;
+// 人物设置栏样式
+.character-settings-section {
   background: rgba(40, 26, 20, 0.4);
   border-bottom: 1px solid rgba(205, 133, 63, 0.3);
   border-top: 1px solid rgba(205, 133, 63, 0.3);
   margin-bottom: 0;
 
-  .guideline-theme-container {
+  .character-settings-header {
+    padding: 10px 16px;
     display: flex;
     align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
 
-    .guideline-theme-label {
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    &:hover {
+      background: rgba(40, 26, 20, 0.5);
+    }
+
+    .settings-header-icon {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .settings-header-text {
       color: #ffd7a1;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
-      white-space: nowrap;
-
-      .label-icon {
-        font-size: 13px;
-        opacity: 0.9;
-      }
-
-      .label-text {
-        color: #ffd7a1;
-      }
-    }
-
-    .guideline-theme-select {
       flex: 1;
-      min-width: 200px;
-      padding: 6px 10px;
-      background: rgba(25, 17, 14, 0.6);
-      border: 1px solid rgba(205, 133, 63, 0.4);
-      border-radius: 6px;
-      color: #f0e6d2;
-      font-size: 11px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-
-      &:hover {
-        border-color: rgba(205, 133, 63, 0.6);
-        background: rgba(25, 17, 14, 0.8);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      }
-
-      &:focus {
-        outline: none;
-        border-color: rgba(205, 133, 63, 0.6);
-        box-shadow:
-          0 0 4px rgba(205, 133, 63, 0.3),
-          0 2px 4px rgba(0, 0, 0, 0.3);
-      }
-
-      option {
-        background: rgba(40, 26, 20, 0.95);
-        color: #f0e6d2;
-        padding: 8px;
-      }
     }
 
-    .refresh-theme-btn {
-      background: linear-gradient(135deg, rgba(205, 133, 63, 0.2), rgba(139, 69, 19, 0.3));
-      border: 1px solid rgba(205, 133, 63, 0.4);
-      color: #ffd7a1;
-      border-radius: 6px;
-      padding: 6px 8px;
-      cursor: pointer;
-      font-size: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-      flex-shrink: 0;
+    .settings-expand-icon {
+      font-size: 10px;
+      color: #cd853f;
+      transition: transform 0.2s ease;
+      opacity: 0.7;
 
-      &:hover {
-        background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(139, 69, 19, 0.4));
-        border-color: rgba(205, 133, 63, 0.6);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-      }
-
-      &:active {
-        transform: translateY(0);
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-      }
-
-      .btn-icon {
-        font-size: 13px;
-        opacity: 0.9;
-        transition: transform 0.2s ease;
-      }
-
-      &:hover .btn-icon {
+      &.expanded {
         transform: rotate(180deg);
+      }
+    }
+  }
+
+  .character-settings-content {
+    padding: 12px 16px;
+    border-top: 1px solid rgba(205, 133, 63, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .setting-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+
+        .label-icon {
+          font-size: 13px;
+          opacity: 0.9;
+        }
+
+        .label-text {
+          color: #ffd7a1;
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+
+        .label-desc {
+          color: #9ca3af;
+          font-size: 10px;
+          font-style: italic;
+          margin-left: 4px;
+        }
+      }
+
+      .setting-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        .guideline-theme-select {
+          flex: 1;
+          min-width: 200px;
+          padding: 6px 10px;
+          background: rgba(25, 17, 14, 0.6);
+          border: 1px solid rgba(205, 133, 63, 0.4);
+          border-radius: 6px;
+          color: #f0e6d2;
+          font-size: 11px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+
+          &:hover {
+            border-color: rgba(205, 133, 63, 0.6);
+            background: rgba(25, 17, 14, 0.8);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+
+          &:focus {
+            outline: none;
+            border-color: rgba(205, 133, 63, 0.6);
+            box-shadow:
+              0 0 4px rgba(205, 133, 63, 0.3),
+              0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+
+          option {
+            background: rgba(40, 26, 20, 0.95);
+            color: #f0e6d2;
+            padding: 8px;
+          }
+        }
+
+        .secondary-keys-input {
+          flex: 1;
+          min-width: 200px;
+          padding: 6px 10px;
+          background: rgba(25, 17, 14, 0.6);
+          border: 1px solid rgba(205, 133, 63, 0.4);
+          border-radius: 6px;
+          color: #f0e6d2;
+          font-size: 11px;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+
+          &::placeholder {
+            color: rgba(156, 163, 175, 0.6);
+          }
+
+          &:hover {
+            border-color: rgba(205, 133, 63, 0.6);
+            background: rgba(25, 17, 14, 0.8);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+
+          &:focus {
+            outline: none;
+            border-color: rgba(205, 133, 63, 0.6);
+            box-shadow:
+              0 0 4px rgba(205, 133, 63, 0.3),
+              0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+        }
+
+        .refresh-theme-btn {
+          background: linear-gradient(135deg, rgba(205, 133, 63, 0.2), rgba(139, 69, 19, 0.3));
+          border: 1px solid rgba(205, 133, 63, 0.4);
+          color: #ffd7a1;
+          border-radius: 6px;
+          padding: 6px 8px;
+          cursor: pointer;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+          flex-shrink: 0;
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(139, 69, 19, 0.4));
+            border-color: rgba(205, 133, 63, 0.6);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+
+          &:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+          }
+
+          .btn-icon {
+            font-size: 13px;
+            opacity: 0.9;
+            transition: transform 0.2s ease;
+          }
+
+          &:hover .btn-icon {
+            transform: rotate(180deg);
+          }
+        }
+
+        // 开关样式
+        .toggle-switch {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          user-select: none;
+
+          input[type='checkbox'] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+          }
+
+          .toggle-slider {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: rgba(107, 114, 128, 0.5);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(156, 163, 175, 0.3);
+
+            &::before {
+              content: '';
+              position: absolute;
+              width: 18px;
+              height: 18px;
+              left: 2px;
+              top: 2px;
+              background: #f0e6d2;
+              border-radius: 50%;
+              transition: all 0.3s ease;
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            }
+          }
+
+          input[type='checkbox']:checked + .toggle-slider {
+            background: rgba(34, 197, 94, 0.6);
+            border-color: rgba(34, 197, 94, 0.4);
+
+            &::before {
+              transform: translateX(20px);
+              background: #fff;
+            }
+          }
+
+          .toggle-label {
+            color: #f0e6d2;
+            font-size: 12px;
+            font-weight: 500;
+          }
+        }
       }
     }
   }
