@@ -9,7 +9,11 @@
       "postDebugTask": "结束任务",
       "url": "http://localhost:6622",
       "disableNetworkCache": true,
+<<<<<<< HEAD
       "internalConsoleOptions": "openOnSessionStart",
+=======
+      "internalConsoleOptions": "neverOpen",
+>>>>>>> 0662714b69fa00a30d7ae8fd37c1d98a403249dc
       "cwd": "${workspaceFolder}",
       "timeout": 100000,
       "sourceMapPathOverrides": {
@@ -29,7 +33,11 @@
       "postDebugTask": "结束任务",
       "url": "http://localhost:8000",
       "disableNetworkCache": true,
+<<<<<<< HEAD
       "internalConsoleOptions": "openOnSessionStart",
+=======
+      "internalConsoleOptions": "neverOpen",
+>>>>>>> 0662714b69fa00a30d7ae8fd37c1d98a403249dc
       "cwd": "${workspaceFolder}",
       "timeout": 100000,
       "sourceMapPathOverrides": {
@@ -47,7 +55,11 @@
       "request": "launch",
       "url": "http://localhost:8000",
       "disableNetworkCache": true,
+<<<<<<< HEAD
       "internalConsoleOptions": "openOnSessionStart",
+=======
+      "internalConsoleOptions": "neverOpen",
+>>>>>>> 0662714b69fa00a30d7ae8fd37c1d98a403249dc
       "cwd": "${workspaceFolder}",
       "timeout": 100000,
       "sourceMapPathOverrides": {
@@ -65,7 +77,11 @@
       "request": "launch",
       "url": "http://localhost:8000",
       "disableNetworkCache": true,
+<<<<<<< HEAD
       "internalConsoleOptions": "openOnSessionStart",
+=======
+      "internalConsoleOptions": "neverOpen",
+>>>>>>> 0662714b69fa00a30d7ae8fd37c1d98a403249dc
       "cwd": "${workspaceFolder}",
       "timeout": 100000,
       "sourceMapPathOverrides": {
