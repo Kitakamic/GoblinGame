@@ -236,6 +236,14 @@ export interface Character {
   // ========== 调教信息 ==========
   /** 最后调教时间 */
   lastTraining?: Date;
+  /** 指导风格主题ID（关联到主题库中的主题） */
+  guidelineThemeId?: string;
+  /** 人物触发额外关键词（加入到世界书的第二提示词 keys_secondary 里面触发） */
+  worldbookSecondaryKeys?: string[];
+  /** 是否为全局人物（将人物的条目 selective 改为 constant，总是触发） */
+  isGlobalCharacter?: boolean;
+  /** 人物剧情记录是否开启常量（将剧情记录条目的 selective 改为 constant，总是触发） */
+  isGlobalStoryHistory?: boolean;
 
   // ========== 生育记录 ==========
   /** 生育记录 */

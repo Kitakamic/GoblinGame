@@ -3,7 +3,7 @@ import { databaseService } from '../../存档系统/数据库服务';
 import { modularSaveManager } from '../../存档系统/模块化存档服务';
 import { WorldbookHelper } from '../工具/世界书助手';
 import { ChainOfThoughtManager, ChainOfThoughtMode } from '../工具/思维链管理器';
-import { TrainingRecordManager } from '../管理器/调教记录管理器';
+import { TrainingRecordManager } from '../管理器/人物剧情/调教记录管理器';
 import type { HistoryRecord, WorldbookEntry } from '../类型/世界书类型定义';
 
 /**

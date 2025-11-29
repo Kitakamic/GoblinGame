@@ -75,7 +75,7 @@
     />
 
     <!-- 全局悬浮球 -->
-    <GlobalFAB @open-settings="openSettings" @open-debug="openDebug" />
+    <GlobalFAB @open-settings="openSettings" @open-debug="openDebug" @open-worldbook="openWorldbook" />
 
     <!-- 欢迎提示弹窗 -->
     <WelcomeModal :show="showWelcomeModal" @confirm="handleWelcomeConfirm" @close="handleWelcomeClose" />
@@ -85,11 +85,15 @@
 
     <!-- 生成错误提示 -->
     <GenerationErrorPanel />
+
+    <!-- 世界书管理界面 -->
+    <WorldbookManager :show="showWorldbookManager" @close="closeWorldbook" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
+import WorldbookManager from './共享资源层/组件/世界书管理界面.vue';
 import GlobalFAB from './共享资源层/组件/全局悬浮球.vue';
 import TextStyleSettings from './共享资源层/组件/文字样式设置.vue';
 import WelcomeModal from './共享资源层/组件/欢迎提示弹窗.vue';
@@ -137,6 +141,7 @@ const disableAutoSave = () => {
 const showSettings = ref(false);
 const showTextStyleSettings = ref(false);
 const showDebugPanel = ref(false);
+const showWorldbookManager = ref(false);
 
 // 设置相关函数
 function openSettings() {
@@ -168,6 +173,15 @@ function openDebug() {
 
 function closeDebug() {
   showDebugPanel.value = false;
+}
+
+// 世界书管理界面相关函数
+function openWorldbook() {
+  showWorldbookManager.value = true;
+}
+
+function closeWorldbook() {
+  showWorldbookManager.value = false;
 }
 
 // 教程确认框状态
@@ -251,6 +265,13 @@ const initializeSaveSystem = async () => {
   }
 };
 
+// 监听打开版本管理的事件处理函数（必须在 setup 顶层定义）
+const handleOpenVersionManager = () => {
+  // 先打开设置面板
+  openSettings();
+  // 版本管理内容已直接显示在设置面板的版本管理选项卡中
+};
+
 // 监听楼层增加事件
 onMounted(async () => {
   // 初始化存档系统
@@ -264,22 +285,8 @@ onMounted(async () => {
     console.error('版本检测初始化失败:', error);
   }
 
-  // 监听打开版本管理的事件
-  const handleOpenVersionManager = () => {
-    // 先打开设置面板
-    openSettings();
-    // 然后触发打开版本管理弹窗（通过设置面板）
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('open-settings-version-manager'));
-    }, 300); // 延迟一点，确保设置面板已经打开
-  };
-
+  // 添加事件监听
   window.addEventListener('open-version-manager', handleOpenVersionManager);
-
-  // 在组件卸载时移除事件监听
-  onUnmounted(() => {
-    window.removeEventListener('open-version-manager', handleOpenVersionManager);
-  });
 
   // 界面第一次重载时，清空人物档案世界书并更新资源世界书
   try {
@@ -334,6 +341,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   disableAutoSave();
+  // 移除事件监听
+  window.removeEventListener('open-version-manager', handleOpenVersionManager);
 });
 </script>
 

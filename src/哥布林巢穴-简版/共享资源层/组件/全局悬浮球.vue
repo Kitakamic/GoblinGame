@@ -48,6 +48,10 @@
         <span class="icon">⛶</span>
         <span class="label">全屏</span>
       </button>
+      <button class="fab-menu-item" title="世界书管理" @click="openWorldbook">
+        <span class="icon">📖</span>
+        <span class="label">世界书</span>
+      </button>
     </div>
   </div>
 </template>
@@ -60,7 +64,7 @@ const fabRef = ref<HTMLElement | null>(null);
 const buttonRef = ref<HTMLElement | null>(null);
 
 // 通过自定义事件向上传递
-const emit = defineEmits(['open-settings', 'open-debug']);
+const emit = defineEmits(['open-settings', 'open-debug', 'open-worldbook']);
 
 // 位置状态
 const position = reactive<{
@@ -440,6 +444,14 @@ function toggleFullscreen() {
     document.exitFullscreen();
   }
   // 延迟关闭菜单
+  setTimeout(() => {
+    isCollapsed.value = true;
+  }, 300);
+}
+
+function openWorldbook() {
+  emit('open-worldbook');
+  // 延迟关闭菜单，让用户看到反馈
   setTimeout(() => {
     isCollapsed.value = true;
   }, 300);

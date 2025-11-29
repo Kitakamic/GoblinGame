@@ -6,6 +6,9 @@
     <button class="tab-button" :class="{ active: activeTab === 'resource' }" @click="$emit('tab-change', 'resource')">
       🏗️ 资源建筑
     </button>
+    <button class="tab-button" :class="{ active: activeTab === 'global' }" @click="$emit('tab-change', 'global')">
+      🌍 全局建筑
+    </button>
   </div>
 </template>
 
@@ -13,7 +16,7 @@
 // ==================== Props ====================
 
 interface Props {
-  activeTab: 'breeding' | 'resource';
+  activeTab: 'breeding' | 'resource' | 'global';
 }
 
 defineProps<Props>();
@@ -21,7 +24,7 @@ defineProps<Props>();
 // ==================== Emits ====================
 
 defineEmits<{
-  'tab-change': [tab: 'breeding' | 'resource'];
+  'tab-change': [tab: 'breeding' | 'resource' | 'global'];
 }>();
 </script>
 

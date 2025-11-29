@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - main
-      - feature/version-management
+      - newConstruction
     paths-ignore:
       - dist/**
   workflow_dispatch:

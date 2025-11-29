@@ -225,7 +225,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { MessageService } from '../../共享资源层/消息/消息服务';
 import { useMessageChat } from '../../共享资源层/消息/消息聊天';
 import ToastContainer from '../../共享资源层/组件/弹窗提示.vue';
@@ -239,7 +239,7 @@ import type { TrainingOption } from '../../功能模块层/调教/类型/调教�
 import { generateWithChainOfThought } from '../../核心层/服务/世界书管理/工具/AI生成助手';
 import { ChainOfThoughtMode } from '../../核心层/服务/世界书管理/工具/思维链管理器';
 import { WorldbookService } from '../../核心层/服务/世界书管理/服务/世界书服务';
-import { TrainingRecordManager } from '../../核心层/服务/世界书管理/管理器/调教记录管理器';
+import { TrainingRecordManager } from '../../核心层/服务/世界书管理/管理器/人物剧情/调教记录管理器';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
 import { TimeParseService } from '../../核心层/服务/通用服务/时间解析服务';
 import CharacterDetailModal from '../调教界面子页面/人物卡界面.vue';
@@ -566,8 +566,6 @@ onMounted(async () => {
 
   console.log('🚀 ========== 调教界面初始化完成 ==========');
 });
-
-onUnmounted(async () => {});
 
 // 构建AI提示词
 

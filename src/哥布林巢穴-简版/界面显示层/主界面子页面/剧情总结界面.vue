@@ -408,7 +408,7 @@ async function handleSummarize() {
 
       if (characterEntry) {
         // 解析对话记录
-        const { TrainingRecordManager } = await import('../../核心层/服务/世界书管理/管理器/调教记录管理器');
+        const { TrainingRecordManager } = await import('../../核心层/服务/世界书管理/管理器/人物剧情/调教记录管理器');
         const records = TrainingRecordManager.parseTrainingHistory(characterEntry.content || '');
 
         // 计算实际对话轮数（每轮 = 用户输入 + AI回复 = 2条）

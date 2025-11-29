@@ -94,7 +94,7 @@ interface Occupant {
 interface Props {
   slotData: BuildingSlot;
   index: number;
-  slotType: 'breeding' | 'resource';
+  slotType: 'breeding' | 'resource' | 'global';
   slotClasses: {
     occupied: boolean;
     empty: boolean;

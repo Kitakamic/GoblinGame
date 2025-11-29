@@ -18,6 +18,84 @@
           <button class="close-btn" @click="close">×</button>
         </div>
       </div>
+      <!-- 人物设置栏 -->
+      <div v-if="internalCharacter" class="character-settings-section">
+        <div class="character-settings-header" @click="isSettingsExpanded = !isSettingsExpanded">
+          <span class="settings-header-icon">⚙️</span>
+          <span class="settings-header-text">人物设置</span>
+          <span class="settings-expand-icon" :class="{ expanded: isSettingsExpanded }">▼</span>
+        </div>
+        <div v-show="isSettingsExpanded" class="character-settings-content">
+          <!-- 1. 指导风格主题 -->
+          <div class="setting-item">
+            <div class="setting-label">
+              <span class="label-icon">📝</span>
+              <span class="label-text">指导风格主题：</span>
+            </div>
+            <div class="setting-control">
+              <select v-model="selectedGuidelineThemeId" class="guideline-theme-select" @change="handleThemeChange">
+                <option value="">使用全局默认</option>
+                <option v-for="(theme, themeId) in guidelineThemes" :key="themeId" :value="themeId">
+                  {{ theme.name }}{{ themeId === defaultThemeId ? ' ⭐（全局默认）' : '' }}
+                </option>
+              </select>
+              <button class="refresh-theme-btn" title="刷新主题库" @click="refreshThemeLibrary">
+                <span class="btn-icon">🔄</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. 人物触发额外关键词 -->
+          <div class="setting-item">
+            <div class="setting-label">
+              <span class="label-icon">🔑</span>
+              <span class="label-text">触发额外关键词：</span>
+              <span class="label-desc">（额外的世界书触发关键词，多个关键词用逗号分隔）</span>
+            </div>
+            <div class="setting-control">
+              <input
+                v-model="secondaryKeysInput"
+                type="text"
+                class="secondary-keys-input"
+                placeholder="例如：女王,公主,角色昵称等"
+                @blur="handleSecondaryKeysChange"
+              />
+            </div>
+          </div>
+
+          <!-- 3. 设置为全局人物 -->
+          <div class="setting-item">
+            <div class="setting-label">
+              <span class="label-icon">🌐</span>
+              <span class="label-text">全局人物：</span>
+              <span class="label-desc">（设置角色设定世界书为总是触发，不依赖关键词）</span>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch">
+                <input v-model="isGlobalCharacter" type="checkbox" @change="handleGlobalCharacterChange" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">{{ isGlobalCharacter ? '是' : '否' }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 4. 人物剧情记录是否开启常量 -->
+          <div class="setting-item">
+            <div class="setting-label">
+              <span class="label-icon">📚</span>
+              <span class="label-text">剧情记录常量：</span>
+              <span class="label-desc">（设置人物剧情记录世界书为总是触发，不依赖关键词）</span>
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch">
+                <input v-model="isGlobalStoryHistory" type="checkbox" @change="handleGlobalStoryHistoryChange" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-label">{{ isGlobalStoryHistory ? '是' : '否' }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
       <div v-if="internalCharacter" class="modal-body">
         <div class="character-detail-content">
           <!-- 人物基础信息展示 -->
@@ -474,10 +552,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { AvatarSwitchService } from '../../功能模块层/人物管理/服务/头像切换服务';
 import type { Character } from '../../功能模块层/人物管理/类型/人物类型';
+import { WorldbookHelper } from '../../核心层/服务/世界书管理/工具/世界书助手';
+import type { GuidelineThemeLibrary } from '../../核心层/服务/世界书管理/工具/人物指导风格生成器';
+import { WorldbookService } from '../../核心层/服务/世界书管理/服务/世界书服务';
 import { modularSaveManager } from '../../核心层/服务/存档系统/模块化存档服务';
+import { toast } from '../../核心层/服务/通用服务/弹窗提示服务';
 import { TimeParseService } from '../../核心层/服务/通用服务/时间解析服务';
 import { BreedingService } from '../../核心层/服务/通用服务/生育服务';
 // 导入本地组件
@@ -523,6 +605,312 @@ const isClothingExpanded = ref(false);
 
 // JSON编辑器状态
 const showJsonEditor = ref(false);
+
+// 人物设置栏展开状态
+const isSettingsExpanded = ref(false);
+
+// 指导风格主题相关
+const guidelineThemes = ref<GuidelineThemeLibrary>({});
+const defaultThemeId = ref<string>('');
+const selectedGuidelineThemeId = ref<string>('');
+
+// 人物设置相关
+const secondaryKeysInput = ref<string>('');
+const isGlobalCharacter = ref<boolean>(false);
+const isGlobalStoryHistory = ref<boolean>(false);
+
+// 加载主题库
+const loadGuidelineThemes = () => {
+  try {
+    const globalVars = getVariables({ type: 'global' });
+    const themeLibraryKey = 'guideline_theme_library';
+    const defaultThemeKey = 'guideline_default_theme_id';
+
+    // 加载主题库
+    if (globalVars[themeLibraryKey] && typeof globalVars[themeLibraryKey] === 'object') {
+      guidelineThemes.value = globalVars[themeLibraryKey] as GuidelineThemeLibrary;
+    } else {
+      guidelineThemes.value = {};
+    }
+
+    // 加载全局默认主题ID
+    if (typeof globalVars[defaultThemeKey] === 'string') {
+      defaultThemeId.value = globalVars[defaultThemeKey];
+    } else {
+      defaultThemeId.value = '';
+    }
+  } catch (error) {
+    console.error('加载指导风格主题库失败:', error);
+    guidelineThemes.value = {};
+    defaultThemeId.value = '';
+  }
+};
+
+// 加载角色的主题ID
+const loadCharacterThemeId = () => {
+  if (internalCharacter.value) {
+    selectedGuidelineThemeId.value = internalCharacter.value.guidelineThemeId || '';
+  } else {
+    selectedGuidelineThemeId.value = '';
+  }
+};
+
+// 加载角色的其他设置
+const loadCharacterSettings = () => {
+  if (internalCharacter.value) {
+    // 加载额外关键词
+    secondaryKeysInput.value = internalCharacter.value.worldbookSecondaryKeys?.join(', ') || '';
+    // 加载全局人物设置
+    isGlobalCharacter.value = internalCharacter.value.isGlobalCharacter || false;
+    // 加载剧情记录常量设置
+    isGlobalStoryHistory.value = internalCharacter.value.isGlobalStoryHistory || false;
+  } else {
+    secondaryKeysInput.value = '';
+    isGlobalCharacter.value = false;
+    isGlobalStoryHistory.value = false;
+  }
+};
+
+// 刷新主题库
+const refreshThemeLibrary = () => {
+  loadGuidelineThemes();
+  // 确保当前选中的主题ID仍然有效
+  if (selectedGuidelineThemeId.value && !guidelineThemes.value[selectedGuidelineThemeId.value]) {
+    // 如果选中的主题不存在了，清空选择
+    selectedGuidelineThemeId.value = '';
+    if (internalCharacter.value) {
+      internalCharacter.value.guidelineThemeId = undefined;
+    }
+  }
+  toast.success('已刷新主题库', { title: '刷新成功' });
+  console.log('✅ 已刷新指导风格主题库');
+};
+
+// 处理主题变更
+const handleThemeChange = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 更新角色的主题ID
+    internalCharacter.value.guidelineThemeId = selectedGuidelineThemeId.value || undefined;
+
+    const themeName = selectedGuidelineThemeId.value
+      ? guidelineThemes.value[selectedGuidelineThemeId.value]?.name || ''
+      : '全局默认';
+
+    await saveCharacterSettings('指导风格主题');
+
+    toast.success(
+      selectedGuidelineThemeId.value
+        ? `已为 ${internalCharacter.value.name} 设置指导风格主题：${themeName}`
+        : `已清除 ${internalCharacter.value.name} 的指导风格主题，将使用全局默认`,
+      { title: '设置成功' },
+    );
+  } catch (error) {
+    console.error('保存指导风格主题失败:', error);
+    toast.error('保存指导风格主题失败', { title: '错误' });
+    // 恢复原值
+    loadCharacterThemeId();
+  }
+};
+
+// 处理额外关键词变更
+const handleSecondaryKeysChange = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 解析输入的关键词（用逗号分隔，去除空格）
+    const keys = secondaryKeysInput.value
+      .split(',')
+      .map(key => key.trim())
+      .filter(key => key.length > 0);
+
+    // 更新角色的额外关键词
+    internalCharacter.value.worldbookSecondaryKeys = keys.length > 0 ? keys : undefined;
+
+    await saveCharacterSettings('额外关键词');
+    // 更新剧情记录条目的 strategy
+    await updateStoryHistoryEntryStrategy();
+  } catch (error) {
+    console.error('保存额外关键词失败:', error);
+    toast.error('保存额外关键词失败', { title: '错误' });
+    // 恢复原值
+    loadCharacterSettings();
+  }
+};
+
+// 处理全局人物设置变更
+const handleGlobalCharacterChange = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 更新角色的全局人物设置
+    internalCharacter.value.isGlobalCharacter = isGlobalCharacter.value || undefined;
+
+    await saveCharacterSettings('全局人物设置');
+  } catch (error) {
+    console.error('保存全局人物设置失败:', error);
+    toast.error('保存全局人物设置失败', { title: '错误' });
+    // 恢复原值
+    loadCharacterSettings();
+  }
+};
+
+// 处理剧情记录常量设置变更
+const handleGlobalStoryHistoryChange = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 更新角色的剧情记录常量设置
+    internalCharacter.value.isGlobalStoryHistory = isGlobalStoryHistory.value || undefined;
+
+    await saveCharacterSettings('剧情记录常量设置');
+    // 更新剧情记录条目的 strategy
+    await updateStoryHistoryEntryStrategy();
+  } catch (error) {
+    console.error('保存剧情记录常量设置失败:', error);
+    toast.error('保存剧情记录常量设置失败', { title: '错误' });
+    // 恢复原值
+    loadCharacterSettings();
+  }
+};
+
+// 更新剧情记录条目的 strategy（当额外关键词或全局常量设置改变时）
+const updateStoryHistoryEntryStrategy = async () => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 使用 modularSaveManager 获取当前世界书名称
+    const worldbookName = modularSaveManager.getCurrentWorldbookName();
+    await WorldbookHelper.ensureExists(worldbookName);
+    const worldbook = await WorldbookHelper.get(worldbookName);
+
+    console.log(
+      `🔍 查找剧情记录条目: characterId=${internalCharacter.value.id}, characterName=${internalCharacter.value.name}`,
+    );
+    console.log(`📚 世界书名称: ${worldbookName}, 条目数量: ${worldbook.length}`);
+
+    // 尝试通过 character_id 或 character_name 匹配
+    const historyEntryIndex = WorldbookHelper.findEntryIndex(
+      worldbook,
+      entry =>
+        entry.extra?.entry_type === 'character_story_history' &&
+        (entry.extra?.character_id === internalCharacter.value!.id ||
+          entry.extra?.character_id === internalCharacter.value!.name ||
+          entry.extra?.character_name === internalCharacter.value!.name),
+    );
+
+    if (historyEntryIndex !== -1) {
+      const existingEntry = worldbook[historyEntryIndex];
+      const secondaryKeys = internalCharacter.value.worldbookSecondaryKeys || [];
+      const isGlobal = internalCharacter.value.isGlobalStoryHistory || false;
+
+      console.log(`📝 找到条目，当前 strategy.type=${existingEntry.strategy.type}`);
+      console.log(`🔧 将更新为: type=${isGlobal ? 'constant' : 'selective'}, secondaryKeys=${secondaryKeys.join(',')}`);
+
+      const strategyType = isGlobal ? 'constant' : 'selective';
+      // 主关键词始终包含人物名称和身份，不受 isGlobalStoryHistory 影响
+      const primaryKeys = [internalCharacter.value.name, internalCharacter.value.title || '角色'];
+
+      worldbook[historyEntryIndex] = {
+        ...existingEntry,
+        strategy: {
+          ...existingEntry.strategy,
+          type: strategyType,
+          keys: primaryKeys,
+          keys_secondary: {
+            ...existingEntry.strategy.keys_secondary,
+            keys: secondaryKeys,
+          },
+        },
+        extra: {
+          ...existingEntry.extra,
+          updated_at: new Date().toISOString(),
+        },
+      };
+
+      await WorldbookHelper.replace(worldbookName, worldbook);
+      console.log(`✅ 已更新剧情记录条目的 strategy (${internalCharacter.value.name}): type=${strategyType}`);
+    } else {
+      console.log(
+        `ℹ️ 角色 ${internalCharacter.value.name} (ID: ${internalCharacter.value.id}) 还没有剧情记录条目，将在创建时应用设置`,
+      );
+      // 列出所有剧情记录条目以便调试
+      const allHistoryEntries = worldbook.filter(entry => entry.extra?.entry_type === 'character_story_history');
+      console.log(
+        `📋 当前世界书中的剧情记录条目:`,
+        allHistoryEntries.map(e => ({
+          name: e.name,
+          character_id: e.extra?.character_id,
+          character_name: e.extra?.character_name,
+        })),
+      );
+    }
+  } catch (error) {
+    console.error('更新剧情记录条目 strategy 失败:', error);
+    // 不抛出错误，避免影响主流程
+  }
+};
+
+// 保存人物设置（通用方法）
+const saveCharacterSettings = async (settingName: string) => {
+  if (!internalCharacter.value) return;
+
+  try {
+    // 保存到存档
+    const trainingData = modularSaveManager.getModuleData({ moduleName: 'training' }) as any;
+    const characters = (trainingData?.characters || []) as Character[];
+
+    const updatedCharacters = characters.map(char => {
+      if (char.id === internalCharacter.value!.id) {
+        return { ...internalCharacter.value! };
+      }
+      return char;
+    });
+
+    modularSaveManager.updateModuleData({
+      moduleName: 'training',
+      data: {
+        ...trainingData,
+        characters: updatedCharacters,
+      },
+    });
+
+    // 保存到数据库
+    await modularSaveManager.saveCurrentGameData(0);
+
+    // 更新世界书中的角色条目（包含 strategy 设置）
+    console.log('📚 更新世界书中的角色条目（包含 strategy 设置）...');
+    await WorldbookService.updateCharacterEntry(internalCharacter.value);
+    console.log('✅ 世界书中的角色条目已更新');
+
+    // 通知父组件更新
+    emit('character-updated', internalCharacter.value);
+
+    toast.success(`已保存${settingName}`, { title: '设置成功' });
+    console.log(`✅ 已更新角色 ${internalCharacter.value.name} 的${settingName}`);
+  } catch (error) {
+    console.error(`保存${settingName}失败:`, error);
+    throw error;
+  }
+};
+
+// 组件挂载时加载主题库和设置
+onMounted(() => {
+  loadGuidelineThemes();
+  // 加载角色的所有设置（确保主题库已加载后再加载角色设置）
+  loadCharacterThemeId();
+  loadCharacterSettings();
+});
+
+// 监听角色变化，更新所有设置
+watch(
+  () => internalCharacter.value,
+  () => {
+    loadCharacterThemeId();
+    loadCharacterSettings();
+  },
+);
 
 // 打开JSON编辑器
 const openJsonEditor = () => {
@@ -1729,6 +2117,11 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
       transition: all 0.3s ease;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
       margin-right: 4px;
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      min-height: 32px;
+      box-sizing: border-box;
 
       &:hover {
         background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(139, 69, 19, 0.4));
@@ -1738,8 +2131,12 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
       }
 
       .btn-icon {
-        font-size: 12px;
+        font-size: 14px;
         opacity: 0.9;
+        line-height: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
       }
     }
 
@@ -2344,6 +2741,256 @@ const formatCapturedTime = (capturedAt?: Date | string): string => {
                 line-height: 1.2;
               }
             }
+          }
+        }
+      }
+    }
+  }
+}
+
+// 人物设置栏样式
+.character-settings-section {
+  background: rgba(40, 26, 20, 0.4);
+  border-bottom: 1px solid rgba(205, 133, 63, 0.3);
+  border-top: 1px solid rgba(205, 133, 63, 0.3);
+  margin-bottom: 0;
+
+  .character-settings-header {
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(40, 26, 20, 0.5);
+    }
+
+    .settings-header-icon {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .settings-header-text {
+      color: #ffd7a1;
+      font-size: 13px;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .settings-expand-icon {
+      font-size: 10px;
+      color: #cd853f;
+      transition: transform 0.2s ease;
+      opacity: 0.7;
+
+      &.expanded {
+        transform: rotate(180deg);
+      }
+    }
+  }
+
+  .character-settings-content {
+    padding: 12px 16px;
+    border-top: 1px solid rgba(205, 133, 63, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    .setting-item {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .setting-label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+
+        .label-icon {
+          font-size: 13px;
+          opacity: 0.9;
+        }
+
+        .label-text {
+          color: #ffd7a1;
+          font-size: 12px;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+
+        .label-desc {
+          color: #9ca3af;
+          font-size: 10px;
+          font-style: italic;
+          margin-left: 4px;
+        }
+      }
+
+      .setting-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+
+        .guideline-theme-select {
+          flex: 1;
+          min-width: 200px;
+          padding: 6px 10px;
+          background: rgba(25, 17, 14, 0.6);
+          border: 1px solid rgba(205, 133, 63, 0.4);
+          border-radius: 6px;
+          color: #f0e6d2;
+          font-size: 11px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+
+          &:hover {
+            border-color: rgba(205, 133, 63, 0.6);
+            background: rgba(25, 17, 14, 0.8);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+
+          &:focus {
+            outline: none;
+            border-color: rgba(205, 133, 63, 0.6);
+            box-shadow:
+              0 0 4px rgba(205, 133, 63, 0.3),
+              0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+
+          option {
+            background: rgba(40, 26, 20, 0.95);
+            color: #f0e6d2;
+            padding: 8px;
+          }
+        }
+
+        .secondary-keys-input {
+          flex: 1;
+          min-width: 200px;
+          padding: 6px 10px;
+          background: rgba(25, 17, 14, 0.6);
+          border: 1px solid rgba(205, 133, 63, 0.4);
+          border-radius: 6px;
+          color: #f0e6d2;
+          font-size: 11px;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+
+          &::placeholder {
+            color: rgba(156, 163, 175, 0.6);
+          }
+
+          &:hover {
+            border-color: rgba(205, 133, 63, 0.6);
+            background: rgba(25, 17, 14, 0.8);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+
+          &:focus {
+            outline: none;
+            border-color: rgba(205, 133, 63, 0.6);
+            box-shadow:
+              0 0 4px rgba(205, 133, 63, 0.3),
+              0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+        }
+
+        .refresh-theme-btn {
+          background: linear-gradient(135deg, rgba(205, 133, 63, 0.2), rgba(139, 69, 19, 0.3));
+          border: 1px solid rgba(205, 133, 63, 0.4);
+          color: #ffd7a1;
+          border-radius: 6px;
+          padding: 6px 8px;
+          cursor: pointer;
+          font-size: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+          flex-shrink: 0;
+
+          &:hover {
+            background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(139, 69, 19, 0.4));
+            border-color: rgba(205, 133, 63, 0.6);
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+          }
+
+          &:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+          }
+
+          .btn-icon {
+            font-size: 13px;
+            opacity: 0.9;
+            transition: transform 0.2s ease;
+          }
+
+          &:hover .btn-icon {
+            transform: rotate(180deg);
+          }
+        }
+
+        // 开关样式
+        .toggle-switch {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          user-select: none;
+
+          input[type='checkbox'] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+          }
+
+          .toggle-slider {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            background: rgba(107, 114, 128, 0.5);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(156, 163, 175, 0.3);
+
+            &::before {
+              content: '';
+              position: absolute;
+              width: 18px;
+              height: 18px;
+              left: 2px;
+              top: 2px;
+              background: #f0e6d2;
+              border-radius: 50%;
+              transition: all 0.3s ease;
+              box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            }
+          }
+
+          input[type='checkbox']:checked + .toggle-slider {
+            background: rgba(34, 197, 94, 0.6);
+            border-color: rgba(34, 197, 94, 0.4);
+
+            &::before {
+              transform: translateX(20px);
+              background: #fff;
+            }
+          }
+
+          .toggle-label {
+            color: #f0e6d2;
+            font-size: 12px;
+            font-weight: 500;
           }
         }
       }

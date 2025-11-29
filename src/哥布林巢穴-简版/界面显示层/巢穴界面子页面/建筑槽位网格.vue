@@ -56,7 +56,7 @@ interface Occupant {
 
 interface Props {
   slots: BuildingSlot[];
-  slotType: 'breeding' | 'resource';
+  slotType: 'breeding' | 'resource' | 'global';
   getSlotCost: (index: number) => SlotCost;
   isNextUnlockSlot: (index: number) => boolean;
   getOccupant?: (index: number) => Occupant | null;
