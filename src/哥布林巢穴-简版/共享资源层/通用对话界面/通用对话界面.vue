@@ -123,22 +123,25 @@
     <div v-if="showCustomInputPanel && dialogueConfig.showCustomInput === true" class="custom-input-overlay">
       <div class="custom-input-panel" @click.stop>
         <div class="custom-input-header">
-          <h3>自定义输入</h3>
+          <h3>{{ isRetryMode ? '重新生成AI回复' : '自定义输入' }}</h3>
           <button class="close-panel-btn" @click="closeCustomInputPanel">✕</button>
         </div>
         <div class="custom-input-body">
+          <p v-if="isRetryMode" style="color: #f0e6d2; margin-bottom: 12px; font-size: 14px">
+            你可以编辑输入内容，然后确认重新生成：
+          </p>
           <textarea
             v-model="customOptionText"
             class="custom-input-textarea"
             :placeholder="customPlaceholder"
             :disabled="isSending"
-            rows="5"
+            :rows="isRetryMode ? 8 : 5"
             @keydown.enter.exact="submitCustomOption"
           ></textarea>
         </div>
         <div class="custom-input-footer">
           <button class="submit-btn" :disabled="!customOptionText.trim() || isSending" @click="submitCustomOption">
-            {{ isSending ? '发送中...' : '发送' }}
+            {{ isSending ? (isRetryMode ? '生成中...' : '发送中...') : isRetryMode ? '确认重新生成' : '发送' }}
           </button>
         </div>
       </div>
@@ -301,10 +304,12 @@ const appendChoiceToCurrentPage = (text: string) => {
 const customOptionText = ref('');
 const customPlaceholder = props.dialogueConfig.customPlaceholder || '输入你的选择…';
 const showCustomInputPanel = ref(false);
+const isRetryMode = ref(false); // 是否为重新生成模式
 
 // 打开自定义输入面板
 const openCustomInputPanel = () => {
   if (isSending.value || props.dialogueConfig.showCustomInput === false) return;
+  isRetryMode.value = false;
   showCustomInputPanel.value = true;
   nextTick(() => {
     const input = document.querySelector('.custom-input-panel textarea') as HTMLTextAreaElement;
@@ -318,11 +323,27 @@ const openCustomInputPanel = () => {
 const closeCustomInputPanel = () => {
   showCustomInputPanel.value = false;
   customOptionText.value = '';
+  isRetryMode.value = false;
 };
 
 const submitCustomOption = async () => {
+  console.log('🎯 submitCustomOption 被调用');
   const text = customOptionText.value.trim();
+  console.log('📝 输入文本:', text, 'isSending:', isSending.value, 'isRetryMode:', isRetryMode.value);
   if (!text || isSending.value) return;
+
+  // 如果是重新生成模式，执行重新生成逻辑
+  if (isRetryMode.value) {
+    // 更新用户输入
+    lastUserInput.value = text;
+
+    // 关闭输入面板
+    closeCustomInputPanel();
+
+    // 执行实际的重新生成逻辑
+    await performRetryAIGeneration();
+    return;
+  }
 
   // 关闭输入面板
   closeCustomInputPanel();
@@ -724,9 +745,40 @@ const savePendingDialogue = async () => {
   }
 };
 
-// 重试AI生成
-const retryAIGeneration = async () => {
-  console.log('🔄 用户点击重试按钮，重新生成AI回复');
+// 打开重新生成对话框（使用自定义输入面板）
+const openRetryDialog = async () => {
+  if (isSending.value) return;
+
+  console.log('🔄 打开重新生成对话框');
+
+  // 加载之前的用户输入
+  if (lastUserInput.value) {
+    customOptionText.value = lastUserInput.value;
+  } else {
+    // 如果没有之前的输入，尝试从最后一条用户消息获取
+    const lastUserIndex = messages.value.findLastIndex(msg => msg.role === 'user');
+    if (lastUserIndex >= 0) {
+      customOptionText.value = messages.value[lastUserIndex].content;
+    } else {
+      customOptionText.value = '';
+    }
+  }
+
+  isRetryMode.value = true;
+  showCustomInputPanel.value = true;
+  await nextTick();
+  // 聚焦到输入框
+  const input = document.querySelector('.custom-input-panel textarea') as HTMLTextAreaElement;
+  if (input) {
+    input.focus();
+    // 将光标移动到末尾
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+};
+
+// 执行实际的重新生成逻辑
+const performRetryAIGeneration = async () => {
+  console.log('🔄 开始重新生成AI回复');
 
   // 清除暂存的AI回复
   currentDialoguePair.value = null;
@@ -734,6 +786,52 @@ const retryAIGeneration = async () => {
   // 清空上次生成的选项
   options.value = [];
   saveCurrentOptions(); // 清除保存的选项
+
+  // 更新最后一条用户消息的内容（如果用户修改了输入）
+  const lastUserIndex = messages.value.findLastIndex(msg => msg.role === 'user');
+  if (lastUserIndex >= 0) {
+    messages.value[lastUserIndex].content = lastUserInput.value;
+    console.log('🔄 已更新最后一条用户消息:', lastUserInput.value);
+  }
+
+  // 先更新页面中显示的用户选择内容（在删除页面之前）
+  // 找到包含用户选择的页面并更新
+  let pageToUpdate = -1;
+  // 首先尝试找到最后生成的页面（如果它包含用户选择）
+  if (lastGeneratedPageIndex.value >= 0 && lastGeneratedPageIndex.value < pages.value.length) {
+    const page = pages.value[lastGeneratedPageIndex.value];
+    if (page.html && page.html.includes('choice-line')) {
+      pageToUpdate = lastGeneratedPageIndex.value;
+    }
+  }
+
+  // 如果最后生成的页面不包含用户选择，从后往前找第一个包含 choice-line 的页面
+  if (pageToUpdate < 0) {
+    for (let i = pages.value.length - 1; i >= 0; i--) {
+      const page = pages.value[i];
+      if (page.html && page.html.includes('choice-line')) {
+        pageToUpdate = i;
+        break;
+      }
+    }
+  }
+
+  // 更新找到的页面中的用户选择内容
+  if (pageToUpdate >= 0) {
+    const page = pages.value[pageToUpdate];
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = page.html;
+
+    // 查找并更新用户选择部分
+    const choiceLine = tempDiv.querySelector('.choice-line');
+    if (choiceLine) {
+      // 替换 choice-line 的内容
+      choiceLine.innerHTML = `<span class="choice-prefix">→</span> ${safeFormatMessage(lastUserInput.value)}`;
+      // 更新页面HTML
+      page.html = tempDiv.innerHTML;
+      console.log('🔄 已更新页面中的用户选择内容（页面索引:', pageToUpdate, '）:', lastUserInput.value);
+    }
+  }
 
   // 删除最后一次生成创建的页面（如果存在）
   if (lastGeneratedPageIndex.value >= 0 && lastGeneratedPageIndex.value < pages.value.length) {
@@ -782,8 +880,13 @@ const retryAIGeneration = async () => {
     }
   }
 
-  // 重新生成
+  // 重新生成（会使用更新后的 lastUserInput.value）
   await generateAndHandleAIReply();
+};
+
+// 重试AI生成（打开对话框）
+const retryAIGeneration = async () => {
+  await openRetryDialog();
 };
 
 const closeDialogue = async () => {
