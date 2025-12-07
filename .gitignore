@@ -1,4 +1,5 @@
 node_modules
+<<<<<<< HEAD
 imageGenerate
 scripts
 otherfiles
@@ -6,6 +7,8 @@ otherfiles
 .kilocode
 .vscode
 @types
+=======
+>>>>>>> 98077453194bdd416e9ea009fc17319ae1e483ca
 
 .DS_Store
 Thumbs.db
@@ -14,4 +17,9 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
+pnpm-debug.log*<<<<<<< HEAD
+=======
+
+auto-imports.d.ts
+components.d.ts
+>>>>>>> 98077453194bdd416e9ea009fc17319ae1e483ca
